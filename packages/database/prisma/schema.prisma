@@ -1,0 +1,1338 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrganisationType {
+  DRIVER
+  TEAM
+  AGENCY
+  COMMERCIAL_ORGANISATION
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  COMMERCIAL_OPERATOR
+  REVIEWER
+  READ_ONLY
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum OutreachStrategy {
+  LINKEDIN_FIRST
+  EMAIL_FIRST
+  PARALLEL
+  MANUAL
+  CUSTOM
+}
+
+enum EmailAutomationMode {
+  MANUAL
+  DRAFT_ONLY
+  APPROVED_AUTOMATIC
+  FULL_AUTOMATION
+}
+
+enum ApprovalMode {
+  EVERY_MESSAGE
+  INITIAL_ONLY
+  HIGH_VALUE_ONLY
+  NONE
+}
+
+enum TargetMarketType {
+  HOME
+  COMPETITION
+  AUDIENCE
+  EXPANSION
+  SPONSOR_TARGET
+}
+
+enum DiscoveryBriefStatus {
+  NEVER_RUN
+  RUNNING
+  COMPLETED
+  FAILED
+  PAUSED
+}
+
+enum ResearchStatus {
+  UNRESEARCHED
+  RESEARCHING
+  RESEARCHED
+  NEED_REVIEW
+}
+
+enum ContactDiscoveryStatus {
+  NOT_STARTED
+  SEARCHING
+  CONTACTS_FOUND
+  NEEDS_MANUAL_SEARCH
+}
+
+enum CommercialStage {
+  DISCOVERED
+  QUALIFIED
+  OUTREACH
+  CONVERSATION
+  OPPORTUNITY
+  WON
+  LOST
+  PAUSED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ContactStatus {
+  NOT_CONTACTED
+  CONTACTED
+  REPLIED
+  MEETING_SCHEDULED
+  ACTIVE_CONVERSATION
+  UNRESPONSIVE
+}
+
+enum Department {
+  PARTNERSHIPS
+  MARKETING
+  COMMERCIAL
+  SALES
+  EXECUTIVE
+  MANAGEMENT
+  OTHER
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PUBLICLY_LISTED
+  EMAIL_VERIFIED
+  OUTDATED
+}
+
+enum ContactPriority {
+  PRIMARY
+  SECONDARY
+  BACKUP
+}
+
+enum PreferredChannel {
+  EMAIL
+  LINKEDIN
+  PHONE
+  EMAIL_AND_LINKEDIN
+  UNKNOWN
+}
+
+enum EchoStatus {
+  NOT_STARTED
+  QUEUED
+  DRAFTING
+  DRAFT_READY
+  APPROVED
+  SENT
+  PAUSED
+  FAILED
+}
+
+enum DraftStatus {
+  NOT_STARTED
+  GENERATING
+  DRAFT_READY
+  NEEDS_REVISION
+  APPROVED
+  SENT
+  FAILED
+}
+
+enum ApprovalStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_CHANGES
+}
+
+enum LinkedInStatus {
+  NOT_STARTED
+  CONNECTION_SENT
+  ACCEPTED
+  FOLLOW_UP_SENT
+  REPLIED
+  NO_RESPONSE
+  PAUSED
+  NOT_INTERESTED
+}
+
+enum EmailStatus {
+  NOT_STARTED
+  DRAFT_CREATED
+  QUEUED
+  SENT
+  REPLIED
+  PAUSED
+  FAILED
+  BOUNCED
+  SUPPRESSED
+}
+
+enum AgentName {
+  ATLAS
+  SAGE
+  RELAY
+  ECHO
+  PULSE
+  SENTINEL
+  NOVA
+  FORGE
+  SEAL
+  ORBIT
+  BEACON
+  LEDGER
+  CONTROL
+  THROTTLE
+}
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AutomationJobStatus {
+  QUEUED
+  DISPATCHED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  DEAD_LETTER
+}
+
+enum SourceType {
+  PUBLIC_WEB
+  COMPANY_WEBSITE
+  LINKEDIN
+  GOOGLE_SEARCH
+  REFERRAL
+  TRADE_SHOW
+  INDUSTRY_ASSOCIATION
+  EXISTING_SPONSOR
+  APOLLO
+  CLAY
+  PERSONAL_NETWORK
+  MANUAL
+  AIRTABLE_MIGRATION
+  AI_GENERATED
+  SYSTEM_GENERATED
+  GMAIL
+}
+
+enum ChannelType {
+  LINKEDIN
+  EMAIL
+  PHONE
+}
+
+enum ChannelActionStatus {
+  NOT_STARTED
+  READY
+  QUEUED
+  SENT
+  ACCEPTED
+  FOLLOW_UP_DUE
+  REPLIED
+  NO_RESPONSE
+  PAUSED
+  FAILED
+  NOT_INTERESTED
+  BOUNCED
+  SUPPRESSED
+}
+
+enum InteractionDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum OpportunityStage {
+  INTERESTED
+  DISCOVERY_CALL
+  NEEDS_ANALYSIS
+  PROPOSAL_REQUESTED
+  PROPOSAL_SENT
+  NEGOTIATION
+  VERBAL_AGREEMENT
+  WON
+  LOST
+  ON_HOLD
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskType {
+  MANUAL_ACTION
+  LINKEDIN_ACTION
+  EMAIL_ACTION
+  FOLLOW_UP
+  MEETING_PREP
+  PROPOSAL
+  DATA_REVIEW
+  AUTOMATION_RETRY
+}
+
+enum IntegrationProvider {
+  GMAIL
+  GOOGLE_CALENDAR
+  OPENAI
+  SEARCH_PROVIDER
+  SLACK
+  WHATSAPP
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  CONNECTED
+  EXPIRED
+  ERROR
+}
+
+enum SuppressionReason {
+  OPT_OUT
+  BOUNCED
+  INVALID_ADDRESS
+  USER_SUPPRESSED
+  LEGAL_RESTRICTION
+  ACTIVE_CONVERSATION
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  APPROVE
+  REJECT
+  LOGIN
+  LOGOUT
+  INTEGRATION_CONNECT
+  INTEGRATION_DISCONNECT
+  AUTOMATION_RUN
+  EMAIL_SEND
+}
+
+model User {
+  id             String                   @id @default(uuid()) @db.Uuid
+  email          String                   @unique
+  passwordHash   String
+  name           String
+  status         UserStatus               @default(ACTIVE)
+  emailVerifiedAt DateTime?               @db.Timestamptz(3)
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime                 @updatedAt @db.Timestamptz(3)
+  memberships    OrganisationMembership[]
+  authSessions   AuthSession[]
+  createdCompanies Company[]              @relation("CompanyCreatedBy")
+  createdContacts Contact[]                @relation("ContactCreatedBy")
+  auditLogs      AuditLog[]
+  approvals      ApprovalEvent[]
+  invitationsSent OrganisationInvitation[] @relation("OrganisationInvitationInvitedBy")
+  invitationsAccepted OrganisationInvitation[] @relation("OrganisationInvitationAcceptedBy")
+}
+
+model Organisation {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String                   @unique
+  type                OrganisationType         @default(DRIVER)
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
+  memberships         OrganisationMembership[]
+  driverProfile       DriverProfile?
+  onboardingResponses OnboardingResponse[]
+  outreachPolicy      OutreachPolicy?
+  targetMarkets       TargetMarket[]
+  discoveryPreference DiscoveryPreference?
+  discoveryBriefs     DiscoveryBrief[]
+  companies           Company[]
+  contacts            Contact[]
+  evidenceSources     EvidenceSource[]
+  outreachRecords     OutreachRecord[]
+  channelActions      ChannelAction[]
+  emailMessages       EmailMessage[]
+  suppressions        SuppressionEntry[]
+  opportunities       Opportunity[]
+  interactions        Interaction[]
+  tasks               Task[]
+  meetings            Meeting[]
+  proposals           Proposal[]
+  agentRuns           AgentRun[]
+  automationJobs      AutomationJob[]
+  jobOutbox            JobOutbox[]
+  promptVersions      PromptVersion[]
+  statusHistory       StatusHistory[]
+  auditLogs           AuditLog[]
+  usageLedger         UsageLedger[]
+  integrationAccounts IntegrationAccount[]
+  leadSources         LeadSource[]
+  authSessions        AuthSession[]
+  invitations         OrganisationInvitation[]
+}
+
+model OrganisationMembership {
+  id             String         @id @default(uuid()) @db.Uuid
+  organisationId String         @db.Uuid
+  userId         String         @db.Uuid
+  role           MembershipRole @default(COMMERCIAL_OPERATOR)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, userId])
+  @@index([userId])
+}
+
+model AuthSession {
+  id                   String        @id @default(uuid()) @db.Uuid
+  userId               String        @db.Uuid
+  activeOrganisationId String?       @db.Uuid
+  tokenHash            String        @unique
+  expiresAt            DateTime      @db.Timestamptz(3)
+  revokedAt            DateTime?     @db.Timestamptz(3)
+  userAgent            String?
+  ipAddress            String?
+  createdAt            DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganisation   Organisation? @relation(fields: [activeOrganisationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([activeOrganisationId])
+}
+
+model OrganisationInvitation {
+  id               String           @id @default(uuid()) @db.Uuid
+  organisationId   String           @db.Uuid
+  email            String
+  role             MembershipRole   @default(COMMERCIAL_OPERATOR)
+  tokenHash        String           @unique
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime         @db.Timestamptz(3)
+  invitedByUserId  String           @db.Uuid
+  acceptedByUserId String?          @db.Uuid
+  acceptedAt       DateTime?        @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
+  organisation     Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  invitedBy        User             @relation("OrganisationInvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy       User?            @relation("OrganisationInvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organisationId, status])
+  @@index([email, status])
+  @@index([expiresAt])
+}
+
+model DriverProfile {
+  id                     String           @id @default(uuid()) @db.Uuid
+  tenantId               String           @unique @db.Uuid
+  athleteName            String?
+  sport                   String?
+  currentSeries           String?
+  currentTeam             String?
+  competitionLevel        String?
+  nationality             String?
+  countryOfResidence      String?
+  homeRegion              String?
+  racingHistory           String?
+  achievements            String?
+  currentProgramme        String?
+  futureGoals             String?
+  personalStory           String?
+  differentiators         String?
+  sponsorshipTargetMinor  Int?
+  minimumDealMinor        Int?
+  maximumDealMinor        Int?
+  currency                String           @default("GBP")
+  fundingDeadline         DateTime?        @db.Timestamptz(3)
+  existingSponsors        Json?
+  excludedBrands          Json?
+  audienceSummary         String?
+  audienceGeography       Json?
+  socialProfiles          Json?
+  sponsorshipInventory    Json?
+  tone                     String?
+  preferredLanguages      Json?
+  onboardingStatus        OnboardingStatus @default(NOT_STARTED)
+  profileVersion          Int              @default(1)
+  source                   SourceType       @default(MANUAL)
+  createdAt                DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime         @updatedAt @db.Timestamptz(3)
+  tenant                   Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model OnboardingResponse {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @db.Uuid
+  userId      String       @db.Uuid
+  version     Int          @default(1)
+  responses   Json
+  completedAt DateTime?    @db.Timestamptz(3)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  tenant      Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+}
+
+model OutreachPolicy {
+  id                          String              @id @default(uuid()) @db.Uuid
+  tenantId                    String              @unique @db.Uuid
+  strategy                    OutreachStrategy    @default(LINKEDIN_FIRST)
+  emailAutomationMode         EmailAutomationMode @default(APPROVED_AUTOMATIC)
+  approvalMode                ApprovalMode        @default(EVERY_MESSAGE)
+  dailyEmailLimit             Int                 @default(20)
+  allowedSendingDays          Json                @default("[1,2,3,4,5]")
+  sendingWindowStart          String              @default("09:00")
+  sendingWindowEnd            String              @default("17:00")
+  timezone                    String              @default("UTC")
+  delayBetweenMessagesSeconds Int                 @default(120)
+  emailFollowUpCount          Int                 @default(2)
+  firstFollowUpDelayDays      Int                 @default(5)
+  secondFollowUpDelayDays     Int                 @default(7)
+  linkedinAcceptanceDelayDays Int                 @default(1)
+  linkedinNoResponseDelayDays Int                 @default(5)
+  stopOnReply                 Boolean             @default(true)
+  stopOnMeeting               Boolean             @default(true)
+  stopOnOptOut                Boolean             @default(true)
+  simultaneousCompanyContacts Int                 @default(1)
+  highValueApprovalMinor      Int?
+  createdAt                   DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt                   DateTime             @updatedAt @db.Timestamptz(3)
+  tenant                      Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model TargetMarket {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @db.Uuid
+  country   String
+  region    String           @default("")
+  type      TargetMarketType
+  priority  Int              @default(3)
+  rationale String?
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
+  tenant    Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, country, region, type])
+  @@index([tenantId, active])
+}
+
+model DiscoveryPreference {
+  id                     String       @id @default(uuid()) @db.Uuid
+  tenantId               String       @unique @db.Uuid
+  preferredIndustries    Json?
+  excludedIndustries     Json?
+  preferredCompanySizes  Json?
+  preferredCompanyTypes  Json?
+  b2bPreference          String?
+  localRegionalGlobal    String?
+  existingSponsorConflicts Json?
+  realisticTargetRule    String?
+  createdAt              DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime     @updatedAt @db.Timestamptz(3)
+  tenant                 Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model DiscoveryBrief {
+  id                    String               @id @default(uuid()) @db.Uuid
+  tenantId              String               @db.Uuid
+  briefName             String
+  active                Boolean              @default(false)
+  region                String
+  industryFocus         String
+  searchTheme           String
+  companiesPerRun       Int                  @default(5)
+  lastRunAt             DateTime?            @db.Timestamptz(3)
+  lastRunStatus         DiscoveryBriefStatus @default(NEVER_RUN)
+  lastResultCount       Int                  @default(0)
+  atlasNotes            String?
+  notes                 String?
+  generatedFromOnboarding Boolean            @default(false)
+  generationReason      String?
+  driverProfileVersion  Int?
+  geographicalRationale String?
+  source                SourceType           @default(MANUAL)
+  createdById           String?              @db.Uuid
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+  tenant                Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companies             Company[]
+  agentRuns             AgentRun[]
+
+  @@index([tenantId, active])
+  @@index([tenantId, lastRunStatus])
+}
+
+model Company {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  tenantId               String                 @db.Uuid
+  companyName            String
+  industries             String?
+  country                String?
+  website                String
+  companyDomain          String
+  companyKey             String
+  linkedinCompanyUrl     String?
+  companySize            String?
+  currentStage           CommercialStage        @default(DISCOVERED)
+  priority               Priority?
+  nextFollowUpAt         DateTime?              @db.Timestamptz(3)
+  lastContactAt          DateTime?              @db.Timestamptz(3)
+  companyOwnerId         String?                @db.Uuid
+  researchStatus         ResearchStatus         @default(UNRESEARCHED)
+  researchNotes          String?
+  partnershipAngle       String?
+  recommendedContactRoles String?
+  lastResearchedAt       DateTime?              @db.Timestamptz(3)
+  contactDiscoveryStatus ContactDiscoveryStatus @default(NOT_STARTED)
+  contactDiscoveryNotes  String?
+  lastContactSearchAt    DateTime?              @db.Timestamptz(3)
+  contactsFoundCount     Int                    @default(0)
+  discoveryRationale     String?
+  discoveryEvidence      String?
+  discoveryBriefId       String?                @db.Uuid
+  atlasDiscoveredAt      DateTime?              @db.Timestamptz(3)
+  confidence             Float?
+  evidenceCompleteness   Float?
+  source                 SourceType             @default(MANUAL)
+  legacyId               String?
+  createdById            String?                @db.Uuid
+  createdAt              DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime               @updatedAt @db.Timestamptz(3)
+  tenant                 Organisation           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy              User?                  @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  discoveryBrief         DiscoveryBrief?        @relation(fields: [discoveryBriefId], references: [id], onDelete: SetNull)
+  score                  CompanyScore?
+  contacts               Contact[]
+  evidence               CompanyEvidence[]
+  outreachRecords        OutreachRecord[]
+  opportunities          Opportunity[]
+  interactions           Interaction[]
+  tasks                  Task[]
+  meetings               Meeting[]
+  proposals              Proposal[]
+  leadSources            CompanyLeadSource[]
+  agentRuns              AgentRun[]
+
+  @@unique([tenantId, companyKey])
+  @@index([tenantId, researchStatus, priority])
+  @@index([tenantId, contactDiscoveryStatus])
+}
+
+model CompanyScore {
+  id                    String   @id @default(uuid()) @db.Uuid
+  companyId             String   @unique @db.Uuid
+  budgetPotential       Int
+  strategicFit          Int
+  geographicalFit       Int
+  motorsportRelevance   Int
+  marketingActivity     Int
+  decisionMakerAccess   Int
+  timingScore           Int
+  commercialScore       Int
+  scoringVersion        Int      @default(1)
+  explanation           Json?
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([commercialScore])
+}
+
+model Contact {
+  id                    String             @id @default(uuid()) @db.Uuid
+  tenantId              String             @db.Uuid
+  companyId             String             @db.Uuid
+  contactName           String
+  jobTitle              String
+  department            Department         @default(OTHER)
+  email                 String?
+  phone                 String?
+  linkedinProfileUrl    String?
+  status                ContactStatus      @default(NOT_CONTACTED)
+  lastContactAt         DateTime?          @db.Timestamptz(3)
+  nextFollowUpAt        DateTime?          @db.Timestamptz(3)
+  notes                 String?
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  lastVerifiedAt        DateTime?          @db.Timestamptz(3)
+  externalPersonId      String?
+  contactPriority       ContactPriority    @default(BACKUP)
+  discoverySource       SourceType         @default(PUBLIC_WEB)
+  contactKey            String
+  echoStatus            EchoStatus         @default(NOT_STARTED)
+  preferredChannel      PreferredChannel   @default(UNKNOWN)
+  confidence            Float?
+  evidenceCompleteness  Float?
+  source                 SourceType         @default(MANUAL)
+  legacyId               String?
+  createdById            String?            @db.Uuid
+  createdAt              DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @db.Timestamptz(3)
+  tenant                 Organisation       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company                Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy              User?              @relation("ContactCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  evidence               ContactEvidence[]
+  outreachRecords        OutreachRecord[]
+  channelActions         ChannelAction[]
+  emailMessages          EmailMessage[]
+  opportunities          Opportunity[]      @relation("OpportunityPrimaryContact")
+  interactions           Interaction[]
+  tasks                  Task[]
+  meetings               Meeting[]
+  agentRuns              AgentRun[]
+
+  @@unique([tenantId, contactKey])
+  @@index([tenantId, echoStatus, status])
+  @@index([tenantId, contactPriority])
+}
+
+model EvidenceSource {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @db.Uuid
+  url            String
+  title          String?
+  extractedFact  String
+  retrievedAt    DateTime     @default(now()) @db.Timestamptz(3)
+  sourceType     SourceType
+  confidence     Float?
+  contentHash    String?
+  sourceProvider String?
+  agentRunId     String?      @db.Uuid
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  tenant         Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentRun       AgentRun?    @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  companies      CompanyEvidence[]
+  contacts       ContactEvidence[]
+  outreach       OutreachEvidence[]
+
+  @@index([tenantId, url])
+}
+
+model CompanyEvidence {
+  companyId  String         @db.Uuid
+  evidenceId String         @db.Uuid
+  claimKey   String?
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  evidence   EvidenceSource @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, evidenceId])
+}
+
+model ContactEvidence {
+  contactId  String         @db.Uuid
+  evidenceId String         @db.Uuid
+  claimKey   String?
+  contact    Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  evidence   EvidenceSource @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, evidenceId])
+}
+
+model OutreachRecord {
+  id                  String         @id @default(uuid()) @db.Uuid
+  tenantId            String         @db.Uuid
+  companyId           String         @db.Uuid
+  contactId           String         @db.Uuid
+  opportunityId       String?        @db.Uuid
+  outreachName        String
+  outreachKey         String
+  sequence            String         @default("initial-v1")
+  echoStatus          EchoStatus     @default(NOT_STARTED)
+  draftStatus         DraftStatus    @default(NOT_STARTED)
+  approvalStatus      ApprovalStatus @default(PENDING_REVIEW)
+  linkedinStatus      LinkedInStatus @default(NOT_STARTED)
+  emailStatus         EmailStatus    @default(NOT_STARTED)
+  currentVersionId    String?        @unique @db.Uuid
+  generatedAt         DateTime?      @db.Timestamptz(3)
+  sentAt              DateTime?      @db.Timestamptz(3)
+  nextFollowUpAt      DateTime?      @db.Timestamptz(3)
+  notes               String?
+  source              SourceType     @default(AI_GENERATED)
+  legacyId            String?
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(3)
+  tenant              Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company             Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact             Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunity         Opportunity?   @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  versions            OutreachVersion[] @relation("OutreachVersions")
+  currentVersion      OutreachVersion?  @relation("CurrentOutreachVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  approvals           ApprovalEvent[]
+  channelActions      ChannelAction[]
+  emailMessages       EmailMessage[]
+  interactions        Interaction[]
+  agentRuns           AgentRun[]
+
+  @@unique([tenantId, outreachKey])
+  @@index([tenantId, approvalStatus, linkedinStatus])
+  @@index([tenantId, emailStatus])
+}
+
+model OutreachVersion {
+  id                       String           @id @default(uuid()) @db.Uuid
+  outreachRecordId         String           @db.Uuid
+  versionNumber            Int
+  linkedinConnectionNote   String?
+  linkedinFollowUpMessage  String?
+  emailSubject             String?
+  emailBody                String?
+  followUpEmail1           String?
+  followUpEmail2           String?
+  callOpener               String
+  personalisationEvidence  String
+  partnershipPitch         String
+  generationNotes          String?
+  promptVersion            String
+  modelUsed                String
+  generatedAt              DateTime         @default(now()) @db.Timestamptz(3)
+  outreachRecord           OutreachRecord   @relation("OutreachVersions", fields: [outreachRecordId], references: [id], onDelete: Cascade)
+  currentFor               OutreachRecord?  @relation("CurrentOutreachVersion")
+  evidence                 OutreachEvidence[]
+  approvals                ApprovalEvent[]
+  channelActions           ChannelAction[]
+  emailMessages            EmailMessage[]
+
+  @@unique([outreachRecordId, versionNumber])
+}
+
+model OutreachEvidence {
+  outreachVersionId String          @db.Uuid
+  evidenceId        String          @db.Uuid
+  claimKey          String?
+  outreachVersion   OutreachVersion @relation(fields: [outreachVersionId], references: [id], onDelete: Cascade)
+  evidence          EvidenceSource  @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([outreachVersionId, evidenceId])
+}
+
+model ApprovalEvent {
+  id                String           @id @default(uuid()) @db.Uuid
+  outreachRecordId  String           @db.Uuid
+  outreachVersionId String           @db.Uuid
+  userId            String           @db.Uuid
+  decision          ApprovalStatus
+  comments          String?
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  outreachRecord    OutreachRecord   @relation(fields: [outreachRecordId], references: [id], onDelete: Cascade)
+  outreachVersion   OutreachVersion  @relation(fields: [outreachVersionId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([outreachRecordId, createdAt])
+}
+
+model ChannelAction {
+  id                String              @id @default(uuid()) @db.Uuid
+  tenantId          String              @db.Uuid
+  outreachRecordId  String              @db.Uuid
+  outreachVersionId String?             @db.Uuid
+  contactId         String              @db.Uuid
+  channel           ChannelType
+  sequenceStep      String
+  status            ChannelActionStatus @default(NOT_STARTED)
+  dueAt             DateTime?           @db.Timestamptz(3)
+  completedAt       DateTime?           @db.Timestamptz(3)
+  automated         Boolean             @default(false)
+  providerMessageId String?
+  providerThreadId  String?
+  idempotencyKey    String
+  errorDetails      String?
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+  tenant            Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outreachRecord    OutreachRecord      @relation(fields: [outreachRecordId], references: [id], onDelete: Cascade)
+  outreachVersion   OutreachVersion?    @relation(fields: [outreachVersionId], references: [id], onDelete: SetNull)
+  contact           Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, channel, status, dueAt])
+}
+
+model EmailMessage {
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @db.Uuid
+  outreachRecordId  String?          @db.Uuid
+  outreachVersionId String?          @db.Uuid
+  contactId         String?          @db.Uuid
+  providerMessageId String
+  providerThreadId  String?
+  recipient         String
+  sender            String?
+  subject           String
+  direction         InteractionDirection
+  status            EmailStatus
+  sentAt            DateTime?        @db.Timestamptz(3)
+  receivedAt        DateTime?        @db.Timestamptz(3)
+  headers           Json?
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  tenant            Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outreachRecord    OutreachRecord?  @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
+  outreachVersion   OutreachVersion? @relation(fields: [outreachVersionId], references: [id], onDelete: SetNull)
+  contact           Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, providerMessageId])
+  @@index([tenantId, providerThreadId])
+}
+
+model SuppressionEntry {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @db.Uuid
+  email       String?
+  contactKey  String?
+  companyKey  String?
+  reason      SuppressionReason
+  notes       String?
+  createdById String?           @db.Uuid
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  tenant      Organisation      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, email])
+  @@index([tenantId, contactKey])
+}
+
+model Opportunity {
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @db.Uuid
+  companyId         String           @db.Uuid
+  primaryContactId  String?          @db.Uuid
+  opportunityName   String
+  opportunityType   String?
+  valueMinor        Int?
+  currency          String           @default("GBP")
+  stage             OpportunityStage @default(INTERESTED)
+  probability       Int              @default(10)
+  expectedCloseDate DateTime?        @db.Date
+  notes             String?
+  source             SourceType       @default(MANUAL)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+  tenant            Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company           Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  primaryContact    Contact?         @relation("OpportunityPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  outreachRecords   OutreachRecord[]
+  interactions      Interaction[]
+  tasks             Task[]
+  meetings          Meeting[]
+  proposals         Proposal[]
+
+  @@index([tenantId, stage])
+}
+
+model Interaction {
+  id               String               @id @default(uuid()) @db.Uuid
+  tenantId         String               @db.Uuid
+  companyId        String?              @db.Uuid
+  contactId        String?              @db.Uuid
+  outreachRecordId String?              @db.Uuid
+  opportunityId    String?              @db.Uuid
+  channel          ChannelType?
+  direction        InteractionDirection
+  summary          String
+  outcome          String?
+  providerMessageId String?
+  providerThreadId  String?
+  occurredAt       DateTime             @default(now()) @db.Timestamptz(3)
+  source           SourceType           @default(MANUAL)
+  createdAt        DateTime             @default(now()) @db.Timestamptz(3)
+  tenant           Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company          Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact          Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  outreachRecord   OutreachRecord?      @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
+  opportunity      Opportunity?         @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, occurredAt])
+}
+
+model Task {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  companyId     String?      @db.Uuid
+  contactId     String?      @db.Uuid
+  opportunityId String?      @db.Uuid
+  ownerId       String?      @db.Uuid
+  title         String
+  description   String?
+  type          TaskType     @default(MANUAL_ACTION)
+  status        TaskStatus   @default(OPEN)
+  dueAt         DateTime?    @db.Timestamptz(3)
+  completedAt   DateTime?    @db.Timestamptz(3)
+  source        SourceType   @default(MANUAL)
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @db.Timestamptz(3)
+  tenant        Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, dueAt])
+}
+
+model Meeting {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  companyId     String?      @db.Uuid
+  contactId     String?      @db.Uuid
+  opportunityId String?      @db.Uuid
+  title         String
+  startsAt      DateTime     @db.Timestamptz(3)
+  endsAt        DateTime?    @db.Timestamptz(3)
+  attendees     Json?
+  agenda        String?
+  preparation   String?
+  notes         String?
+  outcome       String?
+  nextAction    String?
+  calendarEventId String?
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @db.Timestamptz(3)
+  tenant        Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, startsAt])
+}
+
+model Proposal {
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @db.Uuid
+  companyId        String           @db.Uuid
+  opportunityId    String?          @db.Uuid
+  title            String
+  status           String           @default("DRAFT")
+  currentVersionId String?          @unique @db.Uuid
+  sentAt           DateTime?        @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
+  tenant           Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity      Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  versions         ProposalVersion[] @relation("ProposalVersions")
+  currentVersion   ProposalVersion?  @relation("CurrentProposalVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+}
+
+model ProposalVersion {
+  id             String      @id @default(uuid()) @db.Uuid
+  proposalId     String      @db.Uuid
+  versionNumber  Int
+  content        Json
+  fileObjectKey  String?
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  proposal       Proposal    @relation("ProposalVersions", fields: [proposalId], references: [id], onDelete: Cascade)
+  currentFor     Proposal?   @relation("CurrentProposalVersion")
+
+  @@unique([proposalId, versionNumber])
+}
+
+model AgentRun {
+  id               String         @id @default(uuid()) @db.Uuid
+  tenantId         String         @db.Uuid
+  agentName        AgentName
+  status           AgentRunStatus @default(QUEUED)
+  idempotencyKey   String
+  input            Json
+  output           Json?
+  promptVersion    String?
+  modelUsed        String?
+  startedAt        DateTime?      @db.Timestamptz(3)
+  completedAt      DateTime?      @db.Timestamptz(3)
+  heartbeatAt      DateTime?      @db.Timestamptz(3)
+  errorCode        String?
+  errorDetails     String?
+  retryCount       Int            @default(0)
+  inputTokens      Int?
+  outputTokens     Int?
+  totalTokens      Int?
+  estimatedCostUsd Decimal?       @db.Decimal(12, 6)
+  discoveryBriefId String?        @db.Uuid
+  companyId        String?        @db.Uuid
+  contactId        String?        @db.Uuid
+  outreachRecordId String?        @db.Uuid
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+  tenant           Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  discoveryBrief   DiscoveryBrief? @relation(fields: [discoveryBriefId], references: [id], onDelete: SetNull)
+  company          Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact          Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  outreachRecord   OutreachRecord? @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
+  evidence         EvidenceSource[]
+  automationJobs   AutomationJob[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, agentName, status])
+}
+
+model AutomationJob {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @db.Uuid
+  agentRunId     String?             @db.Uuid
+  queueName      String
+  jobName        String
+  idempotencyKey String
+  payload        Json
+  result         Json?
+  status         AutomationJobStatus @default(QUEUED)
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3)
+  scheduledFor   DateTime?           @db.Timestamptz(3)
+  startedAt      DateTime?           @db.Timestamptz(3)
+  completedAt    DateTime?           @db.Timestamptz(3)
+  heartbeatAt    DateTime?           @db.Timestamptz(3)
+  errorDetails   String?
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  tenant         Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentRun       AgentRun?           @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, scheduledFor])
+}
+
+model JobOutbox {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @db.Uuid
+  queueName      String
+  jobName        String
+  idempotencyKey String
+  payload        Json
+  result         Json?
+  status         AutomationJobStatus @default(QUEUED)
+  dispatchedAt   DateTime?           @db.Timestamptz(3)
+  errorDetails   String?
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  tenant         Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([status, createdAt])
+}
+
+model PromptVersion {
+  id           String       @id @default(uuid()) @db.Uuid
+  tenantId     String       @db.Uuid
+  agentName    AgentName
+  version      String
+  template     String
+  inputSchema  Json
+  outputSchema Json
+  active       Boolean      @default(false)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  tenant       Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, agentName, version])
+  @@index([tenantId, agentName, active])
+}
+
+model StatusHistory {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @db.Uuid
+  entityType String
+  entityId   String       @db.Uuid
+  fieldName  String
+  oldValue   String?
+  newValue   String?
+  actorUserId String?     @db.Uuid
+  agentRunId String?      @db.Uuid
+  reason     String?
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  tenant     Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entityType, entityId, createdAt])
+}
+
+model AuditLog {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @db.Uuid
+  userId     String?      @db.Uuid
+  action     AuditAction
+  entityType String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  tenant     Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, entityId])
+}
+
+model UsageLedger {
+  id               String       @id @default(uuid()) @db.Uuid
+  tenantId         String       @db.Uuid
+  provider         String
+  operation        String
+  agentName        AgentName?
+  inputUnits       Int?
+  outputUnits      Int?
+  requestCount     Int          @default(1)
+  estimatedCostUsd Decimal?     @db.Decimal(12, 6)
+  occurredAt       DateTime     @default(now()) @db.Timestamptz(3)
+  metadata         Json?
+  tenant           Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+}
+
+model IntegrationAccount {
+  id                    String              @id @default(uuid()) @db.Uuid
+  tenantId              String              @db.Uuid
+  provider              IntegrationProvider
+  status                IntegrationStatus   @default(DISCONNECTED)
+  externalAccountId     String?
+  externalEmail         String?
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  tokenExpiresAt        DateTime?           @db.Timestamptz(3)
+  scopes                Json?
+  metadata              Json?
+  lastSyncedAt          DateTime?           @db.Timestamptz(3)
+  errorDetails          String?
+  createdAt             DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @db.Timestamptz(3)
+  tenant                Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+}
+
+model LeadSource {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @db.Uuid
+  name      String
+  sourceType SourceType
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  tenant    Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companies CompanyLeadSource[]
+
+  @@unique([tenantId, name])
+}
+
+model CompanyLeadSource {
+  companyId   String     @db.Uuid
+  leadSourceId String    @db.Uuid
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadSource  LeadSource @relation(fields: [leadSourceId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, leadSourceId])
+}
+
+enum MigrationDecision {
+  PENDING
+  APPROVE
+  APPLY_REPAIRS
+  SKIP
+}
+
+enum MigrationRunStatus {
+  PREVIEW
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum MigrationItemOutcome {
+  CREATED
+  UPDATED
+  SKIPPED
+  BLOCKED
+  FAILED
+}
+
+model MigrationReview {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @db.Uuid
+  legacyId    String
+  tableName   String
+  sourceRow   Int
+  decision    MigrationDecision @default(PENDING)
+  notes       String?
+  decidedById String?           @db.Uuid
+  decidedAt   DateTime?         @db.Timestamptz(3)
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, legacyId])
+  @@index([tenantId, decision])
+}
+
+model MigrationRun {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @db.Uuid
+  status            MigrationRunStatus @default(PREVIEW)
+  sourceFingerprint String
+  sourceDirectory   String
+  createdById       String?            @db.Uuid
+  startedAt         DateTime?          @db.Timestamptz(3)
+  completedAt       DateTime?          @db.Timestamptz(3)
+  createdCount      Int                @default(0)
+  updatedCount      Int                @default(0)
+  skippedCount      Int                @default(0)
+  blockedCount      Int                @default(0)
+  failedCount       Int                @default(0)
+  summary           Json?
+  errorDetails      String?
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(3)
+  items             MigrationRunItem[]
+
+  @@index([tenantId, createdAt])
+}
+
+model MigrationRunItem {
+  id        String               @id @default(uuid()) @db.Uuid
+  runId     String               @db.Uuid
+  legacyId  String
+  tableName String
+  outcome   MigrationItemOutcome
+  targetId  String?              @db.Uuid
+  details   String?
+  createdAt DateTime             @default(now()) @db.Timestamptz(3)
+  run       MigrationRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, legacyId])
+}

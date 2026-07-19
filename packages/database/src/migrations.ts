@@ -1,0 +1,38 @@
+import type { GridFlowDatabase } from "./database.js";
+import { readMigrationSql } from "./database.js";
+
+const MIGRATIONS = [
+  "20260719000000_initial",
+  "20260719010000_airtable_import",
+  "20260719030000_auth_multi_athlete",
+] as const;
+
+export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS "_GridFlowMigration" (
+      "name" TEXT PRIMARY KEY,
+      "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  for (const migration of MIGRATIONS) {
+    const applied = await database.query<{ name: string }>(
+      `SELECT "name" FROM "_GridFlowMigration" WHERE "name" = $1`,
+      [migration],
+    );
+    if (applied.rows.length > 0) continue;
+
+    let sql = await readMigrationSql(migration);
+    if (database.kind === "pglite") {
+      sql = sql.replace('CREATE EXTENSION IF NOT EXISTS "pgcrypto";', "");
+    }
+
+    await database.transaction(async (tx) => {
+      await tx.exec(sql);
+      await tx.query(
+        `INSERT INTO "_GridFlowMigration" ("name") VALUES ($1)`,
+        [migration],
+      );
+    });
+  }
+}

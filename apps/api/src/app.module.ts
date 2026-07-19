@@ -1,0 +1,35 @@
+import { Module } from "@nestjs/common";
+import { AuthModule } from "./auth/auth.module.js";
+import { TeamModule } from "./team/team.module.js";
+import { AgentRunsModule } from "./agent-runs/agent-runs.module.js";
+import { ContactsModule } from "./contacts/contacts.module.js";
+import { OutreachModule } from "./outreach/outreach.module.js";
+import { CompaniesModule } from "./companies/companies.module.js";
+import { ContextModule } from "./context/context.module.js";
+import { DashboardModule } from "./dashboard/dashboard.module.js";
+import { DatabaseModule } from "./database/database.module.js";
+import { DiscoveryBriefsModule } from "./discovery-briefs/discovery-briefs.module.js";
+import { DiscoveryModule } from "./discovery/discovery.module.js";
+import { HealthModule } from "./health/health.module.js";
+import { OnboardingModule } from "./onboarding/onboarding.module.js";
+import { MigrationModule } from "./migration/migration.module.js";
+
+@Module({
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    ContextModule,
+    HealthModule,
+    DiscoveryModule,
+    OnboardingModule,
+    DashboardModule,
+    CompaniesModule,
+    DiscoveryBriefsModule,
+    MigrationModule,
+    AgentRunsModule,
+    ContactsModule,
+    OutreachModule,
+    TeamModule,
+  ],
+})
+export class AppModule {}

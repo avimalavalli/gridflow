@@ -1,0 +1,13 @@
+FROM node:22-alpine
+WORKDIR /app
+ARG GRIDFLOW_API_URL=http://api:3001/api/v1
+ARG GRIDFLOW_API_PROXY_TARGET=http://api:3001/api/v1
+ENV GRIDFLOW_API_URL=$GRIDFLOW_API_URL
+ENV GRIDFLOW_API_PROXY_TARGET=$GRIDFLOW_API_PROXY_TARGET
+COPY package.json package-lock.json ./
+COPY apps ./apps
+COPY packages ./packages
+RUN npm ci && npm run build --workspace @gridflow/domain && npm run build --workspace @gridflow/web
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "run", "start", "--workspace", "@gridflow/web"]

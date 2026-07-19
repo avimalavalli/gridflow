@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gridflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: gridflow
+    volumes:
+      - gridflow_staging_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridflow -d gridflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://gridflow:${POSTGRES_PASSWORD}@postgres:5432/gridflow
+      DATABASE_SSL: "false"
+      WEB_ORIGIN: ${WEB_ORIGIN}
+      TRUST_PROXY: "true"
+      GRIDFLOW_DEV_BOOTSTRAP: "false"
+      AUTH_SIGNUP_MODE: ${AUTH_SIGNUP_MODE:-CODE}
+      AUTH_PRIVATE_BETA_CODE: ${AUTH_PRIVATE_BETA_CODE}
+      AUTH_SECURE_COOKIES: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-gpt-5-mini}
+    ports:
+      - "3001:3001"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://gridflow:${POSTGRES_PASSWORD}@postgres:5432/gridflow
+      DATABASE_SSL: "false"
+      GRIDFLOW_DEV_BOOTSTRAP: "false"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_AGENT_MODEL: ${OPENAI_AGENT_MODEL:-gpt-5-mini}
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        GRIDFLOW_API_URL: http://api:3001/api/v1
+        GRIDFLOW_API_PROXY_TARGET: http://api:3001/api/v1
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      GRIDFLOW_DEV_BOOTSTRAP: "false"
+      AUTH_SESSION_COOKIE_NAME: gridflow_session
+    ports:
+      - "3000:3000"
+
+volumes:
+  gridflow_staging_postgres:

@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const apiBase = process.env.GRIDFLOW_API_PROXY_TARGET ?? "http://localhost:3001/api/v1";
 
 const nextConfig: NextConfig = {
+  experimental: { cpus: 2 },
   transpilePackages: ["@gridflow/domain"],
   async rewrites() {
     return [

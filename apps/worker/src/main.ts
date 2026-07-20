@@ -5,6 +5,7 @@ import { AgentEngine } from "@gridflow/engine";
 import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
 import { GmailSyncProcessor } from "./gmail-sync.js";
+import { AuthEmailProcessor } from "./auth-email.js";
 
 loadEnv({ path: resolve(process.cwd(), ".env"), quiet: true });
 
@@ -21,6 +22,9 @@ if (initialRecovery.requeued || initialRecovery.deadLettered) {
 
 const emailProcessor = new EmailAutomationProcessor(database);
 const gmailSync = new GmailSyncProcessor(database);
+const authEmailProcessor = new AuthEmailProcessor(database);
+const recoveredAuthEmails = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10));
+if (recoveredAuthEmails) console.log(JSON.stringify({ event: "stale-auth-emails-recovered", count: recoveredAuthEmails }));
 const recoveredEmails = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredEmails) console.log(JSON.stringify({ event: "stale-email-actions-recovered", count: recoveredEmails }));
 
@@ -30,6 +34,11 @@ console.log(provider ? `GridFlow agent worker started with ${provider.name}.` : 
 console.log("GridFlow email automation processor started.");
 
 const runOnce = async (): Promise<boolean> => {
+  const authEmail = await authEmailProcessor.processNext();
+  if (authEmail.processed) {
+    console.log(JSON.stringify({ event: "auth-email-processed", ...authEmail }));
+    return true;
+  }
   const email = await emailProcessor.processNext();
   if (email.processed) {
     console.log(JSON.stringify({ event: "email-action-processed", ...email }));
@@ -73,6 +82,11 @@ if (once) {
         });
         if (recovered.requeued || recovered.deadLettered) console.log(JSON.stringify({ event: "stale-agent-jobs-recovered", ...recovered }));
       }
+      const authRecovered = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
+        console.error("GridFlow stale-auth-email recovery failed:", error);
+        return 0;
+      });
+      if (authRecovered) console.log(JSON.stringify({ event: "stale-auth-emails-recovered", count: authRecovered }));
       const emailRecovered = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
         console.error("GridFlow stale-email recovery failed:", error);
         return 0;

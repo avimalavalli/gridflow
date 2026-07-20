@@ -37,6 +37,9 @@ export interface AgentRunListItem extends Record<string, unknown> {
   retryCount: number;
   totalTokens: number | null;
   estimatedCostUsd: string | null;
+  qualityStatus: string | null;
+  qualityScore: number | null;
+  qualityReport: Record<string, unknown> | null;
   discoveryBriefId: string | null;
   companyId: string | null;
   contactId: string | null;

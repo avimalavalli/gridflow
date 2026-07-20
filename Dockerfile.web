@@ -7,7 +7,9 @@ ENV GRIDFLOW_API_PROXY_TARGET=$GRIDFLOW_API_PROXY_TARGET
 COPY package.json package-lock.json ./
 COPY apps ./apps
 COPY packages ./packages
-RUN npm ci && npm run build --workspace @gridflow/domain && npm run build --workspace @gridflow/web
+COPY scripts ./scripts
+RUN npm ci && npm run build --workspace @gridflow/domain && cd apps/web && NEXT_TELEMETRY_DISABLED=1 npx next build --webpack --experimental-build-mode compile && node ../../scripts/prepare-next-generate.mjs && NEXT_TELEMETRY_DISABLED=1 npx next build --webpack --experimental-build-mode generate
 ENV NODE_ENV=production
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["npm", "run", "start", "--workspace", "@gridflow/web"]

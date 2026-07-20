@@ -1,4 +1,5 @@
 import {
+  assertAgentQuality,
   atlasPrompt,
   echoPrompt,
   relayPrompt,
@@ -141,7 +142,7 @@ export class AgentEngine {
       const result = await tx.query<AgentRunListItem>(
         `SELECT "id", "agentName"::text AS "agentName", "status"::text AS "status", "promptVersion", "modelUsed",
                 "startedAt", "completedAt", "errorCode", "errorDetails", "retryCount", "totalTokens",
-                "estimatedCostUsd"::text AS "estimatedCostUsd", "discoveryBriefId", "companyId", "contactId",
+                "estimatedCostUsd"::text AS "estimatedCostUsd", "qualityStatus", "qualityScore", "qualityReport", "discoveryBriefId", "companyId", "contactId",
                 "outreachRecordId", "createdAt"
          FROM "AgentRun" WHERE "tenantId"=$1::uuid ORDER BY "createdAt" DESC LIMIT $2`,
         [tenantId, Math.max(1, Math.min(limit, 200))],
@@ -321,28 +322,30 @@ export class AgentEngine {
       const run = await this.loadRun(job.tenantId, job.agentRunId);
       const definition = promptByAgent[job.jobName];
       const result = await provider.generate({ definition, input: run.input, idempotencyKey: run.idempotencyKey });
+      const quality = assertAgentQuality(job.jobName, result.output);
       await this.database.transaction(async (tx) => {
         await setTenantContext(tx, job.tenantId);
         const outreachRecordId = await this.applyOutput(tx, job.tenantId, job.agentRunId, job.jobName, run, result.output, result.model);
         await tx.query(
           `UPDATE "AgentRun" SET "status"='SUCCEEDED', "output"=$2::jsonb, "modelUsed"=$3,
              "inputTokens"=$4,"outputTokens"=$5,"totalTokens"=$6,"estimatedCostUsd"=$7,
+             "qualityStatus"=$9,"qualityScore"=$10,"qualityReport"=$11::jsonb,
              "completedAt"=CURRENT_TIMESTAMP,"heartbeatAt"=CURRENT_TIMESTAMP,"errorCode"=NULL,"errorDetails"=NULL,
              "outreachRecordId"=COALESCE($8::uuid,"outreachRecordId"),"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
           [job.agentRunId, json(result.output), result.model, result.usage.inputTokens, result.usage.outputTokens,
-            result.usage.totalTokens, result.usage.estimatedCostUsd, outreachRecordId],
+            result.usage.totalTokens, result.usage.estimatedCostUsd, outreachRecordId, quality.status, quality.score, json(quality)],
         );
         await tx.query(
           `UPDATE "AutomationJob" SET "status"='SUCCEEDED',"result"=$2::jsonb,"completedAt"=CURRENT_TIMESTAMP,
              "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
-          [job.id, json({ providerResponseId: result.providerResponseId, output: result.output })],
+          [job.id, json({ providerResponseId: result.providerResponseId, output: result.output, quality })],
         );
         await tx.query(
           `INSERT INTO "UsageLedger" (
              "tenantId","provider","operation","agentName","inputUnits","outputUnits","estimatedCostUsd","metadata"
            ) VALUES ($1::uuid,$2,'agent_generation',$3::"AgentName",$4,$5,$6,$7::jsonb)`,
           [job.tenantId, provider.name, job.jobName, result.usage.inputTokens, result.usage.outputTokens,
-            result.usage.estimatedCostUsd, json({ agentRunId: job.agentRunId, providerResponseId: result.providerResponseId })],
+            result.usage.estimatedCostUsd, json({ agentRunId: job.agentRunId, providerResponseId: result.providerResponseId, qualityStatus: quality.status, qualityScore: quality.score })],
         );
         await tx.query(
           `UPDATE "JobOutbox" SET "status"='SUCCEEDED',"result"=$3::jsonb,"updatedAt"=CURRENT_TIMESTAMP

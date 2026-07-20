@@ -12,9 +12,14 @@ import type { Request, Response } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
 import {
   AcceptInvitationDto,
+  DisableMfaDto,
+  ForgotPasswordDto,
   LoginDto,
   RegisterDto,
+  ResetPasswordDto,
   SwitchOrganisationDto,
+  VerifyMfaLoginDto,
+  VerifyMfaSetupDto,
 } from "./auth.dto.js";
 import { AuthService } from "./auth.service.js";
 
@@ -51,6 +56,53 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.auth.logout(request, response);
+  }
+
+
+  @HttpCode(202)
+  @Post("forgot-password")
+  forgotPassword(@Body() input: ForgotPasswordDto, @Req() request: Request) {
+    return this.auth.forgotPassword(input, request);
+  }
+
+  @HttpCode(200)
+  @Post("reset-password")
+  resetPassword(@Body() input: ResetPasswordDto, @Req() request: Request) {
+    return this.auth.resetPassword(input, request);
+  }
+
+  @HttpCode(200)
+  @Post("mfa/verify-login")
+  verifyMfaLogin(
+    @Body() input: VerifyMfaLoginDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.auth.verifyMfaLogin(input, request, response);
+  }
+
+  @Post("mfa/setup")
+  async setupMfa(@Req() request: Request) {
+    const identity = await this.context.resolve(request);
+    return this.auth.setupMfa(identity);
+  }
+
+  @Post("mfa/enable")
+  async enableMfa(@Req() request: Request, @Body() input: VerifyMfaSetupDto) {
+    const identity = await this.context.resolve(request);
+    return this.auth.enableMfa(identity, input);
+  }
+
+  @Post("mfa/recovery-codes")
+  async regenerateRecoveryCodes(@Req() request: Request, @Body() input: VerifyMfaSetupDto) {
+    const identity = await this.context.resolve(request);
+    return this.auth.regenerateRecoveryCodes(identity, input);
+  }
+
+  @Post("mfa/disable")
+  async disableMfa(@Req() request: Request, @Body() input: DisableMfaDto) {
+    const identity = await this.context.resolve(request);
+    return this.auth.disableMfa(identity, input);
   }
 
   @Get("me")

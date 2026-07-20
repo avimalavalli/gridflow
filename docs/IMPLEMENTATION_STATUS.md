@@ -1,70 +1,59 @@
-# GridFlow implementation status — Milestone 6
+# GridFlow implementation status — Milestone 7
 
 ## Verified and runnable
 
-### Multi-athlete foundation
+### Multi-athlete commercial product
 
-- Account registration, login, logout and revocable sessions.
-- Separate organisations for athletes, teams, agencies and commercial organisations.
-- Organisation switching, team invitations and role-based access.
-- Athlete-specific onboarding, target markets, outreach policy and Discovery Briefs.
-- Tenant-scoped relational data, stable keys and row-level-security policies.
+- Isolated organisations, users, roles, invitations and organisation switching.
+- Athlete-specific onboarding, markets, outreach policies and Discovery Briefs.
+- Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings workspaces.
+- Action-led dashboard, search, responsive shell and command palette.
+- Airtable migration audit/import architecture and stable-key protection.
 
-### AI and data foundation
+### Agent engine
 
-- Reconstructed Atlas, Sage, Relay and Echo contracts with strict outputs.
-- OpenAI provider boundary, evidence provenance checks and cost fields.
-- Durable job queue, retries, heartbeats, stale-job recovery and dead-letter handling.
-- Airtable audit, review decisions, transactional importer and idempotent re-import.
-
-### Commercial product core
-
-- Responsive authenticated app shell and functional command palette.
-- Dynamic active-organisation and user identity in the interface.
-- Action-led Command Centre.
-- Searchable Companies and Contacts CRMs.
-- Manual company and contact creation.
-- Company and contact detail workspaces.
-- Outreach review, editing, approvals and version history.
-- Opportunity pipeline, tasks, interactions and meetings.
-- Agent Runs, Discovery Briefs, Team & Access, Settings and Migration interfaces.
+- Durable Atlas → Sage → Relay → Echo execution.
+- Evidence provenance, retries, heartbeats, stale-job recovery and dead-letter handling.
+- Token/cost tracking and prompt/model versioning.
+- Deterministic quality gates with `PASS`, `REVIEW` and `FAIL` reports stored per run.
+- Hard rejection of unresolved placeholders, invented/unsupported data patterns and critical evidence failures.
 
 ### Outreach operations
 
-- Durable LinkedIn action queue while keeping platform actions manual.
-- Gmail OAuth web-flow implementation with signed state.
-- AES-256-GCM token encryption.
-- Gmail draft creation, approved sending and policy-controlled queueing.
-- Worker-side policy re-evaluation before every queued email.
-- Sending-day, sending-window, cap, approval, reply, meeting, suppression and active-conversation safeguards.
-- Gmail history synchronisation with bounded fallback sync.
-- Reply and bounce matching, inbound interaction creation and sequence pausing.
-- Suppression and duplicate-send protection.
-- Outreach Operations metrics and prioritised action queue.
+- Human-controlled LinkedIn execution queue.
+- Gmail OAuth, encrypted tokens, draft/send policies, reply sync, bounce handling and suppression architecture.
+- Re-evaluation of sending rules at execution time and duplicate-send protection.
 
-## Verified without live external calls
+### Account and release security
 
-The complete agent pipeline is fixture-tested, including duplicate protection, evidence validation, retries and recovery. The CRM, authentication and outreach-operation database workflows are validated against disposable databases.
-
-No live sponsor research was performed because a production OpenAI credential was not connected. No real Gmail account was connected and no real email was sent.
+- Password recovery with expiring, one-use hashed tokens.
+- Session revocation after reset.
+- Login lockout controls.
+- Authenticator-app MFA, encrypted secrets and one-use recovery codes.
+- Durable authentication email outbox with Resend-ready production worker.
+- Security headers, liveness/readiness checks, release preflight and CI.
+- Keyboard, focus, reduced-motion and high-contrast improvements.
 
 ## Validation result
 
-- 35 tests passed across 12 files.
-- TypeScript passed.
-- ESLint passed.
-- API, worker and web production builds passed.
-- Commercial CRM smoke suite passed.
-- Authentication and organisation-isolation smoke suite passed.
+- 41 tests passed across 15 files.
+- TypeScript and ESLint passed.
+- API and worker production builds passed.
+- Next.js compile and generate production phases passed.
+- Commercial CRM and authentication/multi-athlete smoke suites passed.
 - Dependency audit: 0 known vulnerabilities.
 
-## Remaining before the main V1 release
+## Verified without live external calls
 
-1. Run and tune a controlled live Atlas → Sage → Relay → Echo quality programme.
-2. Complete a release-owned live Gmail OAuth and mailbox acceptance test.
-3. Add password reset, MFA and complete security hardening.
-4. Complete cross-browser, accessibility, performance and responsive QA.
-5. Add monitoring, backups, production infrastructure and release controls.
-6. Build proposals and later sponsor-delivery modules only after acquisition quality is proven.
+The complete engine and quality gates are fixture-tested. No live sponsor research was run without a release-owned OpenAI credential. No real Gmail or Resend message was sent, and no physical authenticator application was enrolled.
 
-GridFlow remains organisation-based and athlete-agnostic. Racing is a first-class use case, not a hard-coded boundary.
+## Remaining before main V1 release
+
+1. Controlled live Atlas → Sage → Relay → Echo quality programme and prompt tuning.
+2. Release-owned Resend, Gmail OAuth and mailbox acceptance tests.
+3. Browser, accessibility and responsive acceptance testing on real devices.
+4. Production monitoring, backups, infrastructure, domain and incident procedures.
+5. Final permissions/security review and release checklist.
+6. Proposals and sponsor fulfilment only after the acquisition workflow proves reliable.
+
+GridFlow remains organisation-based and athlete-agnostic. Avi is the first migration and acceptance case, not the product model.

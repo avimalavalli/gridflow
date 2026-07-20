@@ -3,6 +3,7 @@ import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { IntegrationsClient } from "./integrations-client";
+import { SecurityClient } from "./security-client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ interface OnboardingData {
   policy: { strategy: string; emailAutomationMode: string; approvalMode: string; dailyEmailLimit: number; timezone: string } | null;
   targetMarkets: Array<{ country: string; type: string }>;
 }
+
+interface AuthData { security: { mfaEnabled: boolean }; }
 
 interface IntegrationData {
   gmail: {
@@ -26,12 +29,14 @@ interface IntegrationData {
 
 export default async function SettingsPage() {
   let data: OnboardingData | null = null;
+  let auth: AuthData = { security: { mfaEnabled: false } };
   let integrations: IntegrationData = { gmail: { configured: false, connected: false, status: "DISCONNECTED", email: null, lastSyncedAt: null, errorDetails: null, historyId: null } };
   let error = "";
   try {
-    [data, integrations] = await Promise.all([
+    [data, integrations, auth] = await Promise.all([
       apiGet<OnboardingData>("/onboarding"),
       apiGet<IntegrationData>("/integrations"),
+      apiGet<AuthData>("/auth/me"),
     ]);
   } catch (cause) {
     error = cause instanceof ApiError ? cause.message : "Unknown settings error.";
@@ -62,6 +67,7 @@ export default async function SettingsPage() {
               </section>
             </div>
           )}
+          <SecurityClient mfaEnabled={auth.security.mfaEnabled} />
           <IntegrationsClient gmail={integrations.gmail} />
         </div>
       )}

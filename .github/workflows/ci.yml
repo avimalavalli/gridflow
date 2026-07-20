@@ -1,0 +1,40 @@
+name: GridFlow CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gridflow-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run validate
+      - name: Build Next.js production bundle — compile
+        working-directory: apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npx next build --webpack --experimental-build-mode compile
+      - name: Prepare Next.js proxy compatibility artifact
+        working-directory: apps/web
+        run: node ../../scripts/prepare-next-generate.mjs
+      - name: Build Next.js production bundle — generate
+        working-directory: apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npx next build --webpack --experimental-build-mode generate
+      - run: npm audit --audit-level=high

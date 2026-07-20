@@ -13,14 +13,17 @@
     "dev:api": "npm run start:dev --workspace @gridflow/api",
     "build": "npm run build:packages && npm run build --workspace @gridflow/api && npm run build --workspace @gridflow/worker && npm run build --workspace @gridflow/web",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @gridflow/api && npm run typecheck --workspace @gridflow/worker && npm run typecheck --workspace @gridflow/web",
-    "test": "vitest run apps/api/test apps/worker/test packages/agents/test packages/domain/test packages/database/test packages/integrations/test packages/engine/test --maxWorkers=1",
+    "test": "vitest run apps/api/test packages/agents/test packages/domain/test packages/database/test packages/integrations/test packages/engine/test apps/worker/test --pool=vmForks --maxWorkers=1 --no-file-parallelism",
     "lint": "npm run lint --workspaces --if-present",
     "db:migrate": "npm run db:migrate --workspace @gridflow/database",
     "smoke": "npm run build:packages && npm run build --workspace @gridflow/api && node scripts/smoke-test.mjs",
     "migration:audit": "tsx apps/api/src/migration/audit-cli.ts",
     "dev:worker": "npm run start:dev --workspace @gridflow/worker",
     "smoke:auth": "npm run build:packages && npm run build --workspace @gridflow/api && node scripts/auth-smoke-test.mjs",
-    "validate": "npm run typecheck && npm test && npm run lint && npm run build && npm run smoke && npm run smoke:auth"
+    "validate": "npm run typecheck && npm test && npm run lint && npm run build:server && npm run smoke && npm run smoke:auth",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "test:all": "vitest run apps/api/test packages/agents/test packages/domain/test packages/database/test packages/integrations/test packages/engine/test apps/worker/test --pool=vmForks --maxWorkers=1 --no-file-parallelism",
+    "build:server": "npm run build:packages && npm run build --workspace @gridflow/api && npm run build --workspace @gridflow/worker"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

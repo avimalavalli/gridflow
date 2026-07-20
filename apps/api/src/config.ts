@@ -16,6 +16,14 @@ export interface ApiConfig {
   invitationDays: number;
   secureCookies: boolean;
   trustProxy: boolean;
+  passwordResetMinutes: number;
+  loginLockoutAttempts: number;
+  loginLockoutMinutes: number;
+  mfaChallengeMinutes: number;
+  authEncryptionKey: string;
+  authMailProvider: "CONSOLE" | "RESEND";
+  authFromEmail: string;
+  resendApiKey: string;
 }
 
 function readBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -66,6 +74,20 @@ export function loadConfig(): ApiConfig {
     process.env.AUTH_SECURE_COOKIES,
     nodeEnv === "production",
   );
+
+  const authEncryptionKey = process.env.AUTH_ENCRYPTION_KEY ?? process.env.INTEGRATION_ENCRYPTION_KEY ?? "";
+  if (nodeEnv === "production" && authEncryptionKey.length < 32) {
+    throw new Error("AUTH_ENCRYPTION_KEY must contain at least 32 characters in production.");
+  }
+  const authMailProvider = (process.env.AUTH_MAIL_PROVIDER ?? (nodeEnv === "production" ? "RESEND" : "CONSOLE")) as "CONSOLE" | "RESEND";
+  if (!["CONSOLE", "RESEND"].includes(authMailProvider)) {
+    throw new Error("AUTH_MAIL_PROVIDER must be CONSOLE or RESEND.");
+  }
+  const authFromEmail = process.env.AUTH_FROM_EMAIL ?? "GridFlow <no-reply@gridflow.local>";
+  const resendApiKey = process.env.RESEND_API_KEY ?? "";
+  if (nodeEnv === "production" && authMailProvider === "RESEND" && (!resendApiKey || !process.env.AUTH_FROM_EMAIL)) {
+    throw new Error("RESEND_API_KEY and AUTH_FROM_EMAIL are required for production password recovery.");
+  }
   if (nodeEnv === "production" && !secureCookies) {
     throw new Error("AUTH_SECURE_COOKIES must be true in production.");
   }
@@ -88,6 +110,14 @@ export function loadConfig(): ApiConfig {
     invitationDays: readPositiveInteger("AUTH_INVITATION_DAYS", process.env.AUTH_INVITATION_DAYS, 7),
     secureCookies,
     trustProxy: readBoolean(process.env.TRUST_PROXY, nodeEnv === "production"),
+    passwordResetMinutes: readPositiveInteger("AUTH_PASSWORD_RESET_MINUTES", process.env.AUTH_PASSWORD_RESET_MINUTES, 30),
+    loginLockoutAttempts: readPositiveInteger("AUTH_LOGIN_LOCKOUT_ATTEMPTS", process.env.AUTH_LOGIN_LOCKOUT_ATTEMPTS, 8),
+    loginLockoutMinutes: readPositiveInteger("AUTH_LOGIN_LOCKOUT_MINUTES", process.env.AUTH_LOGIN_LOCKOUT_MINUTES, 15),
+    mfaChallengeMinutes: readPositiveInteger("AUTH_MFA_CHALLENGE_MINUTES", process.env.AUTH_MFA_CHALLENGE_MINUTES, 5),
+    authEncryptionKey,
+    authMailProvider,
+    authFromEmail,
+    resendApiKey,
   };
 }
 

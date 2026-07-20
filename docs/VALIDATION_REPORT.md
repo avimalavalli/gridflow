@@ -1,4 +1,4 @@
-# GridFlow validation report — Milestone 6
+# GridFlow validation report — Milestone 7
 
 Validated on 20 July 2026 against the clean multi-athlete source tree.
 
@@ -6,11 +6,7 @@ Validated on 20 July 2026 against the clean multi-athlete source tree.
 
 | Check | Result |
 |---|---|
-| Domain package build | Passed |
-| Agent contracts build | Passed |
-| Database package build | Passed |
-| Integrations package build | Passed |
-| Engine package build | Passed |
+| Domain, agent, database, integrations and engine packages | Passed |
 | API TypeScript | Passed |
 | Worker TypeScript | Passed |
 | Web TypeScript | Passed |
@@ -19,65 +15,53 @@ Validated on 20 July 2026 against the clean multi-athlete source tree.
 
 ## Automated tests
 
-- 12 test files passed.
-- 35 tests passed.
-- Existing coverage remains for stable keys, migrations, tenant uniqueness, agent schemas, evidence provenance, authentication cryptography, discovery recommendations, durable execution, duplicate protection, stale-job recovery and dead-letter behaviour.
-- New coverage validates token encryption, signed OAuth state, MIME creation, email extraction, email-policy decisions, Gmail integration status, idempotent email queueing, suppression, LinkedIn action queueing and compatibility with legacy email sequence-step names.
+- **15 test files passed.**
+- **41 tests passed.**
+- Tests run in isolated VM forks to keep disposable PostgreSQL/PGlite instances deterministic.
 
-## Production builds
+New Milestone 7 coverage includes:
 
-- NestJS API build: passed.
-- Worker build: passed.
-- Next.js web build: passed.
-- Dynamic routes built for Dashboard, Companies, Contacts, Outreach, Opportunities, Tasks, Interactions, Meetings, Discovery Briefs, Agent Runs, Migration, Settings, Team, login and invitation flows.
+- TOTP generation and verification;
+- AES-256-GCM authentication-secret encryption;
+- recovery-code hashing;
+- password reset, session revocation and MFA login;
+- authentication email outbox delivery and idempotency;
+- Atlas/Sage/Relay/Echo quality reports and hard failures;
+- previous CRM, Gmail, evidence, tenant-isolation, job-recovery and duplicate-protection coverage.
+
+## Builds
+
+- NestJS API production build: passed.
+- Worker production build: passed.
+- Next.js Webpack compile phase: passed.
+- Next.js generate phase: passed.
+- All application routes were emitted, including account recovery, Settings security, Agent Runs and the commercial workspaces.
+
+The web build uses Next.js' supported split compile/generate modes in CI. A small compatibility step preserves the compiled Proxy artifact between phases for Next.js 16.2 in constrained build environments.
 
 ## Runtime smoke suites
 
-### Commercial CRM smoke
+### Commercial CRM smoke — passed
 
-Passed:
+Onboarding, personalised Discovery Briefs, companies, contacts, opportunities, tasks, interactions, meetings, dashboard queues and organisation scoping remain operational.
 
-- development organisation bootstrap;
-- athlete onboarding and personalised Discovery Briefs;
-- manual company and contact creation;
-- company and contact detail workspaces;
-- opportunity creation and stage updates;
-- task creation and completion;
-- interaction recording;
-- meeting scheduling;
-- dashboard action and pipeline queues;
-- company/contact updates and organisation scoping.
+### Authentication and multi-athlete smoke — passed
 
-The clean repository intentionally excludes private Airtable CSV exports, so the private migration runtime portion is skipped. The migration parser and audit logic remain covered by automated tests.
+Secure sessions, separate athlete organisations, invitations, multi-organisation membership and organisation switching remain operational.
 
-### Authentication and multi-athlete smoke
+## Release controls
 
-Passed:
+Validated:
 
-- secure sessions;
-- separate athlete organisations;
-- team invitations;
-- multi-organisation membership;
-- organisation switching;
-- isolation between athlete datasets.
+- liveness and readiness controllers compile;
+- production configuration rejects insecure cookies, development bootstrap and incomplete recovery configuration;
+- release preflight passes with complete dummy production configuration and fails closed when variables are absent;
+- CI workflow includes typecheck, all tests, lint, server builds, smoke suites, two-phase web build and high-severity dependency audit.
 
-## Gmail and outreach-operation validation
+## Not live-validated
 
-Passed without live external credentials:
-
-- OAuth state signing, expiry and tamper detection;
-- access/refresh-token encryption primitive;
-- Gmail MIME and API request construction;
-- manual, draft-only, approved-automatic and full-automation policy decisions;
-- sending-window, cap, reply, meeting, suppression and active-company-contact stops;
-- durable and idempotent ChannelAction creation;
-- worker compatibility with legacy and current sequence-step formats;
-- LinkedIn due-action queue;
-- suppression state propagation.
-
-## External systems not live-validated
-
-- Live OpenAI web research was not run without a release-owned production credential.
-- A real Gmail OAuth account was not connected and no real email was sent.
-- Google Cloud consent-screen, redirect-domain and production verification remain external configuration tasks.
-- LinkedIn remains manual and human-controlled.
+- Live OpenAI web research and agent-result tuning.
+- Real Resend password-reset delivery.
+- Real authenticator-app enrolment.
+- Real Gmail OAuth mailbox acceptance.
+- Production monitoring, backups and infrastructure failover.

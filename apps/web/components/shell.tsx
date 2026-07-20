@@ -175,7 +175,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
         </div>
       </aside>
 
-      <main className="main">
+      <main className="main" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <div className="topbar-left">
             <button className="icon-button mobile-menu" type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={19} /></button>

@@ -2,33 +2,34 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Milestone 6 product core: a database-backed, multi-organisation application with a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, LinkedIn action workflow and policy-controlled Gmail operations. It is not yet the finished public V1 because live agent-quality validation, live Gmail acceptance, final security hardening and release infrastructure remain incomplete.
+This repository contains the Milestone 7 product: a database-backed, multi-organisation application with a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, outreach operations, account recovery, authenticator-app MFA, deterministic AI quality gates and release controls.
+
+It is not yet the public V1 because live agent tuning, live email acceptance, real-device QA and production infrastructure remain release tasks.
 
 ## Current working flow
 
-`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → company discovery and research → decision-makers → outreach review → LinkedIn/Gmail operations → replies and interactions → opportunities → tasks and meetings`
+`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → outreach review → LinkedIn/Gmail operations → replies and interactions → opportunities → tasks and meetings`
 
 Every business record belongs to an organisation. No athlete identity, nationality, championship or sponsor market is hard-coded into the product.
 
 ## What works now
 
-- Secure account registration, sign-in, logout and revocable sessions.
-- Separate organisations and organisation switching.
-- Owner, administrator, commercial operator, reviewer and read-only roles.
-- Team invitations and access audit history.
+- Registration, sign-in, logout, revocable sessions and login lockout.
+- Password recovery with expiring single-use tokens and session revocation.
+- Authenticator-app MFA with encrypted secrets and one-use recovery codes.
+- Separate organisations, role-based access, team invitations and organisation switching.
 - Athlete-specific onboarding, markets, outreach policy and Discovery Briefs.
 - PostgreSQL schema, tenant-scoped keys and row-level-security policies.
 - Airtable Migration Centre with review, repair, skip, receipts and idempotent import.
-- Atlas, Sage, Relay and Echo contracts with evidence-provenance validation.
-- Durable background jobs, retries, recovery and dead-letter handling.
-- Responsive application shell with functional command search.
-- Action-led Command Centre.
-- Companies and Contacts CRMs with manual creation and connected detail workspaces.
-- Outreach editing, approvals and version preservation.
-- Durable human-controlled LinkedIn action queue.
-- Gmail OAuth, encrypted tokens, draft creation, policy-controlled sending, reply sync, bounce handling and suppression logic.
+- Atlas, Sage, Relay and Echo contracts with evidence provenance and quality gates.
+- Durable jobs, retries, recovery, dead-letter handling, model/token/cost tracking.
+- Responsive app shell, keyboard navigation and command search.
+- Command Centre, Companies, Contacts and connected detail workspaces.
+- Outreach editing, approvals, version history and human-controlled LinkedIn actions.
+- Gmail OAuth, encrypted tokens, draft/send policies, reply sync, bounce and suppression logic.
 - Opportunity pipeline, tasks, interactions and meetings.
-- Agent Runs, Team & Access, Settings, Discovery Briefs and Migration interfaces.
+- Agent Runs with `PASS`, `REVIEW` and `FAIL` quality reports.
+- Liveness/readiness endpoints, release preflight and CI.
 
 ## Multi-athlete behaviour
 
@@ -46,7 +47,8 @@ npm run dev
 Open:
 
 - Web: `http://localhost:3000`
-- API health: `http://localhost:3001/api/v1/health`
+- API liveness: `http://localhost:3001/api/v1/health/live`
+- API readiness: `http://localhost:3001/api/v1/health/ready`
 
 Local development uses the private development identity unless `GRIDFLOW_DEV_BOOTSTRAP=false` is set.
 
@@ -62,13 +64,14 @@ Set:
 GRIDFLOW_DEV_BOOTSTRAP=false
 AUTH_SIGNUP_MODE=OPEN
 AUTH_SECURE_COOKIES=false
+AUTH_ENCRYPTION_KEY=replace-with-at-least-32-private-characters
 ```
 
-Then start GridFlow and use `/signup`.
+Then start GridFlow and use `/signup`. MFA can be configured from Settings → Account security.
 
-## Gmail configuration
+## External integrations
 
-Gmail remains disabled until a release-owned Google OAuth web application is configured. See `.env.example` and `docs/MILESTONE6_OUTREACH_OPERATIONS.md`. Never commit a populated `.env` file.
+Gmail, Resend password-recovery delivery and OpenAI remain disabled until release-owned credentials are configured. Never commit a populated `.env` file.
 
 ## Validation
 
@@ -76,19 +79,21 @@ Gmail remains disabled until a release-owned Google OAuth web application is con
 npm run typecheck
 npm test
 npm run lint
-npm run build
+npm run build:server
 npm run smoke
 npm run smoke:auth
-npm audit
+npm audit --audit-level=high
 ```
+
+CI additionally runs the Next.js production compile and generate phases.
 
 ## Still remaining before the main V1
 
 - Controlled live Atlas → Sage → Relay → Echo quality testing and tuning.
-- Live Gmail OAuth and mailbox acceptance testing with release-owned credentials.
-- Password reset, MFA and final security hardening.
-- Production monitoring, backups, performance testing and release infrastructure.
-- Cross-browser, accessibility and responsive QA.
-- Proposals and sponsor fulfilment after the acquisition workflow is proven.
+- Live Resend and Gmail OAuth acceptance with release-owned accounts.
+- Cross-browser, accessibility and responsive acceptance testing.
+- Production monitoring, backups, domain, infrastructure and incident procedures.
+- Final security review and release checklist.
+- Proposals and sponsor fulfilment after acquisition quality is proven.
 
-See `docs/MILESTONE6_OUTREACH_OPERATIONS.md`, `docs/VALIDATION_REPORT.md` and `docs/IMPLEMENTATION_STATUS.md`.
+See `docs/MILESTONE7_SECURITY_AGENT_QUALITY_RELEASE.md`, `docs/VALIDATION_REPORT.md` and `docs/IMPLEMENTATION_STATUS.md`.

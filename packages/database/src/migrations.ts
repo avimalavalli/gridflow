@@ -5,6 +5,7 @@ const MIGRATIONS = [
   "20260719000000_initial",
   "20260719010000_airtable_import",
   "20260719030000_auth_multi_athlete",
+  "20260720070000_security_quality_release",
 ] as const;
 
 export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {

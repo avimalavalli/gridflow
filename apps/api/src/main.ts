@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { AppModule } from "./app.module.js";
 import { apiConfig } from "./config.js";
+import { logOperationalEvent, OperationalExceptionFilter } from "./observability.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -24,6 +25,8 @@ async function bootstrap(): Promise<void> {
     response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     response.setHeader("Cache-Control", "no-store");
     if (apiConfig.nodeEnv === "production") response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    const startedAt = Date.now();
+    response.once("finish", () => logOperationalEvent({ event: "api-request-completed", service: "gridflow-api", level: response.statusCode >= 500 ? "error" : response.statusCode >= 400 ? "warning" : "info", requestId, method: request.method, path: request.path, statusCode: response.statusCode, durationMs: Date.now() - startedAt }));
     next();
   });
   app.setGlobalPrefix("api/v1");
@@ -31,6 +34,7 @@ async function bootstrap(): Promise<void> {
     origin: apiConfig.webOrigin,
     credentials: true,
   });
+  app.useGlobalFilters(new OperationalExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -39,7 +43,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
   await app.listen(apiConfig.port);
-  console.log(`GridFlow API listening on http://localhost:${apiConfig.port}/api/v1`);
+  logOperationalEvent({ event: "api-started", service: "gridflow-api", level: "info" });
 }
 
 void bootstrap();

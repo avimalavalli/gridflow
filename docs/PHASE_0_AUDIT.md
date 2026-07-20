@@ -3,7 +3,7 @@
 ## Source of truth reviewed
 
 - `GridFlow_Commercial_OS_Complete_Developer_Brief(1).pdf`, version 1.0, July 2026.
-- The approved amendments from Avi:
+- The approved product amendments:
   - Outreach channel order is configurable per user.
   - Email automation can be manual, draft-only, approved automatic or full automation.
   - Discovery Briefs are generated from each athlete's geography, sport/racing programme, audience, goals and preferences.

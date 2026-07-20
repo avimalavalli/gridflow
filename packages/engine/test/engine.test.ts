@@ -80,7 +80,7 @@ afterEach(async () => {
 describe("GridFlow core agent engine", () => {
   it("runs Atlas → Sage → Relay → Echo with durable records and no duplicates", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-engine-"));
-    database = await createDatabase(`pglite://${directory}/db`);
+    database = await createDatabase("pglite://memory");
     await migrateDatabase(database);
 
     const identity = await database.transaction(async (tx) => {
@@ -131,7 +131,7 @@ describe("GridFlow core agent engine", () => {
   });
   it("recovers stale running jobs and dead-letters exhausted jobs", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-stale-job-"));
-    database = await createDatabase(`pglite://${directory}/db`);
+    database = await createDatabase("pglite://memory");
     await migrateDatabase(database);
 
     const identity = await database.transaction(async (tx) => {

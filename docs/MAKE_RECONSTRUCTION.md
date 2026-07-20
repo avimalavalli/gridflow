@@ -9,7 +9,7 @@ GridFlow will not pretend that reconstructed text is the original text. Each rep
 ## Source hierarchy used
 
 1. The 27-page GridFlow Commercial OS developer brief.
-2. The complete Airtable CSV export supplied by Avi.
+2. The complete Airtable CSV export supplied from the prototype.
 3. Existing successful Atlas discovery records.
 4. Existing Sage research, scoring, partnership angles and evidence.
 5. Existing Relay contacts, titles, notes and stable keys.

@@ -2,23 +2,19 @@
 
 ## What is implemented
 
-GridFlow now includes a database-backed Migration Centre with:
+GridFlow includes a database-backed Migration Centre with:
 
 - per-record `Approve`, `Apply Repairs`, `Skip` and `Reset` decisions;
 - a bulk **Approve all safe** action;
 - dependency-aware import preview;
 - blocked and test-record protection;
-- transactional import runs;
-- tenant-scoped migration decisions and receipts;
-- stable-key upserts for Companies, Contacts and Outreach;
-- versioned import of legacy Echo outreach copy;
-- imports for Discovery Briefs, Opportunities, Interactions, Tasks and Lead Sources where their dependencies are valid;
-- audit logging;
+- transactional, tenant-scoped import runs and receipts;
+- stable-key upserts and audit logging;
 - idempotent retries that update existing records rather than create duplicates.
 
 ## Isolated verification result
 
-The supplied Airtable export was tested against a fresh temporary GridFlow database.
+The prototype export was tested against a disposable GridFlow database.
 
 | Result | Count |
 |---|---:|
@@ -28,18 +24,12 @@ The supplied Airtable export was tested against a fresh temporary GridFlow datab
 | Blocked at import time | 11 |
 | Failed | 0 |
 
-The 11 blocked records comprise the original eight source-data blockers plus three dependent records connected to blocked Crew Clothing data:
+A second import created **0 duplicate records** and updated the same 98 records. Blocked and skipped records remained protected.
 
-- one Opportunity;
-- one Interaction;
-- one Task.
+## Privacy boundary
 
-The import was then run a second time against the same database:
-
-- **0 duplicate records were created**;
-- **98 existing records were updated**;
-- the same blocked and skipped records remained protected.
+The clean source package excludes private CSVs, row-level migration reports, company names, contact names, email addresses and domains.
 
 ## Important boundary
 
-The successful test used a disposable local database. The user's live Airtable export has not been written into a hosted production database. A real cutover must happen only after the private app is deployed, the review screen is checked and the import button is deliberately confirmed.
+The successful test used a disposable local database. A real cutover must happen only after the release environment is configured, the review screen is checked and the import is deliberately confirmed by the organisation owner.

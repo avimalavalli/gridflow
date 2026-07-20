@@ -16,7 +16,7 @@ describe("GridFlow database", () => {
   it("applies all PostgreSQL migrations idempotently", async () => {
     const directory = await mkdtemp(join(tmpdir(), "gridflow-db-"));
     tempDirectories.push(directory);
-    const database = await createDatabase(`pglite://${join(directory, "postgres")}`);
+    const database = await createDatabase("pglite://memory");
     openDatabases.push(database);
 
     await migrateDatabase(database);
@@ -32,13 +32,13 @@ describe("GridFlow database", () => {
     const migrations = await database.query<{ count: number }>(
       `SELECT COUNT(*)::int AS "count" FROM "_GridFlowMigration"`,
     );
-    expect(migrations.rows[0]?.count).toBe(4);
+    expect(migrations.rows[0]?.count).toBe(5);
   });
 
   it("enforces tenant-scoped company keys at database level", async () => {
     const directory = await mkdtemp(join(tmpdir(), "gridflow-db-"));
     tempDirectories.push(directory);
-    const database = await createDatabase(`pglite://${join(directory, "postgres")}`);
+    const database = await createDatabase("pglite://memory");
     openDatabases.push(database);
     await migrateDatabase(database);
 

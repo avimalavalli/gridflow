@@ -53,7 +53,7 @@ afterEach(async () => {
 describe("GridFlow account recovery and MFA", () => {
   it("resets passwords, revokes sessions and completes an MFA login", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-auth-service-"));
-    database = await createDatabase(`pglite://${directory}/db`);
+    database = await createDatabase("pglite://memory");
     await migrateDatabase(database);
     apiConfig.authEncryptionKey = "gridflow-test-auth-encryption-key-that-is-long-enough";
     apiConfig.webOrigin = "https://app.gridflow.test";

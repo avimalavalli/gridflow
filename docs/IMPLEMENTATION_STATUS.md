@@ -1,59 +1,38 @@
-# GridFlow implementation status — Milestone 7
+# GridFlow implementation status — Milestone 8
 
-## Verified and runnable
+## Built and verified
 
-### Multi-athlete commercial product
-
-- Isolated organisations, users, roles, invitations and organisation switching.
-- Athlete-specific onboarding, markets, outreach policies and Discovery Briefs.
-- Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings workspaces.
-- Action-led dashboard, search, responsive shell and command palette.
-- Airtable migration audit/import architecture and stable-key protection.
-
-### Agent engine
-
-- Durable Atlas → Sage → Relay → Echo execution.
-- Evidence provenance, retries, heartbeats, stale-job recovery and dead-letter handling.
-- Token/cost tracking and prompt/model versioning.
-- Deterministic quality gates with `PASS`, `REVIEW` and `FAIL` reports stored per run.
-- Hard rejection of unresolved placeholders, invented/unsupported data patterns and critical evidence failures.
-
-### Outreach operations
-
-- Human-controlled LinkedIn execution queue.
-- Gmail OAuth, encrypted tokens, draft/send policies, reply sync, bounce handling and suppression architecture.
-- Re-evaluation of sending rules at execution time and duplicate-send protection.
-
-### Account and release security
-
-- Password recovery with expiring, one-use hashed tokens.
-- Session revocation after reset.
-- Login lockout controls.
-- Authenticator-app MFA, encrypted secrets and one-use recovery codes.
-- Durable authentication email outbox with Resend-ready production worker.
-- Security headers, liveness/readiness checks, release preflight and CI.
-- Keyboard, focus, reduced-motion and high-contrast improvements.
+- Multi-athlete organisations, roles, invitations and isolated data.
+- Athlete onboarding, personalised markets, outreach policy and Discovery Briefs.
+- Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings.
+- Durable Atlas → Sage → Relay → Echo engine with evidence, retries, recovery, cost and quality gates.
+- Human acceptance, rejection and tuning feedback for every successful agent run.
+- LinkedIn operating queue and Gmail draft/send/reply/suppression architecture.
+- Password recovery, MFA, lockout, encrypted integration secrets and security headers.
+- Administrator Operations console for queues, failures, integrations, quality reviews and release readiness.
+- Structured API/worker logging, request IDs and optional external alerts.
+- Database backup, checksum verification and restore-rehearsal tooling.
+- Release preflight, schema consistency checks, CI and deterministic agent-quality fixtures.
 
 ## Validation result
 
-- 41 tests passed across 15 files.
-- TypeScript and ESLint passed.
-- API and worker production builds passed.
-- Next.js compile and generate production phases passed.
-- Commercial CRM and authentication/multi-athlete smoke suites passed.
-- Dependency audit: 0 known vulnerabilities.
+- 43 automated tests passed across 17 files.
+- 8/8 agent-quality regression fixtures matched their expected outcome.
+- Database schema check passed: 46 models and 5 registered migrations.
+- TypeScript, ESLint, API build, worker build and Next.js production build passed.
+- Commercial CRM and multi-athlete authentication smoke suites passed.
+- Controlled release preflight passed.
+- PGlite backup creation, checksum verification and restore rehearsal passed.
 
-## Verified without live external calls
+The dependency audit endpoint returned a 502 during this milestone. No dependencies were added, and the last successful Milestone 7 audit reported zero known vulnerabilities. A successful fresh audit remains a release requirement.
 
-The complete engine and quality gates are fixture-tested. No live sponsor research was run without a release-owned OpenAI credential. No real Gmail or Resend message was sent, and no physical authenticator application was enrolled.
+## Still required before public V1
 
-## Remaining before main V1 release
+1. Controlled live OpenAI research and prompt tuning.
+2. Real Gmail, Resend and authenticator-device acceptance.
+3. Real-browser, responsive, accessibility and performance QA.
+4. Owner-controlled production infrastructure, domain, monitoring, alerts and off-host backups.
+5. Final permissions/security review and production restore rehearsal.
+6. Selected-athlete launch acceptance before wider access.
 
-1. Controlled live Atlas → Sage → Relay → Echo quality programme and prompt tuning.
-2. Release-owned Resend, Gmail OAuth and mailbox acceptance tests.
-3. Browser, accessibility and responsive acceptance testing on real devices.
-4. Production monitoring, backups, infrastructure, domain and incident procedures.
-5. Final permissions/security review and release checklist.
-6. Proposals and sponsor fulfilment only after the acquisition workflow proves reliable.
-
-GridFlow remains organisation-based and athlete-agnostic. Avi is the first migration and acceptance case, not the product model.
+GridFlow is now a release-candidate codebase, not yet a publicly released service.

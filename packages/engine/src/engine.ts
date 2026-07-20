@@ -142,7 +142,8 @@ export class AgentEngine {
       const result = await tx.query<AgentRunListItem>(
         `SELECT "id", "agentName"::text AS "agentName", "status"::text AS "status", "promptVersion", "modelUsed",
                 "startedAt", "completedAt", "errorCode", "errorDetails", "retryCount", "totalTokens",
-                "estimatedCostUsd"::text AS "estimatedCostUsd", "qualityStatus", "qualityScore", "qualityReport", "discoveryBriefId", "companyId", "contactId",
+                "estimatedCostUsd"::text AS "estimatedCostUsd", "qualityStatus", "qualityScore", "qualityReport",
+                "humanReviewStatus", "humanReviewNotes", "humanReviewedAt", "humanReviewedByUserId", "discoveryBriefId", "companyId", "contactId",
                 "outreachRecordId", "createdAt"
          FROM "AgentRun" WHERE "tenantId"=$1::uuid ORDER BY "createdAt" DESC LIMIT $2`,
         [tenantId, Math.max(1, Math.min(limit, 200))],

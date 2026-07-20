@@ -383,6 +383,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   loginChallenges AuthLoginChallenge[]
   authEmailOutbox AuthEmailOutbox[]
+  agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
 }
 
 model Organisation {
@@ -1152,6 +1153,10 @@ model AgentRun {
   qualityStatus    String?
   qualityScore     Int?
   qualityReport    Json?
+  humanReviewStatus String         @default("UNREVIEWED")
+  humanReviewNotes  String?
+  humanReviewedAt   DateTime?      @db.Timestamptz(3)
+  humanReviewedByUserId String?    @db.Uuid
   discoveryBriefId String?        @db.Uuid
   companyId        String?        @db.Uuid
   contactId        String?        @db.Uuid
@@ -1163,11 +1168,13 @@ model AgentRun {
   company          Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact          Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   outreachRecord   OutreachRecord? @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
+  humanReviewedBy  User?           @relation("AgentRunReviewedBy", fields: [humanReviewedByUserId], references: [id], onDelete: SetNull)
   evidence         EvidenceSource[]
   automationJobs   AutomationJob[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, agentName, status])
+  @@index([tenantId, humanReviewStatus, createdAt])
 }
 
 model AutomationJob {

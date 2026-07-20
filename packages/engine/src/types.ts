@@ -40,6 +40,10 @@ export interface AgentRunListItem extends Record<string, unknown> {
   qualityStatus: string | null;
   qualityScore: number | null;
   qualityReport: Record<string, unknown> | null;
+  humanReviewStatus: string;
+  humanReviewNotes: string | null;
+  humanReviewedAt: Date | null;
+  humanReviewedByUserId: string | null;
   discoveryBriefId: string | null;
   companyId: string | null;
   contactId: string | null;

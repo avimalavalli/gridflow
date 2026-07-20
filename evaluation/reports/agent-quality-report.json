@@ -1,0 +1,270 @@
+{
+  "generatedAt": "2026-07-20T08:09:25.718Z",
+  "fixturePath": "evaluation/fixtures/agent-quality-fixtures.json",
+  "fixtures": 8,
+  "expectationsPassed": 8,
+  "expectationsFailed": 0,
+  "perAgent": [
+    {
+      "agentName": "ATLAS",
+      "fixtures": 2,
+      "expectationsPassed": 2,
+      "averageScore": 50
+    },
+    {
+      "agentName": "SAGE",
+      "fixtures": 2,
+      "expectationsPassed": 2,
+      "averageScore": 50
+    },
+    {
+      "agentName": "RELAY",
+      "fixtures": 2,
+      "expectationsPassed": 2,
+      "averageScore": 50
+    },
+    {
+      "agentName": "ECHO",
+      "fixtures": 2,
+      "expectationsPassed": 2,
+      "averageScore": 50
+    }
+  ],
+  "results": [
+    {
+      "id": "atlas-pass-personalised-company",
+      "agentName": "ATLAS",
+      "expectedStatus": "PASS",
+      "actualStatus": "PASS",
+      "score": 100,
+      "passedExpectation": true,
+      "issues": []
+    },
+    {
+      "id": "atlas-fail-domain-and-evidence",
+      "agentName": "ATLAS",
+      "expectedStatus": "FAIL",
+      "actualStatus": "FAIL",
+      "score": 0,
+      "passedExpectation": true,
+      "issues": [
+        {
+          "code": "ATLAS_DOMAIN_MISMATCH",
+          "severity": "error",
+          "message": "Unverified Brand's company key does not match its website domain.",
+          "path": "companies.0.company_key"
+        },
+        {
+          "code": "ATLAS_NO_EVIDENCE",
+          "severity": "error",
+          "message": "Unverified Brand has no evidence source.",
+          "path": "companies.0.sources"
+        },
+        {
+          "code": "ATLAS_THIN_RATIONALE",
+          "severity": "warning",
+          "message": "Unverified Brand needs a more athlete-specific discovery rationale.",
+          "path": "companies.0.discovery_rationale"
+        },
+        {
+          "code": "ATLAS_LOW_CONFIDENCE",
+          "severity": "error",
+          "message": "Unverified Brand is below the minimum confidence threshold.",
+          "path": "companies.0.confidence"
+        }
+      ]
+    },
+    {
+      "id": "sage-pass-evidence-backed-fit",
+      "agentName": "SAGE",
+      "expectedStatus": "PASS",
+      "actualStatus": "PASS",
+      "score": 100,
+      "passedExpectation": true,
+      "issues": []
+    },
+    {
+      "id": "sage-fail-placeholders-and-thin-evidence",
+      "agentName": "SAGE",
+      "expectedStatus": "FAIL",
+      "actualStatus": "FAIL",
+      "score": 0,
+      "passedExpectation": true,
+      "issues": [
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain budget_potential.",
+          "path": "score_explanations.budget_potential"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain strategic_fit.",
+          "path": "score_explanations.strategic_fit"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain geographical_fit.",
+          "path": "score_explanations.geographical_fit"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain motorsport_relevance.",
+          "path": "score_explanations.motorsport_relevance"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain marketing_activity.",
+          "path": "score_explanations.marketing_activity"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain decision_maker_access.",
+          "path": "score_explanations.decision_maker_access"
+        },
+        {
+          "code": "SAGE_SCORE_EXPLANATION_MISSING",
+          "severity": "error",
+          "message": "Sage did not adequately explain timing_score.",
+          "path": "score_explanations.timing_score"
+        },
+        {
+          "code": "SAGE_NO_SOURCES",
+          "severity": "error",
+          "message": "Sage returned no evidence sources.",
+          "path": "sources"
+        },
+        {
+          "code": "SAGE_INCOMPLETE_EVIDENCE",
+          "severity": "warning",
+          "message": "Sage evidence completeness is below 0.45 and requires review.",
+          "path": "evidence_completeness"
+        },
+        {
+          "code": "SAGE_LOW_CONFIDENCE",
+          "severity": "warning",
+          "message": "Sage confidence is below 0.45.",
+          "path": "confidence"
+        },
+        {
+          "code": "SAGE_GENERIC_ANGLE",
+          "severity": "warning",
+          "message": "The partnership angle is too short to demonstrate specific commercial fit.",
+          "path": "partnership_angle"
+        },
+        {
+          "code": "SAGE_PLACEHOLDER",
+          "severity": "error",
+          "message": "Sage output contains an unresolved placeholder."
+        }
+      ]
+    },
+    {
+      "id": "relay-pass-current-contact",
+      "agentName": "RELAY",
+      "expectedStatus": "PASS",
+      "actualStatus": "PASS",
+      "score": 100,
+      "passedExpectation": true,
+      "issues": []
+    },
+    {
+      "id": "relay-fail-unsupported-contact",
+      "agentName": "RELAY",
+      "expectedStatus": "FAIL",
+      "actualStatus": "FAIL",
+      "score": 0,
+      "passedExpectation": true,
+      "issues": [
+        {
+          "code": "RELAY_COUNT_MISMATCH",
+          "severity": "error",
+          "message": "Relay supported_count does not match the contacts array.",
+          "path": "supported_count"
+        },
+        {
+          "code": "RELAY_NO_EVIDENCE",
+          "severity": "error",
+          "message": "Unknown Person has no current public evidence.",
+          "path": "contacts.0.sources"
+        },
+        {
+          "code": "RELAY_INVALID_EMAIL",
+          "severity": "error",
+          "message": "Unknown Person has an invalid email address.",
+          "path": "contacts.0.email"
+        },
+        {
+          "code": "RELAY_INVALID_LINKEDIN",
+          "severity": "error",
+          "message": "Unknown Person has an invalid LinkedIn URL.",
+          "path": "contacts.0.linkedin_profile"
+        },
+        {
+          "code": "RELAY_LOW_CONFIDENCE",
+          "severity": "warning",
+          "message": "Unknown Person requires manual role verification.",
+          "path": "contacts.0.confidence"
+        }
+      ]
+    },
+    {
+      "id": "echo-pass-specific-outreach",
+      "agentName": "ECHO",
+      "expectedStatus": "PASS",
+      "actualStatus": "PASS",
+      "score": 100,
+      "passedExpectation": true,
+      "issues": []
+    },
+    {
+      "id": "echo-fail-placeholder-and-length",
+      "agentName": "ECHO",
+      "expectedStatus": "FAIL",
+      "actualStatus": "FAIL",
+      "score": 0,
+      "passedExpectation": true,
+      "issues": [
+        {
+          "code": "ECHO_PLACEHOLDER",
+          "severity": "error",
+          "message": "Echo output contains an unresolved placeholder."
+        },
+        {
+          "code": "ECHO_LINKEDIN_NOTE_LENGTH",
+          "severity": "error",
+          "message": "LinkedIn connection note exceeds 300 characters.",
+          "path": "linkedin_connection_note"
+        },
+        {
+          "code": "ECHO_SUBJECT_LENGTH",
+          "severity": "warning",
+          "message": "Email subject is longer than 120 characters.",
+          "path": "email_subject"
+        },
+        {
+          "code": "ECHO_EMAIL_LENGTH",
+          "severity": "warning",
+          "message": "Initial email should be concise but commercially complete.",
+          "path": "email_body"
+        },
+        {
+          "code": "ECHO_WEAK_PERSONALISATION",
+          "severity": "error",
+          "message": "Echo did not provide enough evidence for its personalisation.",
+          "path": "personalisation_evidence"
+        },
+        {
+          "code": "ECHO_UNSUPPORTED_HYPE",
+          "severity": "warning",
+          "message": "Echo uses unsupported promotional language that should be reviewed."
+        }
+      ]
+    }
+  ]
+}

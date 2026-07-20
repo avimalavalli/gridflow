@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsOptional, IsUUID } from "class-validator";
+import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 
 export enum AgentNameDto {
   ATLAS = "ATLAS",
@@ -26,4 +26,15 @@ export class EnqueueAgentRunDto {
   @IsOptional()
   @IsBoolean()
   forceRegenerate?: boolean;
+}
+
+export class ReviewAgentRunDto {
+  @IsString()
+  @IsIn(["ACCEPTED", "NEEDS_TUNING", "REJECTED"])
+  status!: "ACCEPTED" | "NEEDS_TUNING" | "REJECTED";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  notes?: string;
 }

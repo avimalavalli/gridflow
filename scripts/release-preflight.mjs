@@ -9,6 +9,8 @@ const required = [
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
   "INTEGRATION_ENCRYPTION_KEY",
+  "GRIDFLOW_RELEASE",
+  "GRIDFLOW_COMMIT_SHA",
 ];
 
 const failures = [];
@@ -23,6 +25,12 @@ if ((process.env.AUTH_ENCRYPTION_KEY ?? "").length < 32) failures.push("AUTH_ENC
 if ((process.env.INTEGRATION_ENCRYPTION_KEY ?? "").length < 32) failures.push("INTEGRATION_ENCRYPTION_KEY must contain at least 32 characters.");
 if (!/^https:\/\//.test(process.env.WEB_ORIGIN ?? "")) failures.push("WEB_ORIGIN must use HTTPS.");
 if (!/^https:\/\//.test(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "")) failures.push("GOOGLE_OAUTH_REDIRECT_URI must use HTTPS.");
+if ((process.env.GRIDFLOW_COMMIT_SHA ?? "").length < 7) failures.push("GRIDFLOW_COMMIT_SHA must contain a real commit identifier.");
+
+const backupsReady = process.env.DATABASE_PROVIDER_BACKUPS === "true" || Boolean(process.env.BACKUP_STORAGE_URL?.trim());
+if (!backupsReady) failures.push("Configure BACKUP_STORAGE_URL or confirm DATABASE_PROVIDER_BACKUPS=true.");
+const alertsReady = process.env.LOG_DRAIN_CONFIGURED === "true" || Boolean(process.env.OPERATIONS_ALERT_WEBHOOK_URL?.trim());
+if (!alertsReady) failures.push("Configure OPERATIONS_ALERT_WEBHOOK_URL or confirm LOG_DRAIN_CONFIGURED=true.");
 
 if (failures.length) {
   console.error("GridFlow release preflight failed:\n- " + failures.join("\n- "));

@@ -18,6 +18,7 @@ import { TasksModule } from "./tasks/tasks.module.js";
 import { InteractionsModule } from "./interactions/interactions.module.js";
 import { MeetingsModule } from "./meetings/meetings.module.js";
 import { IntegrationsModule } from "./integrations/integrations.module.js";
+import { OperationsModule } from "./operations/operations.module.js";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { IntegrationsModule } from "./integrations/integrations.module.js";
     InteractionsModule,
     MeetingsModule,
     IntegrationsModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}

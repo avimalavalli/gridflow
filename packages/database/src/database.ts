@@ -63,7 +63,7 @@ class PGliteDatabase implements GridFlowDatabase {
   private constructor(private readonly db: PGlite) {}
 
   static async create(dataDirectory: string): Promise<PGliteDatabase> {
-    await mkdir(dirname(dataDirectory), { recursive: true });
+    if (dataDirectory !== "memory://") await mkdir(dirname(dataDirectory), { recursive: true });
     const db = new PGlite(dataDirectory);
     await db.waitReady;
     return new PGliteDatabase(db);
@@ -155,6 +155,7 @@ export function databaseUrl(): string {
 
 function pglitePath(url: string): string {
   const raw = url.replace(/^pglite:\/\//, "");
+  if (raw === "memory" || raw.startsWith("memory/")) return "memory://";
   return resolve(process.cwd(), raw || "./.gridflow-data/postgres");
 }
 

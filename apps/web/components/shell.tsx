@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   Bot,
   Building2,
   CalendarDays,
@@ -26,7 +28,9 @@ import {
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 
-const navigation = [
+type NavigationItem = { label: string; href: string; icon: LucideIcon; keywords: string; roles?: readonly string[] };
+
+const navigation: readonly { label: string; items: readonly NavigationItem[] }[] = [
   {
     label: "Workspace",
     items: [
@@ -58,6 +62,7 @@ const navigation = [
       { label: "Team & Access", href: "/team", icon: UsersRound, keywords: "members roles organisations invites" },
       { label: "Settings", href: "/settings", icon: Settings, keywords: "profile strategy preferences policy" },
       { label: "Migration", href: "/migration", icon: DatabaseZap, keywords: "airtable import data" },
+      { label: "Operations", href: "/operations", icon: Activity, keywords: "release health monitoring quality failures readiness", roles: ["OWNER", "ADMIN"] },
     ],
   },
 ] as const;
@@ -116,12 +121,19 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
     return () => window.clearTimeout(timer);
   }, [searchOpen]);
 
+  const visibleNavigation = useMemo(() => {
+    const role = auth?.activeOrganisation.role;
+    return navigation
+      .map((section) => ({ ...section, items: section.items.filter((item) => !item.roles || (role ? item.roles.includes(role) : false)) }))
+      .filter((section) => section.items.length > 0);
+  }, [auth?.activeOrganisation.role]);
+
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const all = navigation.flatMap((section) => section.items.map((item) => ({ ...item, section: section.label })));
+    const all = visibleNavigation.flatMap((section) => section.items.map((item) => ({ ...item, section: section.label })));
     if (!needle) return all;
     return all.filter((item) => `${item.label} ${item.section} ${item.keywords}`.toLowerCase().includes(needle));
-  }, [query]);
+  }, [query, visibleNavigation]);
 
   function goTo(href: string): void {
     setSearchOpen(false);
@@ -152,7 +164,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
         </Link>
 
         <nav className="nav" aria-label="Primary navigation">
-          {navigation.map((section) => (
+          {visibleNavigation.map((section) => (
             <div className="nav-section" key={section.label}>
               <div className="nav-section-label">{section.label}</div>
               {section.items.map((item) => {

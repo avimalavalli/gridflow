@@ -1,0 +1,221 @@
+[
+  {
+    "id": "atlas-pass-personalised-company",
+    "agentName": "ATLAS",
+    "expectedStatus": "PASS",
+    "output": {
+      "companies": [
+        {
+          "company_name": "Apex Performance Systems",
+          "website": "https://apexperformance.example",
+          "company_key": "apexperformance.example",
+          "discovery_rationale": "Apex sells performance technology in the athlete's home and competition markets, giving the partnership a credible route to demonstrate products through training, events and business-to-business hospitality.",
+          "discovery_evidence": "The company operates in both selected markets and publicly promotes athlete and event partnerships.",
+          "sources": [
+            {
+              "url": "https://apexperformance.example/about",
+              "title": "About Apex Performance Systems",
+              "supported_fact": "Apex operates in the athlete's target markets and serves performance-focused customers.",
+              "source_type": "company_website",
+              "retrieved_at": "2026-07-20T00:00:00.000Z",
+              "confidence": 0.95
+            }
+          ],
+          "confidence": 0.86
+        }
+      ],
+      "atlas_notes": "The candidate matches the active Discovery Brief and has enough public evidence for Sage research."
+    }
+  },
+  {
+    "id": "atlas-fail-domain-and-evidence",
+    "agentName": "ATLAS",
+    "expectedStatus": "FAIL",
+    "output": {
+      "companies": [
+        {
+          "company_name": "Unverified Brand",
+          "website": "https://unverified.example",
+          "company_key": "different.example",
+          "discovery_rationale": "Could be a sponsor.",
+          "discovery_evidence": "Unknown.",
+          "sources": [],
+          "confidence": 0.2
+        }
+      ],
+      "atlas_notes": ""
+    }
+  },
+  {
+    "id": "sage-pass-evidence-backed-fit",
+    "agentName": "SAGE",
+    "expectedStatus": "PASS",
+    "output": {
+      "industries": ["Performance technology", "Data analytics"],
+      "country": "United Kingdom",
+      "company_size": "51-200 employees",
+      "linkedin_company_url": "https://www.linkedin.com/company/apex-performance-systems",
+      "budget_potential": 4,
+      "strategic_fit": 5,
+      "geographical_fit": 5,
+      "motorsport_relevance": 4,
+      "marketing_activity": 4,
+      "decision_maker_access": 3,
+      "timing_score": 4,
+      "score_explanations": {
+        "budget_potential": "The company's public expansion activity and established commercial footprint indicate capacity for a mid-value partnership.",
+        "strategic_fit": "Its performance positioning closely matches the athlete's measurable training, competition and technology-led story.",
+        "geographical_fit": "The company trades in the athlete's home market and in the markets where the competition programme is visible.",
+        "motorsport_relevance": "Its products can be demonstrated through data, preparation and performance content without forcing an artificial racing link.",
+        "marketing_activity": "Recent campaigns, event activity and partnership content show that the company actively uses external collaborations.",
+        "decision_maker_access": "Public leadership information exists, although the exact partnership owner still requires Relay verification.",
+        "timing_score": "Current market expansion and the athlete's upcoming programme provide a credible reason to begin discussions now."
+      },
+      "research_notes": "Apex has a visible performance proposition, active marketing programme and a credible cross-market reason to work with the athlete.",
+      "partnership_angle": "Build a measurable performance-technology partnership in which Apex supports the athlete's preparation and data-led content while using events, digital storytelling and customer hospitality to demonstrate its product value across both target markets.",
+      "recommended_contact_roles": ["Head of Partnerships", "Marketing Director", "Commercial Director"],
+      "sources": [
+        {
+          "url": "https://apexperformance.example/about",
+          "title": "About Apex",
+          "supported_fact": "The company operates in the target markets.",
+          "source_type": "company_website",
+          "retrieved_at": "2026-07-20T00:00:00.000Z",
+          "confidence": 0.94
+        },
+        {
+          "url": "https://apexperformance.example/news/expansion",
+          "title": "Apex expansion announcement",
+          "supported_fact": "The company is expanding its commercial activity in the competition market.",
+          "source_type": "news",
+          "retrieved_at": "2026-07-20T00:00:00.000Z",
+          "confidence": 0.9
+        }
+      ],
+      "unknowns": ["Exact annual partnership budget"],
+      "evidence_completeness": 0.82,
+      "confidence": 0.84
+    }
+  },
+  {
+    "id": "sage-fail-placeholders-and-thin-evidence",
+    "agentName": "SAGE",
+    "expectedStatus": "FAIL",
+    "output": {
+      "industries": ["Other"],
+      "country": "Unknown",
+      "company_size": "Unknown",
+      "linkedin_company_url": null,
+      "budget_potential": 3,
+      "strategic_fit": 3,
+      "geographical_fit": 3,
+      "motorsport_relevance": 3,
+      "marketing_activity": 3,
+      "decision_maker_access": 3,
+      "timing_score": 3,
+      "score_explanations": {},
+      "research_notes": "[Company] looks suitable.",
+      "partnership_angle": "Sponsor the athlete.",
+      "recommended_contact_roles": [],
+      "sources": [],
+      "unknowns": [],
+      "evidence_completeness": 0.1,
+      "confidence": 0.2
+    }
+  },
+  {
+    "id": "relay-pass-current-contact",
+    "agentName": "RELAY",
+    "expectedStatus": "PASS",
+    "output": {
+      "requested_count": 2,
+      "supported_count": 1,
+      "contacts": [
+        {
+          "contact_name": "Jordan Patel",
+          "job_title": "Head of Partnerships",
+          "linkedin_profile": "https://www.linkedin.com/in/jordan-patel-partnerships",
+          "email": "jordan.patel@apexperformance.example",
+          "phone": null,
+          "contact_key": "apexperformance.example|jordan-patel|head-of-partnerships",
+          "verification_status": "Publicly Listed",
+          "discovery_source": "Public Web",
+          "notes": "Current role is supported by the company leadership page and LinkedIn profile.",
+          "sources": [
+            {
+              "url": "https://apexperformance.example/team/jordan-patel",
+              "title": "Apex leadership team",
+              "supported_fact": "Jordan Patel is Head of Partnerships at Apex Performance Systems.",
+              "source_type": "company_website",
+              "retrieved_at": "2026-07-20T00:00:00.000Z",
+              "confidence": 0.94
+            }
+          ],
+          "confidence": 0.88
+        }
+      ],
+      "contact_discovery_notes": "One current partnership decision-maker was supported by public evidence.",
+      "fewer_than_requested_reason": "A second contact was not returned because current public evidence was insufficient."
+    }
+  },
+  {
+    "id": "relay-fail-unsupported-contact",
+    "agentName": "RELAY",
+    "expectedStatus": "FAIL",
+    "output": {
+      "requested_count": 2,
+      "supported_count": 2,
+      "contacts": [
+        {
+          "contact_name": "Unknown Person",
+          "job_title": "Marketing",
+          "linkedin_profile": "not-a-url",
+          "email": "wrong-address",
+          "phone": null,
+          "contact_key": "unknown",
+          "verification_status": "Unverified",
+          "discovery_source": "Other Provider",
+          "notes": "Guessed contact.",
+          "sources": [],
+          "confidence": 0.15
+        }
+      ],
+      "contact_discovery_notes": "",
+      "fewer_than_requested_reason": ""
+    }
+  },
+  {
+    "id": "echo-pass-specific-outreach",
+    "agentName": "ECHO",
+    "expectedStatus": "PASS",
+    "output": {
+      "linkedin_connection_note": "Hi Jordan — I noticed Apex's expansion into performance analytics. I am building a cross-market racing programme and would value connecting to explore a relevant partnership.",
+      "linkedin_followup_message": "Thanks for connecting, Jordan. Apex's focus on measurable performance aligns strongly with how I train, race and create partner content. I have a concise idea linking product demonstration, digital storytelling and event hospitality. Would a short conversation next week be useful?",
+      "email_subject": "A measurable performance partnership with Apex",
+      "email_body": "Hi Jordan,\n\nApex's expansion in performance analytics stood out because my racing programme is built around measurable preparation, data and international competition. I would like to share a focused partnership idea combining product demonstration, credible performance content and customer hospitality across our shared markets.\n\nWould you be open to a brief call next week?\n\nBest,\nThe athlete",
+      "follow_up_email_1": "Hi Jordan, following up with one practical angle: Apex could turn race preparation data into a short content series while using selected events for customer engagement. Is this relevant to your current partnership priorities?",
+      "follow_up_email_2": "Hi Jordan, I will close the loop after this note. The opportunity is designed around measurable product storytelling rather than logo placement alone. Happy to send the one-page outline if useful.",
+      "call_opener": "I am calling because Apex's performance-analytics positioning has a natural link to the measurable preparation and content behind my racing programme.",
+      "personalisation_evidence": "Apex publicly announced expansion in performance analytics and operates in both the athlete's home and competition markets.",
+      "partnership_pitch": "A measurable partnership combining product demonstration, athlete performance content, business hospitality and cross-market storytelling.",
+      "generation_notes": "LinkedIn-first sequence; email is available as a secondary channel after review."
+    }
+  },
+  {
+    "id": "echo-fail-placeholder-and-length",
+    "agentName": "ECHO",
+    "expectedStatus": "FAIL",
+    "output": {
+      "linkedin_connection_note": "Hi [Name], this is a deliberately overlong LinkedIn connection note that exceeds the platform-safe limit because it contains generic language, unsupported promises of massive exposure, and no useful reason why the recipient should care about the athlete or the proposed commercial relationship. It continues beyond the sensible character limit.",
+      "linkedin_followup_message": "We guarantee massive exposure.",
+      "email_subject": "A revolutionary once-in-a-lifetime world-class guaranteed partnership opportunity for your company that you absolutely cannot miss",
+      "email_body": "Hi [Name], sponsor us.",
+      "follow_up_email_1": "Following up.",
+      "follow_up_email_2": "Following up again.",
+      "call_opener": "Sponsor us.",
+      "personalisation_evidence": "None.",
+      "partnership_pitch": "Massive exposure guaranteed.",
+      "generation_notes": ""
+    }
+  }
+]

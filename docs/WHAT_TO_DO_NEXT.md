@@ -1,24 +1,20 @@
 # What happens next
 
-Milestone 6 completed the core outreach operating layer: durable LinkedIn actions, Gmail connection infrastructure, email-policy enforcement, queued delivery, reply synchronisation, bounce handling and suppression.
+GridFlow is now at release-candidate code status. The remaining work is acceptance and production ownership, not another round of random features.
 
-## Next developer milestone: live agent quality and release hardening
+## Next milestone: controlled live acceptance
 
-The next work remains focused on the main GridFlow V1 rather than a separate private product.
+1. Create release-owned OpenAI, Gmail and Resend accounts.
+2. Run one personalised Discovery Brief through Atlas → Sage → Relay → Echo.
+3. Human-review every source, company, score, contact and message.
+4. Convert accepted and rejected results into new regression fixtures and tune prompts.
+5. Test Gmail draft, send, reply, bounce, opt-out and sequence-stop behaviour with controlled mailboxes.
+6. Complete real-device browser, mobile, accessibility and performance QA.
+7. Configure managed PostgreSQL, logging, alerts and off-host backups.
+8. Run security, permissions, backup-restore and release checklists.
+9. Deploy the main V1 and open selected athlete accounts.
+10. Expand access only after measured quality and reliability are stable.
 
-1. Build a controlled agent-quality evaluation harness with fixed athlete profiles and expected output criteria.
-2. Run Atlas, Sage, Relay and Echo against live web research using release-owned OpenAI credentials.
-3. Score factual accuracy, evidence quality, commercial relevance, contact suitability and message quality.
-4. Tune prompts, search strategy, model selection and retry behaviour from measured failures.
-5. Add an administrator quality-review console and regression fixtures from accepted results.
-6. Add password reset and verified-email flows.
-7. Add MFA and recovery-code support.
-8. Complete accessibility, browser, responsive and performance testing.
-9. Add structured monitoring, backups, alerts and production release controls.
-10. Configure and validate a release-owned Google OAuth project, then run a controlled mailbox acceptance test without changing the product architecture.
+## After V1 proves the acquisition workflow
 
-## Product boundary
-
-GridFlow remains a multi-athlete, multi-organisation product. No release work may hard-code Avi's identity, motorsport series, geography, sponsor list or sending strategy.
-
-No credentials should be shared in chat or committed to GitHub. Owner-controlled secrets belong only in the final deployment platform's secret manager.
+Add subscriptions, proposals, contracts, sponsor fulfilment and renewals. Those remain deliberately behind the sponsor-discovery and outreach engine.

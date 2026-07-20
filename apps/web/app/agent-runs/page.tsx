@@ -1,7 +1,10 @@
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { DataUnavailable } from "../../components/data-unavailable";
 import { PageHead } from "../../components/page-head";
 import { RetryAgentButton } from "../../components/retry-agent-button";
 import { Shell } from "../../components/shell";
+import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +25,8 @@ interface AgentRun {
   qualityStatus: string | null;
   qualityScore: number | null;
   qualityReport: { issues?: Array<{ message: string }> } | null;
+  humanReviewStatus: string;
+  humanReviewedAt: string | null;
   createdAt: string;
 }
 
@@ -39,11 +44,16 @@ export default async function AgentRunsPage() {
     error = cause instanceof ApiError ? cause.message : "Unknown agent-run error.";
   }
 
+  const awaitingReview = runs.filter((run) => run.status === "SUCCEEDED" && run.humanReviewStatus === "UNREVIEWED" && ["PASS", "REVIEW"].includes(run.qualityStatus ?? "")).length;
+  const blocked = runs.filter((run) => run.qualityStatus === "FAIL").length;
+  const failures = runs.filter((run) => run.status === "FAILED").length;
+
   return <Shell title="Agent Runs">
-    <PageHead title="Automation history" description="Every Atlas, Sage, Relay and Echo job with prompt version, retries, model usage, failures and cost." />
-    {error ? <DataUnavailable message={error} /> : <section className="card">
+    <PageHead title="Automation and quality" description="Every Atlas, Sage, Relay and Echo job with evidence, automated gates, human decisions, retries, usage and cost." action={<Link className="button button-secondary" href="/operations">Open operations</Link>} />
+    {!error ? <section className="metrics section-gap compact-metrics"><article className="metric-card"><span>Awaiting review</span><strong>{awaitingReview}</strong><small>completed results</small></article><article className="metric-card"><span>Quality blocked</span><strong>{blocked}</strong><small>must be rerun</small></article><article className="metric-card"><span>Run failures</span><strong>{failures}</strong><small>need attention</small></article><article className="metric-card"><span>Total runs</span><strong>{runs.length}</strong><small>latest 50 shown</small></article></section> : null}
+    {error ? <DataUnavailable message={error} /> : <section className="card flush">
       {runs.length === 0 ? <div className="empty">No agent runs yet. Activate a Discovery Brief and queue Atlas.</div> :
-        <div className="table-wrap"><table><thead><tr><th>Agent</th><th>Status</th><th>Created</th><th>Model</th><th>Usage</th><th>Quality</th><th>Failure</th><th>Action</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td><strong>{run.agentName}</strong><div className="table-sub">{run.promptVersion ?? "No prompt version"}</div></td><td><span className={`badge ${run.status === "SUCCEEDED" ? "green" : run.status === "FAILED" ? "red" : run.status === "RUNNING" ? "blue" : "amber"}`}>{run.status}</span><div className="table-sub">Retries: {run.retryCount}</div></td><td>{time(run.createdAt)}<div className="table-sub">Completed: {time(run.completedAt)}</div></td><td>{run.modelUsed ?? "Pending"}</td><td>{run.totalTokens ?? 0} tokens<div className="table-sub">${Number(run.estimatedCostUsd ?? 0).toFixed(4)}</div></td><td>{run.qualityStatus ? <><span className={`badge ${run.qualityStatus === "PASS" ? "green" : run.qualityStatus === "FAIL" ? "red" : "amber"}`}>{run.qualityStatus}</span><div className="table-sub">Score {run.qualityScore ?? "—"}{run.qualityReport?.issues?.length ? ` · ${run.qualityReport.issues.length} issue${run.qualityReport.issues.length === 1 ? "" : "s"}` : ""}</div></> : "Pending"}</td><td>{run.errorDetails ? <span title={run.errorDetails}>{run.errorCode ?? "Failed"}<div className="table-sub">{run.errorDetails.slice(0, 90)}</div></span> : "—"}</td><td>{run.status === "FAILED" ? <RetryAgentButton id={run.id} /> : <span className="table-sub">{run.status === "QUEUED" ? "Waiting for worker" : run.status === "RUNNING" ? "Processing" : "Complete"}</span>}</td></tr>)}</tbody></table></div>}
+        <div className="table-wrap"><table><thead><tr><th>Agent</th><th>Status</th><th>Created</th><th>Usage</th><th>Automated quality</th><th>Human review</th><th>Failure</th><th></th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td><Link className="table-link" href={`/agent-runs/${run.id}`}><div className="table-primary">{run.agentName}</div><div className="table-sub">{run.promptVersion ?? "No prompt version"} · {run.modelUsed ?? "Pending"}</div></Link></td><td><StatusBadge value={run.status} /><div className="table-sub">Retries: {run.retryCount}</div></td><td>{time(run.createdAt)}<div className="table-sub">Completed: {time(run.completedAt)}</div></td><td>{run.totalTokens ?? 0} tokens<div className="table-sub">${Number(run.estimatedCostUsd ?? 0).toFixed(4)}</div></td><td>{run.qualityStatus ? <><StatusBadge value={run.qualityStatus} /><div className="table-sub">Score {run.qualityScore ?? "—"}{run.qualityReport?.issues?.length ? ` · ${run.qualityReport.issues.length} issue${run.qualityReport.issues.length === 1 ? "" : "s"}` : ""}</div></> : "Pending"}</td><td><StatusBadge value={run.humanReviewStatus} /><div className="table-sub">{run.humanReviewedAt ? time(run.humanReviewedAt) : "Not reviewed"}</div></td><td>{run.errorDetails ? <span title={run.errorDetails}>{run.errorCode ?? "Failed"}<div className="table-sub">{run.errorDetails.slice(0, 90)}</div></span> : "—"}</td><td><div className="row-actions">{run.status === "FAILED" ? <RetryAgentButton id={run.id} /> : null}<Link className="icon-button" href={`/agent-runs/${run.id}`} aria-label={`Open ${run.agentName} run`}><ArrowUpRight size={14} /></Link></div></td></tr>)}</tbody></table></div>}
     </section>}
   </Shell>;
 }

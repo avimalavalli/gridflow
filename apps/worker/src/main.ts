@@ -6,6 +6,7 @@ import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
 import { GmailSyncProcessor } from "./gmail-sync.js";
 import { AuthEmailProcessor } from "./auth-email.js";
+import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
 loadEnv({ path: resolve(process.cwd(), ".env"), quiet: true });
 
@@ -17,42 +18,41 @@ await migrateDatabase(database);
 const recoveryEngine = new AgentEngine(database);
 const initialRecovery = await recoveryEngine.recoverStaleJobs(Number(process.env.AGENT_STALE_AFTER_MINUTES ?? 10));
 if (initialRecovery.requeued || initialRecovery.deadLettered) {
-  console.log(JSON.stringify({ event: "stale-agent-jobs-recovered", ...initialRecovery }));
+  logWorkerEvent({ event: "stale-agent-jobs-recovered", level: "warning", details: initialRecovery });
 }
 
 const emailProcessor = new EmailAutomationProcessor(database);
 const gmailSync = new GmailSyncProcessor(database);
 const authEmailProcessor = new AuthEmailProcessor(database);
 const recoveredAuthEmails = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10));
-if (recoveredAuthEmails) console.log(JSON.stringify({ event: "stale-auth-emails-recovered", count: recoveredAuthEmails }));
+if (recoveredAuthEmails) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: recoveredAuthEmails } });
 const recoveredEmails = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10));
-if (recoveredEmails) console.log(JSON.stringify({ event: "stale-email-actions-recovered", count: recoveredEmails }));
+if (recoveredEmails) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: recoveredEmails } });
 
 const provider = process.env.OPENAI_API_KEY ? new OpenAIAgentProvider() : null;
 const engine = provider ? new AgentEngine(database, provider) : null;
-console.log(provider ? `GridFlow agent worker started with ${provider.name}.` : "GridFlow AI agent processing is idle: OPENAI_API_KEY is not configured.");
-console.log("GridFlow email automation processor started.");
+logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: provider?.name ?? null, agentProcessingEnabled: Boolean(provider), emailAutomationEnabled: true } });
 
 const runOnce = async (): Promise<boolean> => {
   const authEmail = await authEmailProcessor.processNext();
   if (authEmail.processed) {
-    console.log(JSON.stringify({ event: "auth-email-processed", ...authEmail }));
+    logWorkerEvent({ event: "auth-email-processed", level: "info", details: authEmail as unknown as Record<string, unknown> });
     return true;
   }
   const email = await emailProcessor.processNext();
   if (email.processed) {
-    console.log(JSON.stringify({ event: "email-action-processed", ...email }));
+    logWorkerEvent({ event: "email-action-processed", level: "info", details: email as unknown as Record<string, unknown> });
     return true;
   }
   const sync = await gmailSync.syncNext();
   if (sync.processed) {
-    console.log(JSON.stringify({ event: "gmail-sync-processed", ...sync }));
+    logWorkerEvent({ event: "gmail-sync-processed", level: "info", details: sync as unknown as Record<string, unknown> });
     return true;
   }
   if (!engine) return false;
   const result = await engine.processNext();
   if (result.processed) {
-    console.log(JSON.stringify({ event: "agent-job-processed", ...result }));
+    logWorkerEvent({ event: "agent-job-processed", level: result.status === "DEAD_LETTER" ? "error" : "info", details: result as unknown as Record<string, unknown> });
     return true;
   }
   return false;
@@ -77,25 +77,25 @@ if (once) {
     if (Date.now() - lastRecoveryAt >= 60_000) {
       if (engine) {
         const recovered = await engine.recoverStaleJobs(Number(process.env.AGENT_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
-          console.error("GridFlow stale-job recovery failed:", error);
+          reportWorkerError("stale-agent-job-recovery-failed", error);
           return { requeued: 0, deadLettered: 0 };
         });
-        if (recovered.requeued || recovered.deadLettered) console.log(JSON.stringify({ event: "stale-agent-jobs-recovered", ...recovered }));
+        if (recovered.requeued || recovered.deadLettered) logWorkerEvent({ event: "stale-agent-jobs-recovered", level: "warning", details: recovered });
       }
       const authRecovered = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
-        console.error("GridFlow stale-auth-email recovery failed:", error);
+        reportWorkerError("stale-auth-email-recovery-failed", error);
         return 0;
       });
-      if (authRecovered) console.log(JSON.stringify({ event: "stale-auth-emails-recovered", count: authRecovered }));
+      if (authRecovered) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: authRecovered } });
       const emailRecovered = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
-        console.error("GridFlow stale-email recovery failed:", error);
+        reportWorkerError("stale-email-recovery-failed", error);
         return 0;
       });
-      if (emailRecovered) console.log(JSON.stringify({ event: "stale-email-actions-recovered", count: emailRecovered }));
+      if (emailRecovered) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: emailRecovered } });
       lastRecoveryAt = Date.now();
     }
     const processed = await runOnce().catch((error) => {
-      console.error("GridFlow worker loop failed:", error);
+      reportWorkerError("worker-loop-failed", error);
       return false;
     });
     if (!processed) await new Promise((resolveDelay) => setTimeout(resolveDelay, pollMs));

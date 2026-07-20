@@ -354,6 +354,34 @@ enum AuditAction {
   EMAIL_SEND
 }
 
+enum ReleaseAcceptanceStatus {
+  DRAFT
+  IN_PROGRESS
+  BLOCKED
+  READY
+  APPROVED
+  RELEASED
+}
+
+enum AcceptanceCheckStatus {
+  PENDING
+  PASS
+  FAIL
+  BLOCKED
+  WAIVED
+}
+
+enum AcceptanceCheckCategory {
+  PRODUCT
+  AGENTS
+  OUTREACH
+  AUTH
+  SECURITY
+  DATA
+  INFRASTRUCTURE
+  QA
+}
+
 model User {
   id             String                   @id @default(uuid()) @db.Uuid
   email          String                   @unique
@@ -384,6 +412,8 @@ model User {
   loginChallenges AuthLoginChallenge[]
   authEmailOutbox AuthEmailOutbox[]
   agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
+  releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
+  acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
 }
 
 model Organisation {
@@ -424,6 +454,8 @@ model Organisation {
   authSessions        AuthSession[]
   invitations         OrganisationInvitation[]
   loginChallenges     AuthLoginChallenge[]
+  releaseAcceptances  ReleaseAcceptance[]
+  acceptanceChecks    ReleaseAcceptanceCheck[]
 }
 
 model OrganisationMembership {
@@ -1332,6 +1364,55 @@ model CompanyLeadSource {
   leadSource  LeadSource @relation(fields: [leadSourceId], references: [id], onDelete: Cascade)
 
   @@id([companyId, leadSourceId])
+}
+
+model ReleaseAcceptance {
+  id               String                  @id @default(uuid()) @db.Uuid
+  tenantId         String                  @db.Uuid
+  releaseVersion   String
+  commitSha        String?
+  environment      String                  @default("production")
+  status           ReleaseAcceptanceStatus @default(DRAFT)
+  readinessScore   Int                     @default(0)
+  notes            String?
+  approvedByUserId String?                 @db.Uuid
+  approvedAt       DateTime?               @db.Timestamptz(3)
+  releasedAt       DateTime?               @db.Timestamptz(3)
+  createdAt        DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                @updatedAt @db.Timestamptz(3)
+  tenant           Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  approvedBy       User?                   @relation("ReleaseAcceptanceApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  checks           ReleaseAcceptanceCheck[]
+
+  @@unique([tenantId, releaseVersion])
+  @@index([tenantId, status, updatedAt])
+}
+
+model ReleaseAcceptanceCheck {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  tenantId              String                  @db.Uuid
+  releaseAcceptanceId   String                  @db.Uuid
+  key                   String
+  category              AcceptanceCheckCategory
+  title                 String
+  description           String
+  required              Boolean                 @default(true)
+  automated             Boolean                 @default(false)
+  status                AcceptanceCheckStatus   @default(PENDING)
+  notes                 String?
+  evidenceUrl           String?
+  automatedDetail       String?
+  lastEvaluatedAt       DateTime?               @db.Timestamptz(3)
+  testedAt              DateTime?               @db.Timestamptz(3)
+  testedByUserId        String?                  @db.Uuid
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                 @updatedAt @db.Timestamptz(3)
+  tenant                Organisation             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  releaseAcceptance     ReleaseAcceptance        @relation(fields: [releaseAcceptanceId], references: [id], onDelete: Cascade)
+  testedBy              User?                    @relation("AcceptanceCheckTestedBy", fields: [testedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([releaseAcceptanceId, key])
+  @@index([tenantId, status, category])
 }
 
 enum MigrationDecision {

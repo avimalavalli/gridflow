@@ -9,6 +9,9 @@
 5. Create and verify a database backup.
 6. Complete a restore rehearsal against non-production infrastructure.
 7. Confirm OpenAI, Gmail, Resend, logging, alerting and backup ownership.
+8. Open **Launch Control** and confirm every automated check is green.
+9. Complete every manual live-acceptance check with notes and evidence links.
+10. The organisation owner approves the release only after Launch Control reaches `READY`.
 
 ## Deployment
 
@@ -18,6 +21,7 @@
 4. Confirm release metadata in Operations.
 5. Sign in using a non-owner test account and verify tenant isolation.
 6. Run one approved agent pipeline and one controlled email draft before enabling wider access.
+7. Mark the exact approved cycle `RELEASED` in Launch Control after the deployed commit and environment are confirmed.
 
 ## Rollback
 

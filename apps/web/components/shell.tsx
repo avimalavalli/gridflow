@@ -19,6 +19,7 @@ import {
   Menu,
   MessageSquareText,
   Radar,
+  Rocket,
   Search,
   Send,
   Settings,
@@ -63,6 +64,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Settings", href: "/settings", icon: Settings, keywords: "profile strategy preferences policy" },
       { label: "Migration", href: "/migration", icon: DatabaseZap, keywords: "airtable import data" },
       { label: "Operations", href: "/operations", icon: Activity, keywords: "release health monitoring quality failures readiness", roles: ["OWNER", "ADMIN"] },
+      { label: "Launch Control", href: "/launch", icon: Rocket, keywords: "release acceptance launch checklist production approval", roles: ["OWNER", "ADMIN"] },
     ],
   },
 ] as const;

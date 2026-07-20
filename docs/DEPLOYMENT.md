@@ -1,61 +1,85 @@
-# GridFlow private staging deployment
+# GridFlow V1 production deployment
 
-GridFlow now contains production-oriented authentication and container definitions, but it has not been deployed to a public host.
+GridFlow is built as three services backed by one managed PostgreSQL database:
 
-## Required services
+- `web` — Next.js user interface;
+- `api` — NestJS API, authentication and integrations;
+- `worker` — durable agents, Gmail processing and authentication email delivery;
+- managed PostgreSQL 16+ — tenant data, queues, audit history and release acceptance.
 
-- Managed PostgreSQL 16+ with TLS and automated backups.
-- One web process.
-- One API process.
-- One worker process.
-- HTTPS domain or subdomain.
-- Managed secret storage.
-- Error monitoring and structured log retention.
+The repository is provider-neutral. The final provider must support private GitHub deployments, Dockerfiles, managed secrets, HTTPS, health checks, managed PostgreSQL, log drains and off-host backups.
 
-Redis is not required for the private beta because the current durable queue uses PostgreSQL `AutomationJob` and `JobOutbox` tables.
+## Required production ownership
 
-## Mandatory production environment
+The release owner must control:
+
+- the application domain and DNS;
+- the hosting account;
+- the PostgreSQL database and backups;
+- OpenAI billing and API access;
+- Google Cloud OAuth and Gmail API access;
+- Resend or the approved authentication-email provider;
+- monitoring, alerting and incident contacts.
+
+No production secret belongs in GitHub, a ZIP package or a chat message.
+
+## Mandatory configuration
+
+At minimum, production requires:
 
 ```bash
 NODE_ENV=production
 GRIDFLOW_DEV_BOOTSTRAP=false
 AUTH_SIGNUP_MODE=CODE
-AUTH_PRIVATE_BETA_CODE=<long random private value>
+AUTH_PRIVATE_BETA_CODE=<strong random value>
 AUTH_SECURE_COOKIES=true
 TRUST_PROXY=true
 WEB_ORIGIN=https://app.example.com
 DATABASE_URL=postgresql://...
 DATABASE_SSL=true
+AUTH_ENCRYPTION_KEY=<32+ character secret>
+INTEGRATION_ENCRYPTION_KEY=<32+ character secret>
+AUTH_MAIL_PROVIDER=RESEND
+AUTH_FROM_EMAIL=GridFlow <no-reply@example.com>
+RESEND_API_KEY=<secret>
+OPENAI_API_KEY=<secret>
+OPENAI_AGENT_MODEL=<approved model>
+GOOGLE_OAUTH_CLIENT_ID=<secret>
+GOOGLE_OAUTH_CLIENT_SECRET=<secret>
+GOOGLE_OAUTH_REDIRECT_URI=https://api.example.com/api/v1/integrations/gmail/callback
+GRIDFLOW_RELEASE=<version>
+GRIDFLOW_COMMIT_SHA=<exact deployed commit>
+RELEASE_BUILD_VALIDATED=true
+RELEASE_CI_PASSED=true
+RELEASE_DEPENDENCY_AUDIT_PASSED=true
 ```
 
-The API rejects production startup when the development identity is enabled, secure cookies are disabled or code-based registration has no strong access code.
+Backups and alerts also require either managed-provider confirmation or explicit destinations:
 
-## Containers
+```bash
+DATABASE_PROVIDER_BACKUPS=true
+# or BACKUP_STORAGE_URL=<encrypted off-host destination>
 
-- `Dockerfile.web`
-- `Dockerfile.api`
-- `Dockerfile.worker`
+LOG_DRAIN_CONFIGURED=true
+# or OPERATIONS_ALERT_WEBHOOK_URL=https://...
+```
 
-`docker-compose.staging.yml` is a reference environment for a private server. It expects HTTPS to be terminated by a trusted reverse proxy. Secure authentication cookies will not work correctly over plain HTTP.
+## Controlled deployment sequence
 
-## Deployment sequence
+1. Freeze the exact GitHub commit and release version.
+2. Run CI, schema checks, the full test suite, production builds, smoke suites, agent regression fixtures and a fresh dependency audit.
+3. Provision managed PostgreSQL and test a production-format restore in a clean non-production database.
+4. Create web, API and worker services from the same commit.
+5. Store environment variables in the hosting provider's encrypted secret store.
+6. Apply database migrations once through the controlled release job.
+7. Verify API liveness and readiness, worker polling, structured logs and alerts.
+8. Sign in with owner and non-owner accounts and verify tenant isolation.
+9. Connect release-owned OpenAI, Gmail and authentication email accounts.
+10. Complete every automated and manual item in **Launch Control**.
+11. The organisation owner approves the cycle only when Launch Control reaches `READY`.
+12. Deploy the main application domain, confirm the deployed commit, then mark the cycle `RELEASED`.
+13. Open selected athlete accounts and watch errors, AI quality, sending outcomes and cost before wider access.
 
-1. Provision staging PostgreSQL.
-2. Configure backups and test one restore.
-3. Add web/API/worker services.
-4. Store all secrets in the hosting provider, never in the repository.
-5. Build the web service with its internal API target.
-6. Deploy API and confirm `/api/v1/health`.
-7. Deploy worker and confirm job polling.
-8. Deploy web behind HTTPS.
-9. Register the owner account with the private-beta code.
-10. Create a second test athlete organisation and verify isolation.
-11. Review the Migration Centre without importing.
-12. Run the controlled live five-company agent pilot.
-13. Import approved Airtable records only after the pilot and backup checkpoint.
+## Rollback boundary
 
-## Not yet safe for public launch
-
-Before wider access, add password-reset delivery, optional MFA, gateway rate limiting, monitoring alerts, backup restoration evidence, dependency vulnerability scanning and a focused security review.
-
-The package installer reported two moderate advisories, but the environment's package-registry audit endpoint failed to provide the detailed report. A clean CI security scan is therefore required before staging approval.
+Stop workers and automated sending before rollback. Roll application services back to the last known-good commit. Do not reverse schema migrations blindly. Restore data only from a verified backup when a safe forward repair is not possible.

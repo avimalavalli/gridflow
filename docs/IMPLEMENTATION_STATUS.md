@@ -1,4 +1,4 @@
-# GridFlow implementation status — Milestone 8
+# GridFlow implementation status — Milestone 9
 
 ## Built and verified
 
@@ -9,30 +9,30 @@
 - Human acceptance, rejection and tuning feedback for every successful agent run.
 - LinkedIn operating queue and Gmail draft/send/reply/suppression architecture.
 - Password recovery, MFA, lockout, encrypted integration secrets and security headers.
-- Administrator Operations console for queues, failures, integrations, quality reviews and release readiness.
-- Structured API/worker logging, request IDs and optional external alerts.
-- Database backup, checksum verification and restore-rehearsal tooling.
-- Release preflight, schema consistency checks, CI and deterministic agent-quality fixtures.
+- Administrator Operations console for queues, failures, integrations, quality and release health.
+- Structured logging, optional external alerts, backup verification and restore-rehearsal tooling.
+- **Launch Control** with automated release gates, manual live-acceptance evidence, owner approval, approval revocation when conditions change and final release recording.
+- CI evidence, production preflight, schema checks and deterministic agent-quality regression fixtures.
+- Route loading, error recovery and not-found product states.
 
 ## Validation result
 
-- 43 automated tests passed across 17 files.
+- 45 automated tests passed across 18 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 46 models and 5 registered migrations.
+- Database schema check passed: 48 models and 6 registered migrations.
 - TypeScript, ESLint, API build, worker build and Next.js production build passed.
-- Commercial CRM and multi-athlete authentication smoke suites passed.
-- Controlled release preflight passed.
-- PGlite backup creation, checksum verification and restore rehearsal passed.
+- Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 
-The dependency audit endpoint returned a 502 during this milestone. No dependencies were added, and the last successful Milestone 7 audit reported zero known vulnerabilities. A successful fresh audit remains a release requirement.
+The dependency audit endpoint returned HTTP 502. No dependency was added; a fresh successful audit remains required before public release.
 
 ## Still required before public V1
 
-1. Controlled live OpenAI research and prompt tuning.
-2. Real Gmail, Resend and authenticator-device acceptance.
-3. Real-browser, responsive, accessibility and performance QA.
-4. Owner-controlled production infrastructure, domain, monitoring, alerts and off-host backups.
-5. Final permissions/security review and production restore rehearsal.
-6. Selected-athlete launch acceptance before wider access.
+1. Release-owned production infrastructure and domain.
+2. Live OpenAI acceptance and prompt tuning using real current evidence.
+3. Real Gmail, Resend and authenticator-device acceptance.
+4. Browser, mobile, accessibility and performance QA on real devices.
+5. Production-format backup restore, permission review and security sign-off.
+6. Completion of every required Launch Control check.
+7. Owner approval, deployment and selected-athlete acceptance.
 
-GridFlow is now a release-candidate codebase, not yet a publicly released service.
+GridFlow is a controlled release candidate. The application code is not the remaining blocker; real service ownership and acceptance are.

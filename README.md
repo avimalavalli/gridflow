@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Milestone 8 release-candidate codebase: a database-backed, multi-organisation product with a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, controlled outreach operations, human AI-quality acceptance, account security and release operations.
+This repository contains the Milestone 9 live-acceptance codebase: a database-backed, multi-organisation product with a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, controlled outreach operations, human AI-quality acceptance, account security and release operations and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -23,6 +23,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Human-controlled LinkedIn workflow and policy-controlled Gmail architecture.
 - Airtable migration review/import and stable duplicate protection.
 - Operations console for failures, queues, integrations, quality reviews and release readiness.
+- Launch Control with automated and manual acceptance checks, owner approval and immutable audit history.
 - Structured logging, optional external alerts, backups, verification and restore rehearsals.
 - CI, release preflight, schema validation and deterministic agent-quality regression fixtures.
 
@@ -64,4 +65,4 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/MILESTONE8_RELEASE_CANDIDATE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.

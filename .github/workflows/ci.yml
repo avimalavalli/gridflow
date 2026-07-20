@@ -23,6 +23,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run db:schema-check
+      - run: npm run agents:evaluate
       - run: npm run validate
       - name: Build Next.js production bundle — compile
         working-directory: apps/web
@@ -38,3 +40,16 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack --experimental-build-mode generate
       - run: npm audit --audit-level=high
+      - name: Record release CI evidence
+        run: |
+          mkdir -p reports
+          node -e 'const fs=require("fs"); fs.writeFileSync("reports/ci-evidence.json", JSON.stringify({commit:process.env.GITHUB_SHA, workflow:process.env.GITHUB_WORKFLOW, runId:process.env.GITHUB_RUN_ID, status:"passed", generatedAt:new Date().toISOString()}, null, 2))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gridflow-ci-evidence-${{ github.sha }}
+          path: |
+            reports/ci-evidence.json
+            evaluation/reports/agent-quality-report.json
+            evaluation/reports/agent-quality-report.md
+          if-no-files-found: error
+          retention-days: 30

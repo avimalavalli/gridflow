@@ -20,6 +20,7 @@ interface OperationsOverview {
   authMail: { queued: number; failed: number; deadLetter: number };
   recentFailures: Array<{ id: string; kind: string; title: string; detail: string | null; occurredAt: string; href: string }>;
   qualityReviewQueue: Array<{ id: string; agentName: string; qualityStatus: string | null; qualityScore: number | null; issueCount: number; targetLabel: string; createdAt: string }>;
+  releaseAcceptance: { id: string; releaseVersion: string; status: string; readinessScore: number; updatedAt: string } | null;
   readiness: Record<string, boolean>;
   generatedAt: string;
 }
@@ -54,6 +55,8 @@ export default async function OperationsPage() {
       <div><strong>{operationalRisk ? "Operational attention is required" : "Core operations are healthy"}</strong><p>{operationalRisk ? `${operationalRisk} failed or dead-lettered item${operationalRisk === 1 ? "" : "s"} need review before release.` : "No failed agent, channel or authentication jobs are currently recorded."}</p></div>
       <div className="operations-release"><span>{data.release.version}</span><small>{data.release.commit ? data.release.commit.slice(0, 10) : data.release.environment}</small></div>
     </section>
+
+    {data.releaseAcceptance ? <Link className="launch-operations-link section-gap" href="/launch"><span><ShieldCheck size={17} /><span><strong>{data.releaseAcceptance.releaseVersion}</strong><small>Launch acceptance · {data.releaseAcceptance.readinessScore}% ready</small></span></span><span><StatusBadge value={data.releaseAcceptance.status} /> Open Launch Control</span></Link> : null}
 
     <section className="metrics metrics-six section-gap">
       <article className="metric-card"><span>Human reviews due</span><strong>{data.metrics.awaitingHumanReview}</strong><small>{data.metrics.reviewWarnings} with warnings</small></article>

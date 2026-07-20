@@ -1,20 +1,18 @@
 # What happens next
 
-GridFlow is now at release-candidate code status. The remaining work is acceptance and production ownership, not another round of random features.
+GridFlow now has a hard in-product release gate. The remaining work is real acceptance and production ownership.
 
-## Next milestone: controlled live acceptance
+## Immediate next phase
 
-1. Create release-owned OpenAI, Gmail and Resend accounts.
-2. Run one personalised Discovery Brief through Atlas → Sage → Relay → Echo.
-3. Human-review every source, company, score, contact and message.
-4. Convert accepted and rejected results into new regression fixtures and tune prompts.
-5. Test Gmail draft, send, reply, bounce, opt-out and sequence-stop behaviour with controlled mailboxes.
-6. Complete real-device browser, mobile, accessibility and performance QA.
-7. Configure managed PostgreSQL, logging, alerts and off-host backups.
-8. Run security, permissions, backup-restore and release checklists.
-9. Deploy the main V1 and open selected athlete accounts.
-10. Expand access only after measured quality and reliability are stable.
+1. Choose the production host, database and main domain.
+2. Create release-owned OpenAI, Google Cloud/Gmail and Resend accounts.
+3. Add secrets through the hosting provider—not GitHub or chat.
+4. Deploy web, API and worker from one exact commit.
+5. Open Launch Control and clear the automated configuration checks.
+6. Run one real athlete through onboarding and Atlas → Sage → Relay → Echo.
+7. Review every source, score, contact and message; tune prompts and add regression fixtures.
+8. Test Gmail, password recovery, MFA, backups, permissions and real devices.
+9. Record evidence for every manual Launch Control check.
+10. Owner-approve the release, open selected athlete accounts, then expand only after reliability is proven.
 
-## After V1 proves the acquisition workflow
-
-Add subscriptions, proposals, contracts, sponsor fulfilment and renewals. Those remain deliberately behind the sponsor-discovery and outreach engine.
+No new side feature should interrupt this acceptance sequence.

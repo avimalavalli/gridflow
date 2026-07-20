@@ -47,6 +47,10 @@ export class TenantContextService {
     this.assertRole(identity, ["OWNER", "ADMIN"]);
   }
 
+  assertOwner(identity: RequestIdentity): void {
+    this.assertRole(identity, ["OWNER"], "Only the organisation owner can approve or release GridFlow.");
+  }
+
   private async ensureDevelopmentIdentity(): Promise<RequestIdentity> {
     return this.database.transaction(async (tx) => {
       const user = await tx.query<IdRow>(

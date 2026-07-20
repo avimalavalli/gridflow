@@ -55,6 +55,14 @@ interface QualityReviewRow extends Record<string, unknown> {
   createdAt: Date;
 }
 
+interface ReleaseAcceptanceRow extends Record<string, unknown> {
+  id: string;
+  releaseVersion: string;
+  status: string;
+  readinessScore: number;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class OperationsService {
   constructor(private readonly database: DatabaseService) {}
@@ -62,7 +70,7 @@ export class OperationsService {
   async overview(tenantId: string) {
     const databaseHealth = await this.database.ping();
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, integrations, authMail, failures, qualityReview] = await Promise.all([
+      const [metrics, integrations, authMail, failures, qualityReview, releaseAcceptance] = await Promise.all([
         tx.query<MetricsRow>(
           `SELECT
              (SELECT COUNT(*)::int FROM "AgentRun" WHERE "tenantId"=$1::uuid) AS "agentRuns",
@@ -132,6 +140,11 @@ export class OperationsService {
            ORDER BY CASE ar."qualityStatus" WHEN 'REVIEW' THEN 0 ELSE 1 END, ar."createdAt" DESC LIMIT 12`,
           [tenantId],
         ),
+        tx.query<ReleaseAcceptanceRow>(
+          `SELECT "id","releaseVersion","status"::text AS "status","readinessScore","updatedAt"
+           FROM "ReleaseAcceptance" WHERE "tenantId"=$1::uuid ORDER BY "updatedAt" DESC LIMIT 1`,
+          [tenantId],
+        ),
       ]);
 
       const readiness = {
@@ -162,6 +175,7 @@ export class OperationsService {
         authMail: authMail.rows[0] ?? { queued: 0, failed: 0, deadLetter: 0 },
         recentFailures: failures.rows,
         qualityReviewQueue: qualityReview.rows,
+        releaseAcceptance: releaseAcceptance.rows[0] ?? null,
         readiness,
         generatedAt: new Date().toISOString(),
       };

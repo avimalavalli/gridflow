@@ -11,6 +11,9 @@ const required = [
   "INTEGRATION_ENCRYPTION_KEY",
   "GRIDFLOW_RELEASE",
   "GRIDFLOW_COMMIT_SHA",
+  "RELEASE_BUILD_VALIDATED",
+  "RELEASE_CI_PASSED",
+  "RELEASE_DEPENDENCY_AUDIT_PASSED",
 ];
 
 const failures = [];
@@ -26,6 +29,9 @@ if ((process.env.INTEGRATION_ENCRYPTION_KEY ?? "").length < 32) failures.push("I
 if (!/^https:\/\//.test(process.env.WEB_ORIGIN ?? "")) failures.push("WEB_ORIGIN must use HTTPS.");
 if (!/^https:\/\//.test(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "")) failures.push("GOOGLE_OAUTH_REDIRECT_URI must use HTTPS.");
 if ((process.env.GRIDFLOW_COMMIT_SHA ?? "").length < 7) failures.push("GRIDFLOW_COMMIT_SHA must contain a real commit identifier.");
+for (const gate of ["RELEASE_BUILD_VALIDATED", "RELEASE_CI_PASSED", "RELEASE_DEPENDENCY_AUDIT_PASSED"]) {
+  if (process.env[gate] !== "true") failures.push(`${gate} must be true for the exact release commit.`);
+}
 
 const backupsReady = process.env.DATABASE_PROVIDER_BACKUPS === "true" || Boolean(process.env.BACKUP_STORAGE_URL?.trim());
 if (!backupsReady) failures.push("Configure BACKUP_STORAGE_URL or confirm DATABASE_PROVIDER_BACKUPS=true.");

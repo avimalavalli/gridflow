@@ -11,3 +11,6 @@ coverage
 migration/source/airtable/
 migration/reports/*.json
 migration/reports/*.csv
+.gridflow-data/
+.gridflow-test-data/
+*.tsbuildinfo

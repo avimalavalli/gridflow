@@ -1,6 +1,6 @@
-# GridFlow validation report — Milestone 5
+# GridFlow validation report — Milestone 6
 
-Validated on 19 July 2026 against the clean multi-athlete source tree.
+Validated on 20 July 2026 against the clean multi-athlete source tree.
 
 ## Static validation
 
@@ -19,9 +19,10 @@ Validated on 19 July 2026 against the clean multi-athlete source tree.
 
 ## Automated tests
 
-- 9 test files passed.
-- 23 tests passed.
-- Covered stable keys, migrations, tenant uniqueness, agent schemas, evidence provenance, authentication cryptography, discovery recommendations, durable execution, duplicate protection, stale-job recovery and dead-letter behaviour.
+- 12 test files passed.
+- 35 tests passed.
+- Existing coverage remains for stable keys, migrations, tenant uniqueness, agent schemas, evidence provenance, authentication cryptography, discovery recommendations, durable execution, duplicate protection, stale-job recovery and dead-letter behaviour.
+- New coverage validates token encryption, signed OAuth state, MIME creation, email extraction, email-policy decisions, Gmail integration status, idempotent email queueing, suppression, LinkedIn action queueing and compatibility with legacy email sequence-step names.
 
 ## Production builds
 
@@ -60,8 +61,23 @@ Passed:
 - organisation switching;
 - isolation between athlete datasets.
 
-## External systems not validated
+## Gmail and outreach-operation validation
 
-- Live OpenAI web research was not run without a user-owned production credential.
-- Gmail OAuth and sending are not implemented in this milestone.
+Passed without live external credentials:
+
+- OAuth state signing, expiry and tamper detection;
+- access/refresh-token encryption primitive;
+- Gmail MIME and API request construction;
+- manual, draft-only, approved-automatic and full-automation policy decisions;
+- sending-window, cap, reply, meeting, suppression and active-company-contact stops;
+- durable and idempotent ChannelAction creation;
+- worker compatibility with legacy and current sequence-step formats;
+- LinkedIn due-action queue;
+- suppression state propagation.
+
+## External systems not live-validated
+
+- Live OpenAI web research was not run without a release-owned production credential.
+- A real Gmail OAuth account was not connected and no real email was sent.
+- Google Cloud consent-screen, redirect-domain and production verification remain external configuration tasks.
 - LinkedIn remains manual and human-controlled.

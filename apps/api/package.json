@@ -21,7 +21,8 @@
     "csv-parse": "^6.2.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "@gridflow/engine": "0.1.0"
+    "@gridflow/engine": "0.1.0",
+    "@gridflow/integrations": "0.1.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.14",

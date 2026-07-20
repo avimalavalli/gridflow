@@ -1,23 +1,24 @@
 # What happens next
 
-Milestone 4A completed real authentication, separate athlete organisations, roles, team invitations and organisation switching.
+Milestone 6 completed the core outreach operating layer: durable LinkedIn actions, Gmail connection infrastructure, email-policy enforcement, queued delivery, reply synchronisation, bounce handling and suppression.
 
-## Next developer milestone: private staging and live quality pilot
+## Next developer milestone: live agent quality and release hardening
 
-1. Choose a hosting account and private staging domain.
-2. Provision managed PostgreSQL with backups.
-3. Deploy web, API and worker processes over HTTPS.
-4. Store the private beta code and all API credentials in the host's secret manager.
-5. Register the owner account.
-6. Create a second test athlete organisation and verify isolation online.
-7. Review the Migration Centre without importing.
-8. Connect the server-side OpenAI project.
-9. Run one Discovery Brief capped at five companies.
-10. Manually inspect every source, company, contact and generated outreach item.
-11. Tune Atlas, Sage, Relay and Echo only from observed results.
-12. Complete the LinkedIn daily-action workflow.
-13. Add Gmail after research and outreach quality are accepted.
+The next work remains focused on the main GridFlow V1 rather than a separate private product.
 
-## User action
+1. Build a controlled agent-quality evaluation harness with fixed athlete profiles and expected output criteria.
+2. Run Atlas, Sage, Relay and Echo against live web research using release-owned OpenAI credentials.
+3. Score factual accuracy, evidence quality, commercial relevance, contact suitability and message quality.
+4. Tune prompts, search strategy, model selection and retry behaviour from measured failures.
+5. Add an administrator quality-review console and regression fixtures from accepted results.
+6. Add password reset and verified-email flows.
+7. Add MFA and recovery-code support.
+8. Complete accessibility, browser, responsive and performance testing.
+9. Add structured monitoring, backups, alerts and production release controls.
+10. Configure and validate a release-owned Google OAuth project, then run a controlled mailbox acceptance test without changing the product architecture.
 
-No credentials should be shared in chat or stored inside the ZIP. Account-owner steps will be handled later through the hosting and integration screens.
+## Product boundary
+
+GridFlow remains a multi-athlete, multi-organisation product. No release work may hard-code Avi's identity, motorsport series, geography, sponsor list or sending strategy.
+
+No credentials should be shared in chat or committed to GitHub. Owner-controlled secrets belong only in the final deployment platform's secret manager.

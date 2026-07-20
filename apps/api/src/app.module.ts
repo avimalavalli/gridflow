@@ -17,6 +17,7 @@ import { OpportunitiesModule } from "./opportunities/opportunities.module.js";
 import { TasksModule } from "./tasks/tasks.module.js";
 import { InteractionsModule } from "./interactions/interactions.module.js";
 import { MeetingsModule } from "./meetings/meetings.module.js";
+import { IntegrationsModule } from "./integrations/integrations.module.js";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MeetingsModule } from "./meetings/meetings.module.js";
     TasksModule,
     InteractionsModule,
     MeetingsModule,
+    IntegrationsModule,
   ],
 })
 export class AppModule {}

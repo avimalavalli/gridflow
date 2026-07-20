@@ -8,3 +8,5 @@ node_modules
 .env
 *.log
 *.zip
+.gridflow-test-data
+*.tsbuildinfo

@@ -13,7 +13,7 @@
     "dev:api": "npm run start:dev --workspace @gridflow/api",
     "build": "npm run build:packages && npm run build --workspace @gridflow/api && npm run build --workspace @gridflow/worker && npm run build --workspace @gridflow/web",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @gridflow/api && npm run typecheck --workspace @gridflow/worker && npm run typecheck --workspace @gridflow/web",
-    "test": "vitest run apps/api/test packages/agents/test packages/domain/test packages/database/test packages/integrations/test packages/engine/test --maxWorkers=1",
+    "test": "vitest run apps/api/test apps/worker/test packages/agents/test packages/domain/test packages/database/test packages/integrations/test packages/engine/test --maxWorkers=1",
     "lint": "npm run lint --workspaces --if-present",
     "db:migrate": "npm run db:migrate --workspace @gridflow/database",
     "smoke": "npm run build:packages && npm run build --workspace @gridflow/api && node scripts/smoke-test.mjs",

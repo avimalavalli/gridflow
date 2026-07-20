@@ -13,6 +13,12 @@ export class OutreachController {
     return { outreach: await this.outreach.list(identity.tenantId) };
   }
 
+  @Get("operations/summary")
+  async operations(@Req() request: Request) {
+    const identity = await this.context.resolve(request);
+    return this.outreach.operations(identity.tenantId);
+  }
+
   @Get(":id")
   async detail(@Req() request: Request, @Param("id") id: string) {
     const identity = await this.context.resolve(request);

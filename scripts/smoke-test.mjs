@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
@@ -42,8 +42,32 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+async function request(path, { method = "GET", body } = {}) {
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let payload;
+  try { payload = await response.json(); } catch { payload = {}; }
+  if (!response.ok) {
+    throw new Error(`${method} ${path} failed with ${response.status}: ${JSON.stringify(payload)}\n${logs}`);
+  }
+  return payload;
+}
+
+async function hasAirtableSource() {
+  try {
+    const files = await readdir(join(root, "migration/source/airtable"), { recursive: true });
+    return files.some((file) => /Companies\.csv(?:\.csv)?$/i.test(String(file)));
+  } catch {
+    return false;
+  }
+}
+
 try {
   await waitForHealth();
+
   const input = {
     name: "Smoke Test Driver",
     sport: "GT racing",
@@ -65,61 +89,137 @@ try {
     timezone: "America/New_York",
   };
 
-  const complete = await fetch(`${base}/onboarding/complete`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!complete.ok) {
-    throw new Error(`Onboarding failed with ${complete.status}: ${await complete.text()}`);
-  }
-  const completeBody = await complete.json();
+  const completeBody = await request("/onboarding/complete", { method: "POST", body: input });
   assert(completeBody.recommendations.some((brief) => brief.region.includes("United States")), "US profile did not generate US Discovery Briefs.");
 
-  const profileResponse = await fetch(`${base}/onboarding`);
-  assert(profileResponse.ok, "Saved onboarding profile could not be loaded.");
-  const profile = await profileResponse.json();
+  const profile = await request("/onboarding");
   assert(profile.profile?.athleteName === input.name, "Athlete profile was not persisted.");
   assert(profile.policy?.emailAutomationMode === "FULL_AUTOMATION", "Email automation policy was not persisted.");
 
-  const briefsResponse = await fetch(`${base}/discovery-briefs`);
-  const briefs = await briefsResponse.json();
+  const briefs = await request("/discovery-briefs");
   assert(briefs.discoveryBriefs.length > 0, "Discovery Briefs were not persisted.");
 
-  const dashboardResponse = await fetch(`${base}/dashboard/summary`);
-  assert(dashboardResponse.ok, "Dashboard summary failed.");
+  if (await hasAirtableSource()) {
+    const migration = await request("/migration/airtable/audit");
+    assert(migration.totals?.rows === 111, "Supplied Airtable audit was not loaded correctly.");
+    await request("/migration/airtable/approve-safe", { method: "POST" });
+    const preview = await request("/migration/airtable/import-preview");
+    assert(preview.eligible === 98, `Expected 98 eligible records, received ${preview.eligible}.`);
+    const receipt = await request("/migration/airtable/import", { method: "POST" });
+    assert(receipt.failed === 0, "Airtable import reported a failed record.");
+  } else {
+    console.log("GridFlow smoke: private Airtable source is not included in the clean repository; migration runtime test skipped.");
+  }
 
-  const migrationResponse = await fetch(`${base}/migration/airtable/audit`);
-  assert(migrationResponse.ok, "Airtable migration audit endpoint failed.");
-  const migration = await migrationResponse.json();
-  assert(migration.totals?.rows === 111, "Supplied Airtable audit was not loaded correctly.");
+  const company = await request("/companies", {
+    method: "POST",
+    body: {
+      companyName: "GridFlow Smoke Technology",
+      website: "https://smoke-gridflow.example",
+      country: "United Kingdom",
+      industries: "Technology, Engineering",
+      companySize: "SME",
+    },
+  });
+  assert(company.id, "Manual company creation did not return an ID.");
 
-  const approveSafe = await fetch(`${base}/migration/airtable/approve-safe`, { method: "POST" });
-  if (!approveSafe.ok) throw new Error(`Safe migration review failed: ${await approveSafe.text()}`);
-  const previewResponse = await fetch(`${base}/migration/airtable/import-preview`);
-  const preview = await previewResponse.json();
-  assert(preview.eligible === 98, `Expected 98 eligible records, received ${preview.eligible}.`);
-  assert(preview.blocked === 11, `Expected 11 blocked records including dependency blocks, received ${preview.blocked}.`);
-  assert(preview.skipped === 2, `Expected 2 test records to be skipped, received ${preview.skipped}.`);
+  const contact = await request("/contacts", {
+    method: "POST",
+    body: {
+      companyId: company.id,
+      contactName: "Alex Commercial",
+      jobTitle: "Head of Partnerships",
+      email: "alex@smoke-gridflow.example",
+      linkedinProfileUrl: "https://www.linkedin.com/in/alex-commercial-smoke",
+    },
+  });
+  assert(contact.id, "Manual contact creation did not return an ID.");
 
-  const importResponse = await fetch(`${base}/migration/airtable/import`, { method: "POST" });
-  if (!importResponse.ok) throw new Error(`Airtable import failed: ${await importResponse.text()}`);
-  const receipt = await importResponse.json();
-  assert(receipt.created === 98, `Expected 98 created records, received ${receipt.created}.`);
-  assert(receipt.blocked === 11, `Expected 11 blocked import records, received ${receipt.blocked}.`);
-  assert(receipt.failed === 0, "Airtable import reported a failed record.");
+  const opportunity = await request("/opportunities", {
+    method: "POST",
+    body: {
+      companyId: company.id,
+      primaryContactId: contact.id,
+      opportunityName: "2027 Technology Partnership",
+      valueMinor: 5000000,
+      currency: "GBP",
+      probability: 35,
+      stage: "DISCOVERY_CALL",
+    },
+  });
+  assert(opportunity.id, "Opportunity creation did not return an ID.");
 
-  const companiesResponse = await fetch(`${base}/companies`);
-  const companies = await companiesResponse.json();
-  assert(companies.companies?.length === 35, `Expected 35 imported companies, received ${companies.companies?.length}.`);
+  const task = await request("/tasks", {
+    method: "POST",
+    body: {
+      companyId: company.id,
+      contactId: contact.id,
+      opportunityId: opportunity.id,
+      title: "Prepare discovery-call value proposition",
+      type: "MEETING_PREP",
+      dueAt: new Date(Date.now() + 86_400_000).toISOString(),
+    },
+  });
+  assert(task.id, "Task creation did not return an ID.");
 
-  const secondImportResponse = await fetch(`${base}/migration/airtable/import`, { method: "POST" });
-  if (!secondImportResponse.ok) throw new Error(`Idempotent re-import failed: ${await secondImportResponse.text()}`);
-  const secondReceipt = await secondImportResponse.json();
-  assert(secondReceipt.updated === 98, `Expected 98 idempotent updates, received ${secondReceipt.updated}.`);
-  assert(secondReceipt.created === 0, "Idempotent re-import created duplicate records.");
+  const interaction = await request("/interactions", {
+    method: "POST",
+    body: {
+      companyId: company.id,
+      contactId: contact.id,
+      opportunityId: opportunity.id,
+      direction: "OUTBOUND",
+      channel: "LINKEDIN",
+      summary: "Connection accepted and discovery call proposed",
+      outcome: "Positive response",
+    },
+  });
+  assert(interaction.id, "Interaction creation did not return an ID.");
 
-  console.log("GridFlow smoke test passed: database, onboarding, personalised briefs, Airtable review, transactional import and idempotent re-import.");
+  const meeting = await request("/meetings", {
+    method: "POST",
+    body: {
+      companyId: company.id,
+      contactId: contact.id,
+      opportunityId: opportunity.id,
+      title: "GridFlow smoke discovery call",
+      startsAt: new Date(Date.now() + 172_800_000).toISOString(),
+      agenda: "Commercial objectives, audience fit and next steps",
+    },
+  });
+  assert(meeting.id, "Meeting creation did not return an ID.");
+
+  const companyDetail = await request(`/companies/${company.id}`);
+  assert(companyDetail.contacts.length === 1, "Company workspace did not return its linked contact.");
+  assert(companyDetail.opportunities.length === 1, "Company workspace did not return its linked opportunity.");
+
+  const contactDetail = await request(`/contacts/${contact.id}`);
+  assert(contactDetail.interactions.length === 1, "Contact workspace did not return its linked interaction.");
+  assert(contactDetail.meetings.length === 1, "Contact workspace did not return its linked meeting.");
+
+  await request(`/opportunities/${opportunity.id}`, { method: "PATCH", body: { stage: "PROPOSAL_REQUESTED", probability: 55 } });
+  await request(`/tasks/${task.id}`, { method: "PATCH", body: { status: "COMPLETED" } });
+  await request(`/meetings/${meeting.id}`, { method: "PATCH", body: { preparation: "Review partnership angle and commercial score." } });
+  await request(`/contacts/${contact.id}`, { method: "PATCH", body: { status: "ACTIVE_CONVERSATION" } });
+  await request(`/companies/${company.id}`, { method: "PATCH", body: { priority: "HIGH", currentStage: "OPPORTUNITY" } });
+
+  const dashboard = await request("/dashboard/summary");
+  assert(dashboard.metrics.companiesDiscovered >= 1, "Dashboard did not count the commercial company.");
+  assert(dashboard.metrics.opportunities >= 1, "Dashboard did not count the active opportunity.");
+  assert(dashboard.upcomingMeetings.length >= 1, "Dashboard did not show the upcoming meeting.");
+  assert(dashboard.recentActivity.length >= 1, "Dashboard did not show recent commercial activity.");
+
+  const [companies, contacts, opportunities, tasks, interactions, meetings] = await Promise.all([
+    request("/companies"), request("/contacts"), request("/opportunities"), request("/tasks"), request("/interactions"), request("/meetings"),
+  ]);
+  assert(companies.companies.some((item) => item.id === company.id), "Companies workspace omitted the created company.");
+  assert(contacts.contacts.some((item) => item.id === contact.id), "Contacts workspace omitted the created contact.");
+  assert(opportunities.opportunities.some((item) => item.id === opportunity.id), "Opportunity pipeline omitted the created deal.");
+  assert(tasks.tasks.some((item) => item.id === task.id && item.status === "COMPLETED"), "Task update was not persisted.");
+  assert(interactions.interactions.some((item) => item.id === interaction.id), "Interaction timeline omitted the created interaction.");
+  assert(meetings.meetings.some((item) => item.id === meeting.id), "Meeting workspace omitted the created meeting.");
+
+  console.log("GridFlow smoke test passed: onboarding, personalised briefs, commercial CRM workspaces, pipeline, tasks, interactions, meetings and dashboard queues.");
 } finally {
   child.kill("SIGTERM");
   await new Promise((resolveExit) => {

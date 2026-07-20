@@ -1,76 +1,74 @@
+import Link from "next/link";
+import { Activity, ArrowUpRight, Bot, Building2, CalendarDays, ContactRound, Handshake, Send } from "lucide-react";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 import { DataUnavailable } from "../../components/data-unavailable";
+import { EmptyState } from "../../components/empty-state";
+import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
 
 export const dynamic = "force-dynamic";
 
-interface DashboardSummary {
-  companiesDiscovered: number;
-  companiesResearched: number;
-  highPriority: number;
-  mediumPriority: number;
-  lowPriority: number;
-  contactsFound: number;
-  outreachDraftsReady: number;
-  linkedinActionsDue: number;
-  replies: number;
-  opportunities: number;
-  pipelineValueMinor: number;
-  overdueFollowUps: number;
-  automationFailures: number;
-  estimatedAutomationCostUsd: string;
+interface DashboardSnapshot {
+  metrics: {
+    companiesDiscovered: number; companiesResearched: number; highPriority: number; contactsFound: number;
+    outreachDraftsReady: number; replies: number; opportunities: number; pipelineValueMinor: number;
+    overdueFollowUps: number; automationFailures: number; estimatedAutomationCostUsd: string;
+  };
+  actions: Array<{ id: string; kind: string; title: string; detail: string | null; dueAt: string | null; href: string; urgency: string }>;
+  upcomingMeetings: Array<{ id: string; title: string; startsAt: string; companyName: string | null; contactName: string | null }>;
+  opportunityStages: Array<{ stage: string; count: number; valueMinor: number }>;
+  recentActivity: Array<{ id: string; summary: string; outcome: string | null; occurredAt: string; direction: string; channel: string | null; companyName: string | null; contactName: string | null }>;
 }
 
-const money = (minor: number): string =>
-  new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(minor / 100);
+const money = (minor: number, currency = "GBP"): string => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);
+const dateTime = (value: string): string => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 
 export default async function DashboardPage() {
-  let summary: DashboardSummary | null = null;
+  let snapshot: DashboardSnapshot | null = null;
   let error = "";
-  try {
-    summary = await apiGet<DashboardSummary>("/dashboard/summary");
-  } catch (cause) {
-    error = cause instanceof ApiError ? cause.message : "Unknown dashboard error.";
-  }
+  try { snapshot = await apiGet<DashboardSnapshot>("/dashboard/summary"); }
+  catch (cause) { error = cause instanceof ApiError ? cause.message : "Unknown dashboard error."; }
 
   return (
     <Shell title="Command Centre">
-      <PageHead
-        eyebrow="Commercial OS"
-        title="Your sponsorship command centre"
-        description="Live pipeline figures from the GridFlow database. No invented demo records."
-        action={<a className="button button-primary" href="/discovery-briefs">Open Discovery Briefs</a>}
-      />
-      {!summary ? <DataUnavailable message={error} /> : (
-        <>
-          <section className="metrics metrics-six">
-            <div className="metric"><div className="metric-label">Companies discovered</div><div className="metric-value">{summary.companiesDiscovered}</div><div className="metric-foot">{summary.companiesResearched} fully researched</div></div>
-            <div className="metric"><div className="metric-label">Priority prospects</div><div className="metric-value">{summary.highPriority}</div><div className="metric-foot">{summary.mediumPriority} medium · {summary.lowPriority} low</div></div>
-            <div className="metric"><div className="metric-label">Contacts found</div><div className="metric-value">{summary.contactsFound}</div><div className="metric-foot">Evidence-backed decision-makers</div></div>
-            <div className="metric"><div className="metric-label">Outreach ready</div><div className="metric-value">{summary.outreachDraftsReady}</div><div className="metric-foot">Awaiting review or policy action</div></div>
-            <div className="metric"><div className="metric-label">Pipeline value</div><div className="metric-value">{money(summary.pipelineValueMinor)}</div><div className="metric-foot">{summary.opportunities} active opportunities</div></div>
-            <div className="metric"><div className="metric-label">Automation cost</div><div className="metric-value">${Number(summary.estimatedAutomationCostUsd).toFixed(2)}</div><div className="metric-foot">Recorded AI and API usage</div></div>
-          </section>
-          <div className="grid-2 balanced">
+      <PageHead eyebrow="Commercial OS" title="Turn sponsor work into a daily system" description="Prioritise the next commercial action, keep every conversation moving and see where the pipeline is creating value." action={<Link className="button button-primary" href="/discovery-briefs"><Building2 size={15}/>Discover companies</Link>} />
+      {!snapshot ? <DataUnavailable message={error} /> : <>
+        <section className="metrics metrics-six">
+          <div className="metric"><span className="metric-icon"><Building2 size={17}/></span><div className="metric-label">Companies</div><div className="metric-value">{snapshot.metrics.companiesDiscovered}</div><div className="metric-foot">{snapshot.metrics.companiesResearched} fully researched</div></div>
+          <div className="metric"><span className="metric-icon"><ContactRound size={17}/></span><div className="metric-label">Contacts</div><div className="metric-value">{snapshot.metrics.contactsFound}</div><div className="metric-foot">Decision-makers in the CRM</div></div>
+          <div className="metric"><span className="metric-icon"><Send size={17}/></span><div className="metric-label">Drafts ready</div><div className="metric-value">{snapshot.metrics.outreachDraftsReady}</div><div className="metric-foot">Messages awaiting action</div></div>
+          <div className="metric"><span className="metric-icon"><Handshake size={17}/></span><div className="metric-label">Active deals</div><div className="metric-value">{snapshot.metrics.opportunities}</div><div className="metric-foot">{money(snapshot.metrics.pipelineValueMinor)} pipeline value</div></div>
+          <div className="metric"><span className="metric-icon"><Activity size={17}/></span><div className="metric-label">Replies</div><div className="metric-value">{snapshot.metrics.replies}</div><div className="metric-foot">Inbound commercial activity</div></div>
+          <div className="metric"><span className="metric-icon"><Bot size={17}/></span><div className="metric-label">AI cost</div><div className="metric-value">${Number(snapshot.metrics.estimatedAutomationCostUsd).toFixed(2)}</div><div className="metric-foot">{snapshot.metrics.automationFailures} failed runs</div></div>
+        </section>
+
+        <div className="split-layout">
+          <div className="stack">
             <section className="card">
-              <div className="card-head"><div><div className="eyebrow">Human action</div><h2>Today&apos;s queues</h2></div></div>
-              <div className="queue">
-                <div className="queue-item"><div><div className="queue-title">LinkedIn actions due</div><div className="queue-copy">Manual profile review, connection notes and follow-ups.</div></div><span className="badge blue">{summary.linkedinActionsDue}</span></div>
-                <div className="queue-item"><div><div className="queue-title">Replies needing attention</div><div className="queue-copy">Meaningful replies stay human-controlled.</div></div><span className="badge green">{summary.replies}</span></div>
-                <div className="queue-item"><div><div className="queue-title">Overdue follow-ups</div><div className="queue-copy">Open tasks whose due date has passed.</div></div><span className={`badge ${summary.overdueFollowUps ? "amber" : ""}`}>{summary.overdueFollowUps}</span></div>
-              </div>
+              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/tasks">All tasks <ArrowUpRight size={14}/></Link></div>
+              {snapshot.actions.length === 0 ? <EmptyState title="Your queue is clear" copy="New follow-ups, approvals and system issues will appear here." /> : <div className="queue">{snapshot.actions.map((action) => <Link href={action.href} className="queue-item" key={`${action.kind}-${action.id}`}><div className="queue-main"><div className="queue-title">{action.title}</div><div className="queue-copy">{action.detail || "Open the record for the full context."}{action.dueAt ? ` · ${dateTime(action.dueAt)}` : ""}</div></div><div className="queue-meta"><StatusBadge value={action.urgency}/><ArrowUpRight size={13}/></div></Link>)}</div>}
             </section>
+
             <section className="card">
-              <div className="card-head"><div><div className="eyebrow">System health</div><h2>Automation readiness</h2></div></div>
-              <div className="queue">
-                <div className="queue-item"><div><div className="queue-title">Failed agent runs</div><div className="queue-copy">Failures will appear here with retry controls.</div></div><span className={`badge ${summary.automationFailures ? "red" : "green"}`}>{summary.automationFailures}</span></div>
-                <div className="queue-item"><div><div className="queue-title">Current build stage</div><div className="queue-copy">The queued Atlas → Sage → Relay → Echo engine is ready. Live research waits only for private API credentials.</div></div><span className="badge blue">Agent Engine</span></div>
-              </div>
+              <div className="section-header"><div><div className="eyebrow">Pipeline</div><h2>Commercial opportunities</h2><p>Value and deal count across each active stage.</p></div><Link className="button button-secondary" href="/opportunities">Open pipeline</Link></div>
+              {snapshot.opportunityStages.length === 0 ? <EmptyState title="No opportunities yet" copy="Convert a meaningful sponsor conversation into an opportunity to start tracking value and probability." action={<Link className="button button-primary" href="/opportunities">Create opportunity</Link>} /> : <div className="queue">{snapshot.opportunityStages.map((stage) => <div className="queue-item" key={stage.stage}><div className="queue-main"><div className="queue-title">{stage.stage.replaceAll("_"," ")}</div><div className="queue-copy">{stage.count} {stage.count === 1 ? "opportunity" : "opportunities"}</div></div><div className="queue-meta"><strong>{money(stage.valueMinor)}</strong></div></div>)}</div>}
             </section>
           </div>
-        </>
-      )}
+
+          <div className="stack">
+            <section className="card">
+              <div className="section-header"><div><div className="eyebrow">Calendar</div><h2>Upcoming meetings</h2></div><Link className="button button-ghost" href="/meetings">View all</Link></div>
+              {snapshot.upcomingMeetings.length === 0 ? <EmptyState title="No meetings scheduled" copy="Book a discovery call or sponsor meeting and it will appear here." /> : <div className="queue">{snapshot.upcomingMeetings.map((meeting) => <Link href="/meetings" className="queue-item" key={meeting.id}><span className="metric-icon"><CalendarDays size={15}/></span><div className="queue-main"><div className="queue-title">{meeting.title}</div><div className="queue-copy">{dateTime(meeting.startsAt)} · {meeting.companyName || meeting.contactName || "Commercial meeting"}</div></div></Link>)}</div>}
+            </section>
+
+            <section className="card">
+              <div className="section-header"><div><div className="eyebrow">Activity</div><h2>Recent commercial history</h2></div><Link className="button button-ghost" href="/interactions">Full timeline</Link></div>
+              {snapshot.recentActivity.length === 0 ? <EmptyState title="No interactions recorded" copy="Emails, calls, LinkedIn actions and internal notes will create a traceable timeline." /> : <div className="timeline">{snapshot.recentActivity.map((item) => <div className="timeline-item" key={item.id}><span className="timeline-dot"/><div><div className="timeline-title">{item.summary}</div><div className="timeline-copy">{[item.companyName,item.contactName,item.outcome].filter(Boolean).join(" · ")}</div><div className="timeline-time">{item.channel?.replaceAll("_"," ") || item.direction} · {dateTime(item.occurredAt)}</div></div></div>)}</div>}
+            </section>
+          </div>
+        </div>
+      </>}
     </Shell>
   );
 }

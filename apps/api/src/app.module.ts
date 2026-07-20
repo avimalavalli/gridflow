@@ -13,6 +13,10 @@ import { DiscoveryModule } from "./discovery/discovery.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { OnboardingModule } from "./onboarding/onboarding.module.js";
 import { MigrationModule } from "./migration/migration.module.js";
+import { OpportunitiesModule } from "./opportunities/opportunities.module.js";
+import { TasksModule } from "./tasks/tasks.module.js";
+import { InteractionsModule } from "./interactions/interactions.module.js";
+import { MeetingsModule } from "./meetings/meetings.module.js";
 
 @Module({
   imports: [
@@ -30,6 +34,10 @@ import { MigrationModule } from "./migration/migration.module.js";
     ContactsModule,
     OutreachModule,
     TeamModule,
+    OpportunitiesModule,
+    TasksModule,
+    InteractionsModule,
+    MeetingsModule,
   ],
 })
 export class AppModule {}

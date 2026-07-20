@@ -1,40 +1,60 @@
-# GridFlow implementation status — Milestone 4A
+# GridFlow implementation status — Milestone 5
 
 ## Verified and runnable
 
-- Multi-tenant relational foundation and database-level unique keys.
-- Real account registration, login, logout and revocable sessions.
-- Private-beta access-code mode.
-- Separate athlete/team organisations and organisation switching.
-- Owner, administrator, commercial operator, reviewer and read-only roles.
-- Expiring, hashed team invitations.
-- Authentication and access-change audit history.
-- Athlete onboarding, DriverProfile, OutreachPolicy, markets and personalised Discovery Briefs.
+### Multi-athlete foundation
+
+- Account registration, login, logout and revocable sessions.
+- Separate organisations for athletes, teams, agencies and commercial organisations.
+- Organisation switching, team invitations and role-based access.
+- Athlete-specific onboarding, target markets, outreach policy and Discovery Briefs.
+- Tenant-scoped relational data, stable keys and row-level-security policies.
+
+### AI and data foundation
+
+- Reconstructed Atlas, Sage, Relay and Echo contracts with strict outputs.
+- OpenAI provider boundary, evidence provenance checks and cost fields.
+- Durable job queue, retries, heartbeats, stale-job recovery and dead-letter handling.
 - Airtable audit, review decisions, transactional importer and idempotent re-import.
-- Atlas, Sage, Relay and Echo prompt contracts and strict outputs.
-- OpenAI Responses API provider boundary and source-provenance validation.
-- Durable job queue, worker, retries, dead-letter and recovery.
-- Companies, Contacts, Outreach, Discovery Briefs, Agent Runs, Migration and Team & Access interfaces.
-- Docker build definitions and staging Compose template.
-- TypeScript, tests, lint, builds and two end-to-end smoke suites.
+
+### Product Core
+
+- Responsive authenticated app shell and functional command palette.
+- Dynamic active-organisation and user identity in the interface.
+- Action-led Command Centre.
+- Searchable Companies and Contacts CRMs.
+- Manual company and contact creation.
+- Complete company and contact detail workspaces.
+- Outreach review, editing, approvals and manual LinkedIn action logging.
+- Opportunity pipeline.
+- Tasks, interactions and meetings workspaces.
+- Connected dashboard queues and activity history.
+- Agent Runs, Discovery Briefs, Team & Access, Settings and Migration interfaces.
 
 ## Verified without live external calls
 
-Agent execution has been proven with deterministic fixtures. Authentication and multi-organisation behaviour have been proven against isolated temporary databases.
+The complete agent pipeline is fixture-tested, including duplicate protection, evidence validation, retries and recovery. The product-core API and database workflows are runtime smoke-tested against disposable databases.
 
-No live sponsor research has been performed because no private OpenAI credential was connected. No hosted database or domain has been supplied.
+No live sponsor research was performed because a production OpenAI credential was not connected. No Gmail account was connected.
 
-## Not yet complete
+## Validation result
 
-- Hosted private staging deployment.
-- Password reset delivery and MFA.
-- Edge/gateway login rate limiting and production security review.
-- First live Atlas → Sage → Relay → Echo quality pilot.
-- Gmail OAuth, sending, reply matching, bounces and suppression.
-- Complete LinkedIn daily-action workflow.
-- Opportunity, meeting and proposal operating interfaces.
-- Pulse, Sentinel, Nova, Forge, Seal, Orbit, Beacon, Ledger, full Control reporting and SaaS billing.
+- 23 tests passed across 9 files.
+- TypeScript passed.
+- ESLint passed.
+- API, worker and web production builds passed.
+- Commercial CRM smoke suite passed.
+- Authentication and organisation-isolation smoke suite passed.
+- Dependency audit: 0 known vulnerabilities.
 
-## Next milestone
+## Remaining before the main V1 release
 
-Milestone 4B is private staging deployment and a controlled five-company live pilot. It requires user-owned hosting, domain and API credentials; none should be pasted into source code or chat.
+1. Run and tune a controlled live Atlas → Sage → Relay → Echo quality programme.
+2. Finish the daily LinkedIn execution queue, acceptance and reply workflow.
+3. Add Gmail OAuth, sending policy enforcement, reply matching, suppression and bounce handling.
+4. Add password reset, MFA and complete security hardening.
+5. Complete cross-browser, accessibility, performance and responsive QA.
+6. Add monitoring, backups, production infrastructure and release controls.
+7. Build proposals and later sponsor-delivery modules only after acquisition quality is proven.
+
+GridFlow remains organisation-based and athlete-agnostic. The original racing-driver data is a migration dataset, not a product template.

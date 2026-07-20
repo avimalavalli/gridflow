@@ -1,55 +1,43 @@
 # GridFlow
 
-GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams and commercial organisations.
+GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository is the Milestone 4 private-beta foundation. It is a real database-backed, multi-organisation application with a durable Atlas → Sage → Relay → Echo engine. It is not yet a publicly hosted service.
+This repository contains the Milestone 5 product core: a database-backed, multi-organisation application with a durable Atlas → Sage → Relay → Echo engine and a connected commercial CRM. It is not yet the finished public V1 because live AI quality validation and Gmail operations remain incomplete.
 
 ## Current working flow
 
-`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas → Sage → Relay → Echo → outreach review`
+`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → company discovery and research → decision-makers → outreach review → LinkedIn/email actions → interactions → opportunities → tasks and meetings`
 
-Every business record belongs to an organisation. The first racing-driver dataset is only the migration fixture; no athlete identity, country, series or sponsor market is hard-coded into the product.
+Every business record belongs to an organisation. No athlete identity, nationality, championship or sponsor market is hard-coded into the product.
 
 ## What works now
 
-- Password-based account registration and sign-in.
-- Opaque, revocable database sessions stored in HTTP-only cookies.
-- Scrypt password hashing with random salts.
-- Private-beta registration modes: `OPEN`, `CODE` and `CLOSED`.
-- Separate organisations for athletes, teams, agencies and commercial operations.
-- Organisation switching for users who work with more than one athlete.
+- Secure account registration, sign-in, logout and revocable sessions.
+- Separate organisations and organisation switching.
 - Owner, administrator, commercial operator, reviewer and read-only roles.
-- Secure team invitations with hashed, expiring tokens and manual invitation-link delivery.
-- Role checks on onboarding, migration, Discovery Brief control and agent execution.
-- Authentication and invitation audit events.
-- Neutral onboarding defaults and athlete-specific markets.
+- Team invitations and access audit history.
+- Athlete-specific onboarding, markets, outreach policy and Discovery Briefs.
 - PostgreSQL schema, tenant-scoped keys and row-level-security policies.
 - Airtable Migration Centre with review, repair, skip, receipts and idempotent import.
-- Reconstructed Atlas, Sage, Relay and Echo contracts with strict validation.
-- Evidence-provenance checks for web research.
-- Durable PostgreSQL job outbox, retries, heartbeats, stale recovery and dead-letter handling.
-- Live Companies, Contacts, Discovery Briefs, Outreach, Agent Runs and Team & Access screens.
-- Docker definitions and a private-staging Compose template.
+- Atlas, Sage, Relay and Echo contracts with evidence-provenance validation.
+- Durable background jobs, retries, recovery and dead-letter handling.
+- Responsive application shell with functional command search.
+- Action-led Command Centre.
+- Companies and Contacts CRMs with manual creation and connected detail workspaces.
+- Outreach editing, approvals, version preservation and manual LinkedIn action logging.
+- Opportunity pipeline, tasks, interactions and meetings.
+- Agent Runs, Team & Access, Settings, Discovery Briefs and Migration interfaces.
 
 ## Multi-athlete behaviour
 
-Each athlete or team receives its own organisation containing its own:
-
-- profile and onboarding answers;
-- target markets and Discovery Briefs;
-- companies, contacts and evidence;
-- agent jobs and costs;
-- outreach and actions;
-- migration decisions and audit history.
-
-A user may belong to multiple organisations and switch between them. Membership never grants access to another organisation unless that organisation explicitly invites the user.
+Each athlete or team receives a separate organisation containing its own profile, strategy, companies, contacts, evidence, outreach, opportunities, jobs, costs and team members. A user can work across several organisations only when each organisation grants access.
 
 ## Run locally
 
 Requirements: Node.js 22+ and npm 10+.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -61,8 +49,6 @@ Open:
 Local development uses the private development identity unless `GRIDFLOW_DEV_BOOTSTRAP=false` is set.
 
 ## Test real authentication locally
-
-Copy the environment file and disable the development identity:
 
 ```bash
 cp .env.example .env
@@ -87,17 +73,16 @@ npm run lint
 npm run build
 npm run smoke
 npm run smoke:auth
+npm audit
 ```
 
-The authentication smoke test verifies separate athlete organisations, team invitations, multi-organisation membership, organisation switching and permission enforcement.
+## Still remaining before the main V1
 
-## Still not complete
+- Controlled live Atlas → Sage → Relay → Echo quality testing and tuning.
+- Complete LinkedIn action, acceptance and reply workflow.
+- Gmail OAuth, policy-controlled sending, reply synchronisation, bounces and suppression.
+- Password reset, MFA and final security hardening.
+- Production monitoring, backups, performance testing and release infrastructure.
+- Proposals and sponsor fulfilment after the acquisition workflow is proven.
 
-- Password-reset email delivery and MFA.
-- Hosted staging infrastructure and a real domain.
-- Controlled live OpenAI sponsor-research pilot.
-- Gmail OAuth, sending and reply synchronisation.
-- Complete LinkedIn action and reply workflow.
-- Pulse, Sentinel, Nova, Forge, Seal, Orbit, Beacon, Ledger, full Control reporting and billing.
-
-See `docs/MILESTONE4_AUTH_MULTI_ATHLETE.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/DEPLOYMENT.md`.
+See `docs/MILESTONE5_PRODUCT_CORE.md` and `docs/IMPLEMENTATION_STATUS.md`.

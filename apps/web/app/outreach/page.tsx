@@ -1,48 +1,12 @@
+import Link from "next/link";
+import { ArrowUpRight, Linkedin, Mail, Send } from "lucide-react";
 import { DataUnavailable } from "../../components/data-unavailable";
+import { EmptyState } from "../../components/empty-state";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
+import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
-
-export const dynamic = "force-dynamic";
-
-interface Outreach {
-  id: string;
-  outreachName: string;
-  companyName: string;
-  contactName: string;
-  draftStatus: string;
-  approvalStatus: string;
-  linkedinStatus: string;
-  emailStatus: string;
-  versionNumber: number | null;
-  linkedinConnectionNote: string | null;
-  linkedinFollowUpMessage: string | null;
-  emailSubject: string | null;
-  emailBody: string | null;
-  callOpener: string | null;
-  partnershipPitch: string | null;
-}
-
-export default async function OutreachPage() {
-  let outreach: Outreach[] = [];
-  let error = "";
-  try {
-    const response = await apiGet<{ outreach: Outreach[] }>("/outreach");
-    outreach = response.outreach;
-  } catch (cause) {
-    error = cause instanceof ApiError ? cause.message : "Unknown outreach error.";
-  }
-
-  return <Shell title="Outreach">
-    <PageHead title="Review and action workbench" description="Evidence-backed outreach versions created by Echo. LinkedIn actions remain manual." />
-    {error ? <DataUnavailable message={error} /> : outreach.length === 0 ? <section className="card"><div className="empty">No Echo outreach exists yet. Run Echo on an eligible contact.</div></section> :
-      <div className="brief-grid">{outreach.map((item) => <article className="brief-card" key={item.id}>
-        <div className="brief-card-top"><span className={`badge ${item.approvalStatus === "APPROVED" ? "green" : "amber"}`}>{item.approvalStatus.replaceAll("_", " ")}</span><span className="badge">v{item.versionNumber ?? 0}</span></div>
-        <div className="eyebrow">{item.companyName}</div><h2>{item.contactName}</h2>
-        <p><strong>LinkedIn note</strong><br />{item.linkedinConnectionNote || "No verified LinkedIn channel."}</p>
-        <p><strong>Email</strong><br />{item.emailSubject ? `${item.emailSubject}\n${item.emailBody ?? ""}` : "No genuine email address supplied."}</p>
-        <p><strong>Call opener</strong><br />{item.callOpener}</p>
-        <div className="brief-industries">Draft: {item.draftStatus.replaceAll("_", " ")} · LinkedIn: {item.linkedinStatus.replaceAll("_", " ")} · Email: {item.emailStatus.replaceAll("_", " ")}</div>
-      </article>)}</div>}
-  </Shell>;
-}
+export const dynamic="force-dynamic";
+interface Outreach{id:string;outreachName:string;companyName:string;companyId:string;contactName:string;contactId:string;draftStatus:string;approvalStatus:string;linkedinStatus:string;emailStatus:string;versionNumber:number|null;linkedinConnectionNote:string|null;emailSubject:string|null;generatedAt:string|null;nextFollowUpAt:string|null;preferredChannel:string;contactEmail:string|null;linkedinProfileUrl:string|null}
+const dt=(v:string)=>new Intl.DateTimeFormat("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(v));
+export default async function OutreachPage(){let outreach:Outreach[]=[];let error="";try{outreach=(await apiGet<{outreach:Outreach[]}>("/outreach")).outreach}catch(e){error=e instanceof ApiError?e.message:"Unknown outreach error."}return <Shell title="Outreach"><PageHead eyebrow="Execution workbench" title="Review, approve and execute personalised outreach" description="Echo creates the draft. You retain control over the final message, LinkedIn action and relationship timing." action={<Link className="button button-primary" href="/contacts"><Send size={14}/>Find eligible contacts</Link>}/>{error?<DataUnavailable message={error}/>:outreach.length===0?<section className="card"><EmptyState title="No outreach has been generated" copy="Run Echo on a primary or secondary contact at a qualified company." action={<Link className="button button-primary" href="/contacts">Open contacts</Link>}/></section>:<section className="card flush"><div className="table-wrap"><table><thead><tr><th>Contact</th><th>Company</th><th>Draft</th><th>LinkedIn</th><th>Email</th><th>Next action</th><th>Channels</th><th></th></tr></thead><tbody>{outreach.map(o=><tr key={o.id}><td><Link className="table-link" href={`/outreach/${o.id}`}><div className="table-primary">{o.contactName}</div><div className="table-sub">{o.outreachName} · v{o.versionNumber??0}</div></Link></td><td><Link className="table-link" href={`/companies/${o.companyId}`}><div className="table-primary">{o.companyName}</div></Link></td><td><StatusBadge value={o.approvalStatus}/><div className="table-sub">{o.draftStatus.replaceAll("_"," ")}</div></td><td><StatusBadge value={o.linkedinStatus}/></td><td><StatusBadge value={o.emailStatus}/></td><td>{o.nextFollowUpAt?<><div className="table-primary">{dt(o.nextFollowUpAt)}</div><div className="table-sub">Scheduled follow-up</div></>:<span className="table-sub">Review required</span>}</td><td><div className="row-actions" style={{justifyContent:"flex-start"}}>{o.linkedinProfileUrl?<Linkedin size={14}/>:null}{o.contactEmail?<Mail size={14}/>:null}<span className="table-sub">{o.preferredChannel.replaceAll("_"," ")}</span></div></td><td><Link className="icon-button" href={`/outreach/${o.id}`}><ArrowUpRight size={14}/></Link></td></tr>)}</tbody></table></div></section>}</Shell>}

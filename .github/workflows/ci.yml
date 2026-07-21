@@ -15,36 +15,84 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+          node-version: 22.16.0
+          package-manager-cache: false
+
+      - name: Verify Node and npm
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies reliably
+        shell: bash
+        run: |
+          npm config set audit false
+          npm config set fund false
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 600000
+
+          for attempt in 1 2 3; do
+            echo "npm ci attempt ${attempt}/3"
+            if npm ci --no-audit --no-fund; then
+              exit 0
+            else
+              status=$?
+              echo "npm ci failed with exit code ${status}. Clearing npm cache before retry."
+              rm -rf node_modules
+              npm cache clean --force || true
+              sleep $((attempt * 20))
+            fi
+          done
+
+          echo "npm ci failed after 3 attempts."
+          exit 1
+
       - run: npm run db:schema-check
       - run: npm run agents:evaluate
       - run: npm run validate
+
       - name: Build Next.js production bundle — compile
         working-directory: apps/web
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack --experimental-build-mode compile
+
       - name: Prepare Next.js proxy compatibility artifact
         working-directory: apps/web
         run: node ../../scripts/prepare-next-generate.mjs
+
       - name: Build Next.js production bundle — generate
         working-directory: apps/web
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack --experimental-build-mode generate
-      - run: npm audit --audit-level=high
+
+      - name: Dependency security audit
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            echo "npm audit attempt ${attempt}/3"
+            if npm audit --audit-level=high; then
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+
       - name: Record release CI evidence
         run: |
           mkdir -p reports
           node -e 'const fs=require("fs"); fs.writeFileSync("reports/ci-evidence.json", JSON.stringify({commit:process.env.GITHUB_SHA, workflow:process.env.GITHUB_WORKFLOW, runId:process.env.GITHUB_RUN_ID, status:"passed", generatedAt:new Date().toISOString()}, null, 2))'
-      - uses: actions/upload-artifact@v4
+
+      - uses: actions/upload-artifact@v7
         with:
           name: gridflow-ci-evidence-${{ github.sha }}
           path: |
@@ -53,3 +101,12 @@ jobs:
             evaluation/reports/agent-quality-report.md
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload npm debug logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gridflow-npm-debug-${{ github.sha }}
+          path: ~/.npm/_logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7

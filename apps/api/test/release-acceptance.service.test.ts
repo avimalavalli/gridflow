@@ -12,7 +12,7 @@ class TestDatabaseService {
 }
 
 const envKeys = [
-  "GRIDFLOW_RELEASE", "GRIDFLOW_COMMIT_SHA", "RELEASE_BUILD_VALIDATED", "RELEASE_CI_PASSED",
+  "GRIDFLOW_RELEASE", "GRIDFLOW_COMMIT_SHA", "RAILWAY_GIT_COMMIT_SHA", "RELEASE_BUILD_VALIDATED", "RELEASE_CI_PASSED",
   "RELEASE_DEPENDENCY_AUDIT_PASSED", "OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "DATABASE_PROVIDER_BACKUPS",
   "LOG_DRAIN_CONFIGURED",
@@ -25,6 +25,7 @@ let database: GridFlowDatabase | undefined;
 beforeEach(() => {
   process.env.GRIDFLOW_RELEASE = "v1.0.0-rc.1";
   process.env.GRIDFLOW_COMMIT_SHA = "1234567890abcdef";
+  delete process.env.RAILWAY_GIT_COMMIT_SHA;
   process.env.RELEASE_BUILD_VALIDATED = "true";
   process.env.RELEASE_CI_PASSED = "true";
   process.env.RELEASE_DEPENDENCY_AUDIT_PASSED = "true";
@@ -108,6 +109,16 @@ describe("ReleaseAcceptanceService", () => {
     const released = await service.markReleased(tenantId, userId);
     expect(released.release.status).toBe("RELEASED");
     expect(released.release.releasedAt).toBeTruthy();
+
+    process.env.RAILWAY_GIT_COMMIT_SHA = "fedcba0987654321";
+    const nextDeployment = await service.overview(tenantId);
+    expect(nextDeployment.release.commitSha).toBe("fedcba0987654321");
+    expect(nextDeployment.release.status).toBe("IN_PROGRESS");
+    expect(nextDeployment.release.approvedByName).toBeNull();
+    expect(nextDeployment.release.releasedAt).toBeNull();
+    expect(
+      nextDeployment.groups.flatMap((group) => group.checks).filter((check) => !check.automated).every((check) => check.status === "PENDING"),
+    ).toBe(true);
 
     const audit = await database.query<{ action: string }>(`SELECT "action"::text AS "action" FROM "AuditLog" WHERE "tenantId"=$1::uuid AND "entityType"='ReleaseAcceptance' ORDER BY "createdAt"`, [tenantId]);
     expect(audit.rows.map((row) => row.action)).toContain("APPROVE");

@@ -1,6 +1,7 @@
 import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
+import { currentReleaseCommit, currentReleaseVersion } from "../release-metadata.js";
 
 @Controller("health")
 export class HealthController {
@@ -12,8 +13,8 @@ export class HealthController {
       status: "ok",
       service: "gridflow-api",
       check: "liveness",
-      version: process.env.GRIDFLOW_RELEASE ?? "development",
-      commit: process.env.GRIDFLOW_COMMIT_SHA ?? null,
+      version: currentReleaseVersion(),
+      commit: currentReleaseCommit(),
       timestamp: new Date().toISOString(),
     };
   }

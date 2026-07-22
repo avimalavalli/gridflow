@@ -57,7 +57,7 @@ await writeFile(manifestPath, JSON.stringify({
   bytes: file.size,
   sha256: checksum,
   release: process.env.GRIDFLOW_RELEASE ?? null,
-  commit: process.env.GRIDFLOW_COMMIT_SHA ?? null,
+  commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GRIDFLOW_COMMIT_SHA ?? null,
 }, null, 2) + "\n", "utf8");
 
 console.log(JSON.stringify({ event: "database-backup-created", databaseKind, backupPath, checksumPath, manifestPath, bytes: file.size }));

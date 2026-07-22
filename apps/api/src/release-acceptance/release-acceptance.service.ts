@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { SqlExecutor } from "@gridflow/database";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
+import { currentReleaseCommit, currentReleaseVersion, releaseMetadataConfigured } from "../release-metadata.js";
 import type { CreateReleaseAcceptanceDto, UpdateAcceptanceCheckDto } from "./release-acceptance.dto.js";
 
 type AcceptanceStatus = "PENDING" | "PASS" | "FAIL" | "BLOCKED" | "WAIVED";
@@ -102,10 +103,6 @@ function clean(value?: string | null): string | null {
 
 function configured(value: string | undefined): boolean {
   return Boolean(value && value.trim());
-}
-
-function currentReleaseVersion(): string {
-  return process.env.GRIDFLOW_RELEASE?.trim() || "v1-release-candidate";
 }
 
 @Injectable()
@@ -243,14 +240,34 @@ export class ReleaseAcceptanceService {
 
   private async ensureCurrentRelease(tx: SqlExecutor, tenantId: string): Promise<ReleaseRow> {
     const version = currentReleaseVersion();
+    const commit = currentReleaseCommit();
     const existing = await this.findReleaseByVersion(tx, tenantId, version);
-    if (existing) return existing;
+    if (existing) {
+      if (commit && existing.commitSha !== commit) {
+        await tx.query(
+          `UPDATE "ReleaseAcceptance" SET "commitSha"=$3,"status"='DRAFT',"readinessScore"=0,
+             "approvedByUserId"=NULL,"approvedAt"=NULL,"releasedAt"=NULL,"updatedAt"=CURRENT_TIMESTAMP
+           WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+          [tenantId, existing.id, commit],
+        );
+        await tx.query(
+          `UPDATE "ReleaseAcceptanceCheck" SET "status"='PENDING',"notes"=NULL,"evidenceUrl"=NULL,
+             "testedAt"=NULL,"testedByUserId"=NULL,"updatedAt"=CURRENT_TIMESTAMP
+           WHERE "tenantId"=$1::uuid AND "releaseAcceptanceId"=$2::uuid AND "automated"=FALSE`,
+          [tenantId, existing.id],
+        );
+        const refreshed = await this.findReleaseByVersion(tx, tenantId, version);
+        if (!refreshed) throw new Error("Release acceptance cycle could not be refreshed.");
+        return refreshed;
+      }
+      return existing;
+    }
     const inserted = await tx.query<ReleaseRow>(
       `INSERT INTO "ReleaseAcceptance" ("tenantId","releaseVersion","commitSha","environment","status","updatedAt")
        VALUES ($1::uuid,$2,$3,$4,'DRAFT',CURRENT_TIMESTAMP)
        RETURNING "id","tenantId","releaseVersion","commitSha","environment","status"::text AS "status","readinessScore","notes",
                  "approvedByUserId",NULL::text AS "approvedByName","approvedAt","releasedAt","createdAt","updatedAt"`,
-      [tenantId, version, clean(process.env.GRIDFLOW_COMMIT_SHA), apiConfig.nodeEnv],
+      [tenantId, version, commit, apiConfig.nodeEnv],
     );
     const row = inserted.rows[0];
     if (!row) throw new Error("Release acceptance cycle could not be initialised.");
@@ -328,9 +345,9 @@ export class ReleaseAcceptanceService {
       production_security: productionSecurity
         ? { status: "PASS", detail: apiConfig.nodeEnv === "production" ? "Production authentication controls are enabled." : "Development environment; production controls will be enforced by preflight." }
         : { status: "BLOCKED", detail: "Disable development bootstrap, enable secure cookies and provide a strong AUTH_ENCRYPTION_KEY." },
-      release_metadata: configured(process.env.GRIDFLOW_RELEASE) && configured(process.env.GRIDFLOW_COMMIT_SHA)
-        ? { status: "PASS", detail: `Release ${process.env.GRIDFLOW_RELEASE} at commit ${process.env.GRIDFLOW_COMMIT_SHA?.slice(0, 12)}.` }
-        : { status: "BLOCKED", detail: "GRIDFLOW_RELEASE and GRIDFLOW_COMMIT_SHA are required." },
+      release_metadata: releaseMetadataConfigured()
+        ? { status: "PASS", detail: `Release ${currentReleaseVersion()} at commit ${currentReleaseCommit()?.slice(0, 12)}.` }
+        : { status: "BLOCKED", detail: "GRIDFLOW_RELEASE and a deployed commit identifier are required." },
       build_validation: process.env.RELEASE_BUILD_VALIDATED === "true"
         ? { status: "PASS", detail: "Production build validation is recorded for this release." }
         : { status: "BLOCKED", detail: "Set RELEASE_BUILD_VALIDATED=true only after API, worker and web builds pass for this commit." },

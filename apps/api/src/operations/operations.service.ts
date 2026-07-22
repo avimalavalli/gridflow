@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
+import { currentReleaseCommit, currentReleaseVersion, releaseMetadataConfigured } from "../release-metadata.js";
 
 interface MetricsRow extends Record<string, unknown> {
   agentRuns: number;
@@ -153,7 +154,7 @@ export class OperationsService {
         passwordRecovery: apiConfig.nodeEnv !== "production" || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
         liveAgents: Boolean(process.env.OPENAI_API_KEY),
         gmailOAuth: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET && process.env.GOOGLE_OAUTH_REDIRECT_URI && process.env.INTEGRATION_ENCRYPTION_KEY),
-        releaseMetadata: Boolean(process.env.GRIDFLOW_RELEASE && process.env.GRIDFLOW_COMMIT_SHA),
+        releaseMetadata: releaseMetadataConfigured(),
         backups: process.env.DATABASE_PROVIDER_BACKUPS === "true" || Boolean(process.env.BACKUP_STORAGE_URL),
         structuredLogging: true,
         externalAlerts: process.env.LOG_DRAIN_CONFIGURED === "true" || Boolean(process.env.OPERATIONS_ALERT_WEBHOOK_URL),
@@ -161,8 +162,8 @@ export class OperationsService {
 
       return {
         release: {
-          version: process.env.GRIDFLOW_RELEASE ?? "development",
-          commit: process.env.GRIDFLOW_COMMIT_SHA ?? null,
+          version: currentReleaseVersion(),
+          commit: currentReleaseCommit(),
           environment: apiConfig.nodeEnv,
         },
         database: { status: "ok", kind: databaseHealth.kind },

@@ -10,7 +10,6 @@ const required = [
   "GOOGLE_OAUTH_REDIRECT_URI",
   "INTEGRATION_ENCRYPTION_KEY",
   "GRIDFLOW_RELEASE",
-  "GRIDFLOW_COMMIT_SHA",
   "RELEASE_BUILD_VALIDATED",
   "RELEASE_CI_PASSED",
   "RELEASE_DEPENDENCY_AUDIT_PASSED",
@@ -28,7 +27,8 @@ if ((process.env.AUTH_ENCRYPTION_KEY ?? "").length < 32) failures.push("AUTH_ENC
 if ((process.env.INTEGRATION_ENCRYPTION_KEY ?? "").length < 32) failures.push("INTEGRATION_ENCRYPTION_KEY must contain at least 32 characters.");
 if (!/^https:\/\//.test(process.env.WEB_ORIGIN ?? "")) failures.push("WEB_ORIGIN must use HTTPS.");
 if (!/^https:\/\//.test(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "")) failures.push("GOOGLE_OAUTH_REDIRECT_URI must use HTTPS.");
-if ((process.env.GRIDFLOW_COMMIT_SHA ?? "").length < 7) failures.push("GRIDFLOW_COMMIT_SHA must contain a real commit identifier.");
+const releaseCommit = process.env.RAILWAY_GIT_COMMIT_SHA?.trim() || process.env.GRIDFLOW_COMMIT_SHA?.trim() || "";
+if (releaseCommit.length < 7) failures.push("RAILWAY_GIT_COMMIT_SHA or GRIDFLOW_COMMIT_SHA must contain a real commit identifier.");
 for (const gate of ["RELEASE_BUILD_VALIDATED", "RELEASE_CI_PASSED", "RELEASE_DEPENDENCY_AUDIT_PASSED"]) {
   if (process.env[gate] !== "true") failures.push(`${gate} must be true for the exact release commit.`);
 }

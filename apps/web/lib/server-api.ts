@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { ApiError } from "./api";
-
-const apiBase = process.env.GRIDFLOW_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+import { serverApiBase } from "./api-base";
 
 async function parseError(response: Response): Promise<ApiError> {
   let message = `GridFlow API returned ${response.status}.`;
@@ -19,7 +18,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   const cookieStore = await cookies();
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, {
+    response = await fetch(`${serverApiBase()}${path}`, {
       cache: "no-store",
       headers: cookieStore.size ? { cookie: cookieStore.toString() } : undefined,
     });

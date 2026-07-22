@@ -10,6 +10,16 @@ interface LoginResponse {
   message?: string | string[];
 }
 
+async function responseBody(response: Response): Promise<LoginResponse> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as LoginResponse;
+  } catch {
+    return { message: response.ok ? undefined : `GridFlow API returned ${response.status}.` };
+  }
+}
+
 export function LoginForm({ initialError = "" }: { initialError?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -30,7 +40,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const body = (await response.json()) as LoginResponse;
+      const body = await responseBody(response);
       if (!response.ok) throw new Error(Array.isArray(body.message) ? body.message.join(" ") : body.message ?? "Sign in failed.");
       if (body.mfaRequired && body.challengeToken) {
         setChallengeToken(body.challengeToken);
@@ -57,7 +67,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ challengeToken, code }),
       });
-      const body = (await response.json()) as LoginResponse;
+      const body = await responseBody(response);
       if (!response.ok) throw new Error(Array.isArray(body.message) ? body.message.join(" ") : body.message ?? "Verification failed.");
       router.push("/");
       router.refresh();

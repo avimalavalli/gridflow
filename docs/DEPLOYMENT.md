@@ -9,6 +9,8 @@ GridFlow is built as three services backed by one managed PostgreSQL database:
 
 The repository is provider-neutral. The final provider must support private GitHub deployments, Dockerfiles, managed secrets, HTTPS, health checks, managed PostgreSQL, log drains and off-host backups.
 
+For the checked-in Railway service definitions, private-network variables and exact verification sequence, see `docs/RAILWAY.md`.
+
 ## Required production ownership
 
 The release owner must control:

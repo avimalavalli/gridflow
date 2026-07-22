@@ -66,3 +66,5 @@ npm run backup:restore-check -- /path/to/backup
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
 See `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+
+Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

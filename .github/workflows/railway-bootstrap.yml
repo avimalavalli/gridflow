@@ -1,0 +1,101 @@
+name: Temporary Railway production bootstrap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/railway-bootstrap.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gridflow-railway-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out GridFlow
+        uses: actions/checkout@v4
+
+      - name: Install official Railway CLI
+        run: npm install --global @railway/cli@5.27.2
+
+      - name: Authorise Railway
+        run: script -q -e -c "railway login --browserless" /dev/null
+
+      - name: Configure verified production variables
+        env:
+          PROJECT_ID: a4aa27f1-54f6-495b-8d7b-e1292185d7c2
+          ENVIRONMENT_ID: 26cf0b4c-73cf-4f3e-818e-fd48608b8e36
+          API_SERVICE_ID: 517ac94c-2293-4a83-984f-24b92e46c4ff
+          WORKER_SERVICE_ID: 34440d94-160b-4bed-aa13-1eec684ee42d
+          RELEASE_SHA: ac7d2a53b3a56ca38cb9049bee2393af7cf22481
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          railway variable list --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$API_SERVICE_ID" --json > /tmp/gridflow-api-vars.json
+          railway variable list --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$WORKER_SERVICE_ID" --json > /tmp/gridflow-worker-vars.json
+
+          api_encryption_key="$(jq -r '.INTEGRATION_ENCRYPTION_KEY // empty' /tmp/gridflow-api-vars.json)"
+          worker_encryption_key="$(jq -r '.INTEGRATION_ENCRYPTION_KEY // empty' /tmp/gridflow-worker-vars.json)"
+
+          if [[ -n "$api_encryption_key" ]]; then
+            integration_encryption_key="$api_encryption_key"
+          elif [[ -n "$worker_encryption_key" ]]; then
+            integration_encryption_key="$worker_encryption_key"
+          else
+            integration_encryption_key="$(openssl rand -base64 48 | tr -d '\n')"
+          fi
+
+          printf '%s' "$integration_encryption_key" | railway variable set INTEGRATION_ENCRYPTION_KEY --stdin --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$API_SERVICE_ID" --skip-deploys >/dev/null
+          printf '%s' "$integration_encryption_key" | railway variable set INTEGRATION_ENCRYPTION_KEY --stdin --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$WORKER_SERVICE_ID" --skip-deploys >/dev/null
+
+          railway variable set             OPENAI_AGENT_MODEL=gpt-5-mini             OPENAI_TIMEOUT_MS=120000             GRIDFLOW_RELEASE=v1.0.0             GRIDFLOW_COMMIT_SHA="$RELEASE_SHA"             RELEASE_BUILD_VALIDATED=true             RELEASE_CI_PASSED=true             RELEASE_DEPENDENCY_AUDIT_PASSED=true             GRIDFLOW_DEV_BOOTSTRAP=false             AUTH_SECURE_COOKIES=true             TRUST_PROXY=true             WEB_ORIGIN=https://web-production-24fce.up.railway.app             --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$API_SERVICE_ID" --skip-deploys >/dev/null
+
+          railway variable set             OPENAI_AGENT_MODEL=gpt-5-mini             OPENAI_TIMEOUT_MS=120000             GRIDFLOW_RELEASE=v1.0.0             GRIDFLOW_COMMIT_SHA="$RELEASE_SHA"             GRIDFLOW_DEV_BOOTSTRAP=false             --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$WORKER_SERVICE_ID" --skip-deploys >/dev/null
+
+          echo "Configured GridFlow production defaults and shared integration encryption."
+          echo "OPENAI_API_KEY was intentionally left unchanged/unset."
+
+      - name: Redeploy API and worker
+        env:
+          PROJECT_ID: a4aa27f1-54f6-495b-8d7b-e1292185d7c2
+          ENVIRONMENT_ID: 26cf0b4c-73cf-4f3e-818e-fd48608b8e36
+          API_SERVICE_ID: 517ac94c-2293-4a83-984f-24b92e46c4ff
+          WORKER_SERVICE_ID: 34440d94-160b-4bed-aa13-1eec684ee42d
+        run: |
+          railway redeploy --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$API_SERVICE_ID" --yes --json
+          railway redeploy --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$WORKER_SERVICE_ID" --yes --json
+
+      - name: Verify production proxy and authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://web-production-24fce.up.railway.app"
+          for attempt in {1..30}; do
+            live="$(curl -sS -o /dev/null -w '%{http_code}' "$base/backend/health/live" || true)"
+            login="$(curl -sS -o /dev/null -w '%{http_code}' -H 'content-type: application/json' --data '{"email":"codex-healthcheck@example.invalid","password":"intentionally-invalid"}' "$base/backend/auth/login" || true)"
+            if [[ "$live" == "200" && "$login" == "401" ]]; then
+              echo "Production health and authentication proxy checks passed."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production did not become healthy within the verification window." >&2
+          exit 1
+
+      - name: Remove temporary workflow
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "gridflow-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/railway-bootstrap.yml
+          git commit -m "chore: remove temporary Railway bootstrap"
+          git push

@@ -28,7 +28,8 @@ export class HealthController {
         productionAuth: apiConfig.nodeEnv !== "production" || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
         passwordRecovery: apiConfig.nodeEnv !== "production" || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
       };
-      if (Object.values(checks).some((value) => !value)) throw new Error("One or more production readiness checks failed.");
+      const failedChecks = Object.entries(checks).filter(([, ready]) => !ready).map(([name]) => name);
+      if (failedChecks.length > 0) throw new Error(`Production readiness checks failed: ${failedChecks.join(", ")}.`);
       return { status: "ready", service: "gridflow-api", check: "readiness", checks, ...database, timestamp: new Date().toISOString() };
     } catch (error) {
       throw new ServiceUnavailableException({ status: "not-ready", service: "gridflow-api", message: error instanceof Error ? error.message : String(error), timestamp: new Date().toISOString() });

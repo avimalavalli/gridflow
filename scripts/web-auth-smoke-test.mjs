@@ -91,6 +91,20 @@ try {
   const loginPage = await waitFor(`${webBase}/login`, "web", web);
   assert(loginPage.status === 200, "The production login page did not return 200.");
 
+  const forgotPasswordPage = await webRequest("/forgot-password");
+  assert(forgotPasswordPage.response.status === 200, "The forgot-password page is not publicly accessible.");
+
+  const resetPasswordPage = await webRequest("/reset-password?token=smoke-test-token");
+  assert(resetPasswordPage.response.status === 200, "The reset-password page is not publicly accessible.");
+
+  const protectedPage = await webRequest("/dashboard");
+  assert(protectedPage.response.status === 307, "An unauthenticated dashboard request was not redirected.");
+  const protectedRedirect = new URL(protectedPage.response.headers.get("location") ?? "", webBase);
+  assert(
+    protectedRedirect.pathname === "/login" && protectedRedirect.searchParams.get("next") === "/dashboard",
+    "The dashboard redirect did not preserve its destination.",
+  );
+
   const readiness = await webRequest("/backend/health/ready");
   assert(readiness.response.ok && readiness.payload.status === "ready", "The runtime web-to-API proxy is not ready.");
 
@@ -121,7 +135,7 @@ try {
   assert(identity.response.ok, `The proxied session was not accepted: ${JSON.stringify(identity.payload)}`);
   assert(identity.payload.activeOrganisation?.organisationName === "Web Proxy Racing", "Login returned the wrong organisation.");
 
-  console.log("GridFlow web auth smoke test passed: production web runtime proxy, cookies, registration, logout and login.");
+  console.log("GridFlow web auth smoke test passed: public recovery routes, protected-route redirect, runtime proxy, cookies, registration, logout and login.");
 } finally {
   api.kill("SIGTERM");
   web.kill("SIGTERM");

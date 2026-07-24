@@ -1,4 +1,5 @@
-const nullableUri = { anyOf: [{ type: "string", format: "uri" }, { type: "null" }] } as const;
+const httpUrl = { type: "string", pattern: "^https?://\\S+$" } as const;
+const nullableHttpUrl = { anyOf: [httpUrl, { type: "null" }] } as const;
 const nullableEmail = { anyOf: [{ type: "string", format: "email" }, { type: "null" }] } as const;
 const nullableString = { anyOf: [{ type: "string" }, { type: "null" }] } as const;
 
@@ -7,7 +8,7 @@ export const sourceSchema = {
   additionalProperties: false,
   required: ["url", "title", "supported_fact", "source_type", "retrieved_at", "confidence"],
   properties: {
-    url: { type: "string", format: "uri" },
+    url: httpUrl,
     title: { type: "string", minLength: 1 },
     supported_fact: { type: "string", minLength: 1 },
     source_type: {
@@ -32,7 +33,7 @@ export const atlasOutputSchema = {
         required: ["company_name", "website", "company_key", "discovery_rationale", "discovery_evidence", "sources", "confidence"],
         properties: {
           company_name: { type: "string", minLength: 1 },
-          website: { type: "string", format: "uri" },
+          website: httpUrl,
           company_key: { type: "string", minLength: 3 },
           discovery_rationale: { type: "string", minLength: 20 },
           discovery_evidence: { type: "string", minLength: 20 },
@@ -68,7 +69,7 @@ export const sageOutputSchema = {
     industries: { type: "array", minItems: 1, items: { type: "string" } },
     country: { type: "string", minLength: 1 },
     company_size: { type: "string", minLength: 1 },
-    linkedin_company_url: nullableUri,
+    linkedin_company_url: nullableHttpUrl,
     budget_potential: { type: "integer", minimum: 0, maximum: 5 },
     strategic_fit: { type: "integer", minimum: 0, maximum: 5 },
     geographical_fit: { type: "integer", minimum: 0, maximum: 5 },
@@ -111,7 +112,7 @@ export const relayOutputSchema = {
         properties: {
           contact_name: { type: "string", minLength: 2 },
           job_title: { type: "string", minLength: 2 },
-          linkedin_profile: nullableUri,
+          linkedin_profile: nullableHttpUrl,
           email: nullableEmail,
           phone: nullableString,
           contact_key: { type: "string", minLength: 5 },

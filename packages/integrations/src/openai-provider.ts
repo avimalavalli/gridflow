@@ -32,7 +32,7 @@ export class OpenAIAgentProvider implements AgentModelProvider {
     this.outputCost = options.outputCostPerMillionUsd ?? numberEnv("OPENAI_OUTPUT_COST_PER_MILLION_USD");
     this.client = new OpenAI({
       apiKey,
-      timeout: options.timeoutMs ?? numberEnv("OPENAI_TIMEOUT_MS") ?? 300_000,
+      timeout: options.timeoutMs ?? numberEnv("OPENAI_TIMEOUT_MS") ?? 900_000,
       maxRetries: 0,
     });
   }

@@ -70,6 +70,7 @@ AUTH_FROM_EMAIL=GridFlow <no-reply@your-verified-domain>
 RESEND_API_KEY=<same-value-as-api>
 OPENAI_API_KEY=<secret>
 OPENAI_AGENT_MODEL=<approved-model>
+OPENAI_TIMEOUT_MS=300000
 GOOGLE_OAUTH_CLIENT_ID=<secret>
 GOOGLE_OAUTH_CLIENT_SECRET=<secret>
 GOOGLE_OAUTH_REDIRECT_URI=https://<api-public-domain>/api/v1/integrations/gmail/callback

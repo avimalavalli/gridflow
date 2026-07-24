@@ -182,7 +182,7 @@ export class AgentEngine {
       );
       await tx.query(
         `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","newValues")
-         VALUES ($1::uuid,$2::uuid,'RETRY','AgentRun',$3::uuid,$4::jsonb)`,
+         VALUES ($1::uuid,$2::uuid,'AUTOMATION_RUN','AgentRun',$3::uuid,$4::jsonb)`,
         [tenantId, userId, agentRunId, json({ retry: true })],
       );
       return { id: row.id, agentName: row.agentName, status: "QUEUED", idempotencyKey: row.idempotencyKey, reused: true };

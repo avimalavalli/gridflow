@@ -137,7 +137,22 @@ try {
   assert(identity.response.ok, `The proxied session was not accepted: ${JSON.stringify(identity.payload)}`);
   assert(identity.payload.activeOrganisation?.organisationName === "Web Proxy Racing", "Login returned the wrong organisation.");
 
-  console.log("GridFlow web auth smoke test passed: public recovery routes, protected-route redirect, API failover, cookies, registration, logout and login.");
+  const authenticatedEntry = await webRequest("/", { cookie: loginCookie });
+  const authenticatedLocation = authenticatedEntry.response.headers.get("location");
+  const authenticatedHtml = typeof authenticatedEntry.payload.raw === "string" ? authenticatedEntry.payload.raw : "";
+  const redirectedToOnboarding = authenticatedLocation
+    ? new URL(authenticatedLocation, webBase).pathname === "/onboarding"
+    : authenticatedHtml.includes("url=/onboarding") || authenticatedHtml.includes(";/onboarding;307;");
+  assert(
+    redirectedToOnboarding,
+    `A newly authenticated user was not sent to onboarding (status ${authenticatedEntry.response.status}, location ${authenticatedLocation ?? "(streamed response)"}).`,
+  );
+  assert(
+    !authenticatedHtml.includes("error=unavailable") && !authenticatedLocation?.includes("error=unavailable"),
+    "A successful authenticated app entry was incorrectly reported as an unavailable API.",
+  );
+
+  console.log("GridFlow web auth smoke test passed: public recovery routes, protected-route redirect, API failover, cookies, registration, logout, login and authenticated app entry.");
 } finally {
   api.kill("SIGTERM");
   web.kill("SIGTERM");

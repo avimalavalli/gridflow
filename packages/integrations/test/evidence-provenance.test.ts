@@ -47,6 +47,13 @@ describe("web evidence provenance", () => {
       .toEqual(["https://example.com/about"]);
   });
 
+  it("accepts a declared homepage when web search returned another page on the same verified host", () => {
+    expect(() => assertEvidenceBackedByWebSearch(output, [{
+      type: "web_search_call",
+      action: { type: "search", sources: [{ type: "url", url: "https://www.example.com/company/news" }] },
+    }])).not.toThrow();
+  });
+
   it("rejects evidence URLs not observed in the web-search response", () => {
     expect(() => assertEvidenceBackedByWebSearch(output, [{
       type: "web_search_call",

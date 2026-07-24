@@ -698,3 +698,126 @@ export class AgentEngine {
           candidate.confidence],
       );
       const contactId = contact.rows[0]?.id;
+      if (!contactId) throw new Error(`Relay could not upsert ${candidate.contact_name}.`);
+      for (const source of candidate.sources) {
+        const evidenceId = await saveEvidence(tx, tenantId, agentRunId, source);
+        await tx.query(
+          `INSERT INTO "ContactEvidence" ("contactId","evidenceId","claimKey") VALUES ($1::uuid,$2::uuid,'relay_discovery') ON CONFLICT DO NOTHING`,
+          [contactId, evidenceId],
+        );
+      }
+      created += 1;
+    }
+
+    await tx.query(
+      `UPDATE "Company" SET "contactDiscoveryStatus"=$3::"ContactDiscoveryStatus",
+         "contactDiscoveryNotes"=$4,"lastContactSearchAt"=CURRENT_TIMESTAMP,"contactsFoundCount"=$5,
+         "updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+      [tenantId, companyId, created > 0 ? "CONTACTS_FOUND" : "NEEDS_MANUAL_SEARCH",
+        [output.contact_discovery_notes, output.fewer_than_requested_reason].filter(Boolean).join("\n"), created],
+    );
+  }
+
+  private async applyEcho(tx: SqlExecutor, tenantId: string, agentRunId: string, contactId: string, output: EchoOutput, modelUsed: string): Promise<string> {
+    const context = await tx.query<{
+      contactName: string; contactKey: string; email: string | null; linkedin: string | null; phone: string | null;
+      companyId: string; companyName: string; emailAutomationMode: string; approvalMode: string;
+    }>(
+      `SELECT c."contactName",c."contactKey",c."email",c."linkedinProfileUrl" AS "linkedin",c."phone",
+              co."id" AS "companyId",co."companyName",p."emailAutomationMode"::text AS "emailAutomationMode",
+              p."approvalMode"::text AS "approvalMode"
+       FROM "Contact" c JOIN "Company" co ON co."id"=c."companyId"
+       LEFT JOIN "OutreachPolicy" p ON p."tenantId"=c."tenantId"
+       WHERE c."tenantId"=$1::uuid AND c."id"=$2::uuid`, [tenantId, contactId],
+    );
+    const row = context.rows[0];
+    if (!row) throw new Error("Echo contact context is unavailable.");
+    if (!row.email && [output.email_subject, output.email_body, output.follow_up_email_1, output.follow_up_email_2].some((value) => value.trim())) {
+      throw new Error("Echo generated email content without a genuine contact email.");
+    }
+    if (!row.linkedin && [output.linkedin_connection_note, output.linkedin_followup_message].some((value) => value.trim())) {
+      throw new Error("Echo generated LinkedIn content without a verified LinkedIn profile.");
+    }
+
+    const stableOutreachKey = outreachKey(row.contactKey);
+    const outreach = await tx.query<IdRow>(
+      `INSERT INTO "OutreachRecord" (
+         "tenantId","companyId","contactId","outreachName","outreachKey","sequence","echoStatus","draftStatus",
+         "approvalStatus","linkedinStatus","emailStatus","generatedAt","source","createdAt","updatedAt"
+       ) VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,'initial-v1','DRAFT_READY','DRAFT_READY',
+         $6::"ApprovalStatus",'NOT_STARTED','NOT_STARTED',CURRENT_TIMESTAMP,'AI_GENERATED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ON CONFLICT ("tenantId","outreachKey") DO UPDATE SET
+         "echoStatus"='DRAFT_READY',"draftStatus"='DRAFT_READY',"approvalStatus"=$6::"ApprovalStatus",
+         "generatedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+       RETURNING "id"`,
+      [tenantId, row.companyId, contactId, `${row.companyName} — ${row.contactName}`, stableOutreachKey,
+        row.approvalMode === "NONE" ? "APPROVED" : "PENDING_REVIEW"],
+    );
+    const outreachRecordId = outreach.rows[0]?.id;
+    if (!outreachRecordId) throw new Error("Echo outreach record was not created.");
+    const versionResult = await tx.query<{ nextVersion: number }>(
+      `SELECT COALESCE(MAX("versionNumber"),0)+1 AS "nextVersion" FROM "OutreachVersion" WHERE "outreachRecordId"=$1::uuid`, [outreachRecordId],
+    );
+    const versionNumber = Number(versionResult.rows[0]?.nextVersion ?? 1);
+    const version = await tx.query<IdRow>(
+      `INSERT INTO "OutreachVersion" (
+         "outreachRecordId","versionNumber","linkedinConnectionNote","linkedinFollowUpMessage","emailSubject","emailBody",
+         "followUpEmail1","followUpEmail2","callOpener","personalisationEvidence","partnershipPitch","generationNotes",
+         "promptVersion","modelUsed","generatedAt"
+       ) VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,CURRENT_TIMESTAMP) RETURNING "id"`,
+      [outreachRecordId, versionNumber, output.linkedin_connection_note, output.linkedin_followup_message,
+        output.email_subject, output.email_body, output.follow_up_email_1, output.follow_up_email_2,
+        output.call_opener, output.personalisation_evidence, output.partnership_pitch, output.generation_notes, echoPrompt.version, modelUsed],
+    );
+    const versionId = version.rows[0]?.id;
+    if (!versionId) throw new Error("Echo outreach version was not created.");
+    await tx.query(`UPDATE "OutreachRecord" SET "currentVersionId"=$2::uuid,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [outreachRecordId, versionId]);
+    await tx.query(`UPDATE "Contact" SET "echoStatus"='DRAFT_READY',"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, contactId]);
+
+    const evidence = await tx.query<{ evidenceId: string }>(
+      `SELECT "evidenceId" FROM "ContactEvidence" WHERE "contactId"=$1::uuid
+       UNION SELECT ce."evidenceId" FROM "CompanyEvidence" ce WHERE ce."companyId"=$2::uuid`, [contactId, row.companyId],
+    );
+    for (const item of evidence.rows) {
+      await tx.query(`INSERT INTO "OutreachEvidence" ("outreachVersionId","evidenceId","claimKey") VALUES ($1::uuid,$2::uuid,'echo_context') ON CONFLICT DO NOTHING`, [versionId, item.evidenceId]);
+    }
+
+    if (row.linkedin) {
+      await tx.query(
+        `INSERT INTO "ChannelAction" (
+           "tenantId","outreachRecordId","outreachVersionId","contactId","channel","sequenceStep","status","automated","idempotencyKey","updatedAt"
+         ) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'LINKEDIN','connection-initial',$5::"ChannelActionStatus",false,$6,CURRENT_TIMESTAMP)
+         ON CONFLICT ("tenantId","idempotencyKey") DO UPDATE SET "outreachVersionId"=EXCLUDED."outreachVersionId","updatedAt"=CURRENT_TIMESTAMP`,
+        [tenantId, outreachRecordId, versionId, contactId, row.approvalMode === "NONE" ? "READY" : "NOT_STARTED", `${stableOutreachKey}|linkedin|connection-initial`],
+      );
+    }
+    if (row.email) {
+      const automatic = row.emailAutomationMode === "FULL_AUTOMATION" && row.approvalMode === "NONE";
+      await tx.query(
+        `INSERT INTO "ChannelAction" (
+           "tenantId","outreachRecordId","outreachVersionId","contactId","channel","sequenceStep","status","automated","idempotencyKey","updatedAt"
+         ) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','initial',$5::"ChannelActionStatus",$6,$7,CURRENT_TIMESTAMP)
+         ON CONFLICT ("tenantId","idempotencyKey") DO UPDATE SET "outreachVersionId"=EXCLUDED."outreachVersionId","status"=EXCLUDED."status","automated"=EXCLUDED."automated","updatedAt"=CURRENT_TIMESTAMP`,
+        [tenantId, outreachRecordId, versionId, contactId, automatic ? "QUEUED" : row.approvalMode === "NONE" ? "READY" : "NOT_STARTED", automatic, `${stableOutreachKey}|email|initial`],
+      );
+    }
+    return outreachRecordId;
+  }
+
+  private async applyFailureState(tx: SqlExecutor, tenantId: string, agentRunId: string, agentName: CoreAgentName, details: string): Promise<void> {
+    const run = await tx.query<{ discoveryBriefId: string | null; companyId: string | null; contactId: string | null }>(
+      `SELECT "discoveryBriefId","companyId","contactId" FROM "AgentRun" WHERE "id"=$1::uuid`, [agentRunId],
+    );
+    const row = run.rows[0];
+    if (!row) return;
+    if (agentName === "ATLAS" && row.discoveryBriefId) {
+      await tx.query(`UPDATE "DiscoveryBrief" SET "lastRunStatus"='FAILED',"atlasNotes"=$3,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, row.discoveryBriefId, details]);
+    } else if (agentName === "SAGE" && row.companyId) {
+      await tx.query(`UPDATE "Company" SET "researchStatus"='NEED_REVIEW',"researchNotes"=COALESCE("researchNotes",'')||$3,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, row.companyId, `\nAgent failure: ${details}`]);
+    } else if (agentName === "RELAY" && row.companyId) {
+      await tx.query(`UPDATE "Company" SET "contactDiscoveryStatus"='NEEDS_MANUAL_SEARCH',"contactDiscoveryNotes"=$3,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, row.companyId, details]);
+    } else if (agentName === "ECHO" && row.contactId) {
+      await tx.query(`UPDATE "Contact" SET "echoStatus"='FAILED',"notes"=COALESCE("notes",'')||$3,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, row.contactId, `\nEcho failure: ${details}`]);
+    }
+  }
+}

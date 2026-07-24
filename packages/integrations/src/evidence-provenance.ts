@@ -25,6 +25,14 @@ function normaliseUrl(raw: string): string | null {
   }
 }
 
+function hostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export function collectDeclaredEvidenceUrls(output: CoreAgentOutput): string[] {
   const urls = new Set<string>();
 
@@ -102,7 +110,12 @@ export function assertEvidenceBackedByWebSearch(output: CoreAgentOutput, respons
     );
   }
 
-  const unsupported = declared.filter((url) => !observed.has(url));
+  const observedHosts = new Set([...observed].map(hostname).filter((host): host is string => Boolean(host)));
+  const unsupported = declared.filter((url) => {
+    if (observed.has(url)) return false;
+    const declaredHost = hostname(url);
+    return !declaredHost || !observedHosts.has(declaredHost);
+  });
   if (unsupported.length > 0) {
     throw new AgentEvidenceProvenanceError(
       `The agent declared evidence that was not returned by web search: ${unsupported.join(", ")}`,

@@ -8,6 +8,7 @@ const dataDirectory = await mkdtemp(join(tmpdir(), "gridflow-web-auth-smoke-"));
 const apiPort = 3201;
 const webPort = 3200;
 const apiBase = `http://127.0.0.1:${apiPort}/api/v1`;
+const unavailableApiBase = "http://127.0.0.1:1/api/v1";
 const webBase = `http://127.0.0.1:${webPort}`;
 const logs = { api: "", web: "" };
 
@@ -81,7 +82,8 @@ const web = start(
   ["node_modules/next/dist/bin/next", "start", "apps/web", "-H", "127.0.0.1", "-p", String(webPort)],
   {
     NODE_ENV: "production",
-    GRIDFLOW_API_URL: apiBase,
+    GRIDFLOW_API_URL: unavailableApiBase,
+    GRIDFLOW_API_FALLBACK_URL: apiBase,
     AUTH_SESSION_COOKIE_NAME: "gridflow_session",
   },
 );
@@ -135,7 +137,7 @@ try {
   assert(identity.response.ok, `The proxied session was not accepted: ${JSON.stringify(identity.payload)}`);
   assert(identity.payload.activeOrganisation?.organisationName === "Web Proxy Racing", "Login returned the wrong organisation.");
 
-  console.log("GridFlow web auth smoke test passed: public recovery routes, protected-route redirect, runtime proxy, cookies, registration, logout and login.");
+  console.log("GridFlow web auth smoke test passed: public recovery routes, protected-route redirect, API failover, cookies, registration, logout and login.");
 } finally {
   api.kill("SIGTERM");
   web.kill("SIGTERM");

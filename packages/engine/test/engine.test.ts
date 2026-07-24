@@ -172,6 +172,38 @@ describe("GridFlow core agent engine", () => {
       return (await tx.query<{ runStatus: string; jobStatus: string }>(`SELECT r."status"::text AS "runStatus",j."status"::text AS "jobStatus" FROM "AgentRun" r JOIN "AutomationJob" j ON j."agentRunId"=r."id" WHERE r."id"=$1::uuid`, [run.id])).rows[0]!;
     });
     expect(states).toEqual({ runStatus: "FAILED", jobStatus: "DEAD_LETTER" });
+
+    const retried = await engine.retryRun(identity.tenantId, identity.userId, run.id);
+    expect(retried).toMatchObject({ id: run.id, status: "QUEUED", reused: true });
+
+    const retryState = await database.transaction(async (tx) => {
+      await setTenantContext(tx, identity.tenantId);
+      return (await tx.query<{
+        runStatus: string;
+        jobStatus: string;
+        outboxStatus: string;
+        auditAction: string;
+      }>(
+        `SELECT
+           r."status"::text AS "runStatus",
+           j."status"::text AS "jobStatus",
+           o."status"::text AS "outboxStatus",
+           a."action"::text AS "auditAction"
+         FROM "AgentRun" r
+         JOIN "AutomationJob" j ON j."agentRunId"=r."id"
+         JOIN "JobOutbox" o ON o."tenantId"=r."tenantId" AND o."idempotencyKey"=r."idempotencyKey"
+         JOIN "AuditLog" a ON a."tenantId"=r."tenantId" AND a."entityType"='AgentRun'
+           AND a."entityId"=r."id"::text AND a."newValues"->>'retry'='true'
+         WHERE r."id"=$1::uuid`,
+        [run.id],
+      )).rows[0]!;
+    });
+    expect(retryState).toEqual({
+      runStatus: "QUEUED",
+      jobStatus: "QUEUED",
+      outboxStatus: "QUEUED",
+      auditAction: "AUTOMATION_RUN",
+    });
   });
 
 });

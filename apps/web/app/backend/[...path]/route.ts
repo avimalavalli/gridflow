@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { serverApiBase } from "../../../lib/api-base";
+import { serverApiBases } from "../../../lib/api-base";
 
 export const dynamic = "force-dynamic";
 
@@ -43,29 +43,56 @@ function downstreamHeaders(upstream: Response): Headers {
   return headers;
 }
 
+function connectionMessage(error: unknown): string {
+  if (!(error instanceof Error)) return "unknown connection error";
+  return error.message.slice(0, 300);
+}
+
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
     const { path } = await context.params;
     const encodedPath = path.map((segment) => encodeURIComponent(segment)).join("/");
-    const upstreamUrl = new URL(`${serverApiBase()}/${encodedPath}`);
-    upstreamUrl.search = request.nextUrl.search;
-
     const method = request.method.toUpperCase();
     const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();
-    const upstream = await fetch(upstreamUrl, {
-      method,
-      headers: upstreamHeaders(request),
-      body: body?.byteLength ? body : undefined,
-      cache: "no-store",
-      redirect: "manual",
-      signal: AbortSignal.timeout(30_000),
-    });
+    const headers = upstreamHeaders(request);
+    const bases = serverApiBases();
+    let lastConnectionError: unknown;
 
-    return new NextResponse(upstream.body, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers: downstreamHeaders(upstream),
-    });
+    for (const [index, base] of bases.entries()) {
+      const upstreamUrl = new URL(`${base}/${encodedPath}`);
+      upstreamUrl.search = request.nextUrl.search;
+
+      try {
+        const upstream = await fetch(upstreamUrl, {
+          method,
+          headers,
+          body: body?.byteLength ? body : undefined,
+          cache: "no-store",
+          redirect: "manual",
+          signal: AbortSignal.timeout(15_000),
+        });
+
+        return new NextResponse(upstream.body, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: downstreamHeaders(upstream),
+        });
+      } catch (error) {
+        lastConnectionError = error;
+        console.error(JSON.stringify({
+          level: "error",
+          event: "web-api-proxy-connection-failed",
+          method,
+          path: `/${encodedPath}`,
+          upstream: index === 0 ? "primary" : "fallback",
+          fallbackAvailable: index < bases.length - 1,
+          message: connectionMessage(error),
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    }
+
+    throw lastConnectionError ?? new Error("No GridFlow API endpoint was available.");
   } catch (error) {
     const configurationError = error instanceof Error && error.message.includes("not configured");
     return NextResponse.json(

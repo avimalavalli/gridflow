@@ -24,10 +24,12 @@ The files select the correct Dockerfile, health check and restart policy. The AP
 ```bash
 NODE_ENV=production
 GRIDFLOW_API_URL=http://gridflow-api.railway.internal:3001/api/v1
+GRIDFLOW_API_FALLBACK_URL=https://<api-public-domain>/api/v1
 AUTH_SESSION_COOKIE_NAME=gridflow_session
 ```
 
 `GRIDFLOW_API_URL` is read at runtime. It is not a public browser variable and must point to the API service's Railway private DNS name. If the API service has a different name, replace `gridflow-api` with that exact service name.
+`GRIDFLOW_API_FALLBACK_URL` is a server-side recovery route. GridFlow uses it only when the primary private-network connection throws a connection error; normal traffic stays on Railway's private network.
 
 ## Required API variables
 
@@ -80,7 +82,8 @@ GOOGLE_OAUTH_REDIRECT_URI=https://<api-public-domain>/api/v1/integrations/gmail/
 3. Check `/api/v1/health/ready`; a `503` response names the missing production dependency.
 4. Deploy the worker and confirm a `worker-started` structured log entry.
 5. Deploy the web service and open `/login`.
-6. From the public web domain, request `/backend/health/ready`. It must return the API readiness JSON, not an HTML `502` page.
-7. Register or sign in with the private-beta account and confirm `/backend/auth/me` returns the active organisation.
+6. Confirm Railway marks the web deployment healthy using `/backend/health/live`, which verifies both the web runtime and its API connection.
+7. From the public web domain, request `/backend/health/ready`. It must return the API readiness JSON, not an HTML `502` page.
+8. Register or sign in with the private-beta account and confirm `/backend/auth/me` returns the active organisation.
 
 The web service is the only service that needs to be public for normal app use. Give the API a temporary Railway domain only when configuring or accepting Google OAuth; normal web-to-API traffic stays on Railway's private network.

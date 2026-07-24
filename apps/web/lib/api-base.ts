@@ -4,9 +4,15 @@ function normaliseApiUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
 }
 
-export function serverApiBase(): string {
+export function serverApiBases(): string[] {
   const configured = process.env.GRIDFLOW_API_URL ?? process.env.GRIDFLOW_API_PROXY_TARGET;
-  if (configured?.trim()) return normaliseApiUrl(configured);
+  const fallback = process.env.GRIDFLOW_API_FALLBACK_URL;
+
+  const bases = [configured, fallback]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .map(normaliseApiUrl);
+
+  if (bases.length > 0) return [...new Set(bases)];
 
   if (process.env.NODE_ENV === "production") {
     throw new Error(
@@ -14,5 +20,9 @@ export function serverApiBase(): string {
     );
   }
 
-  return LOCAL_API_URL;
+  return [LOCAL_API_URL];
+}
+
+export function serverApiBase(): string {
+  return serverApiBases()[0];
 }

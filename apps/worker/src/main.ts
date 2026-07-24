@@ -6,6 +6,7 @@ import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
 import { GmailSyncProcessor } from "./gmail-sync.js";
 import { AuthEmailProcessor } from "./auth-email.js";
+import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
 loadEnv({ path: resolve(process.cwd(), ".env"), quiet: true });
@@ -32,6 +33,10 @@ if (recoveredEmails) logWorkerEvent({ event: "stale-email-actions-recovered", le
 const provider = process.env.OPENAI_API_KEY ? new OpenAIAgentProvider() : null;
 const engine = provider ? new AgentEngine(database, provider) : null;
 logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: provider?.name ?? null, agentProcessingEnabled: Boolean(provider), emailAutomationEnabled: true } });
+const healthServer = once ? null : await startWorkerHealthServer({
+  port: Math.max(1, Number(process.env.PORT ?? 3_002)),
+  agentProvider: provider?.name ?? null,
+});
 
 const runOnce = async (): Promise<boolean> => {
   const authEmail = await authEmailProcessor.processNext();
@@ -66,6 +71,7 @@ if (once) {
   const stop = async (): Promise<void> => {
     if (stopping) return;
     stopping = true;
+    if (healthServer) await stopWorkerHealthServer(healthServer);
     await closeDatabase();
     process.exit(0);
   };

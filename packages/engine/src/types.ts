@@ -16,6 +16,13 @@ export interface EnqueuedAgentRun {
   reused: boolean;
 }
 
+export interface ResolvedAgentRun {
+  id: string;
+  agentName: CoreAgentName;
+  status: "CANCELLED";
+  resolutionNote: string;
+}
+
 export interface ProcessResult {
   processed: boolean;
   jobId?: string;

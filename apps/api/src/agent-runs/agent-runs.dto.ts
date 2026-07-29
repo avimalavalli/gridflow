@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
 
 export enum AgentNameDto {
   ATLAS = "ATLAS",
@@ -37,4 +37,11 @@ export class ReviewAgentRunDto {
   @IsString()
   @MaxLength(4000)
   notes?: string;
+}
+
+export class ResolveAgentRunDto {
+  @IsString()
+  @MinLength(12)
+  @MaxLength(4000)
+  resolutionNote!: string;
 }

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
 import { AgentRunsService } from "./agent-runs.service.js";
-import { EnqueueAgentRunDto, ReviewAgentRunDto } from "./agent-runs.dto.js";
+import { EnqueueAgentRunDto, ResolveAgentRunDto, ReviewAgentRunDto } from "./agent-runs.dto.js";
 
 @Controller("agent-runs")
 export class AgentRunsController {
@@ -35,6 +35,13 @@ export class AgentRunsController {
     const identity = await this.context.resolve(request);
     this.context.assertOperator(identity);
     return this.runs.retry(identity.tenantId, identity.userId, id);
+  }
+
+  @Post(":id/resolve")
+  async resolve(@Req() request: Request, @Param("id") id: string, @Body() input: ResolveAgentRunDto) {
+    const identity = await this.context.resolve(request);
+    this.context.assertOperator(identity);
+    return this.runs.resolveFailed(identity.tenantId, identity.userId, id, input.resolutionNote);
   }
 
   @Post(":id/review")

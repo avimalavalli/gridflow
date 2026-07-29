@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nest build",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "start:dev": "nest start --watch",
+    "start:dev": "tsx watch src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
@@ -25,10 +25,10 @@
     "@gridflow/integrations": "0.1.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.14",
     "@nestjs/testing": "^11.1.28",
     "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

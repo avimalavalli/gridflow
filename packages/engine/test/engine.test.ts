@@ -206,4 +206,95 @@ describe("GridFlow core agent engine", () => {
     });
   });
 
+
+  it("dismisses a resolved failed run without deleting its failure history", async () => {
+    directory = await mkdtemp(join(tmpdir(), "gridflow-resolve-failure-"));
+    database = await createDatabase("pglite://memory");
+    await migrateDatabase(database);
+
+    const user = await database.query<{ id: string }>(
+      `INSERT INTO "User" ("email","passwordHash","name","updatedAt")
+       VALUES ('resolve@gridflow.example','x','Resolve Test',CURRENT_TIMESTAMP) RETURNING "id"`,
+    );
+    const organisation = await database.query<{ id: string }>(
+      `INSERT INTO "Organisation" ("name","slug","type","updatedAt")
+       VALUES ('Resolve Athlete','resolve-athlete','DRIVER',CURRENT_TIMESTAMP) RETURNING "id"`,
+    );
+    const userId = user.rows[0]!.id;
+    const tenantId = organisation.rows[0]!.id;
+    await database.query(
+      `INSERT INTO "OrganisationMembership" ("organisationId","userId","role")
+       VALUES ($1::uuid,$2::uuid,'OWNER')`,
+      [tenantId, userId],
+    );
+    const run = await database.query<{ id: string }>(
+      `INSERT INTO "AgentRun" (
+         "tenantId","agentName","status","idempotencyKey","input","errorCode","errorDetails","completedAt","updatedAt"
+       ) VALUES (
+         $1::uuid,'ATLAS','FAILED','resolved-atlas','{}'::jsonb,'PROVENANCE_FAILED',
+         'Earlier duplicate attempt failed its strict evidence gate.',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+       ) RETURNING "id"`,
+      [tenantId],
+    );
+    await database.query(
+      `INSERT INTO "AutomationJob" (
+         "tenantId","agentRunId","queueName","jobName","idempotencyKey","payload","status","updatedAt"
+       ) VALUES ($1::uuid,$2::uuid,'core-agents','ATLAS','resolved-atlas','{}'::jsonb,'DEAD_LETTER',CURRENT_TIMESTAMP)`,
+      [tenantId, run.rows[0]!.id],
+    );
+    await database.query(
+      `INSERT INTO "JobOutbox" (
+         "tenantId","queueName","jobName","idempotencyKey","payload","status","updatedAt"
+       ) VALUES ($1::uuid,'core-agents','ATLAS','resolved-atlas','{}'::jsonb,'DEAD_LETTER',CURRENT_TIMESTAMP)`,
+      [tenantId],
+    );
+
+    const engine = new AgentEngine(database);
+    const resolved = await engine.resolveFailedRun(
+      tenantId,
+      userId,
+      run.rows[0]!.id,
+      "Superseded by a successful, accepted Atlas run.",
+    );
+    expect(resolved).toMatchObject({ id: run.rows[0]!.id, status: "CANCELLED" });
+
+    const state = await database.query<{
+      runStatus: string;
+      jobStatus: string;
+      outboxStatus: string;
+      errorCode: string;
+      errorDetails: string;
+      auditAction: string;
+      resolutionNote: string;
+    }>(
+      `SELECT
+         r."status"::text AS "runStatus",
+         j."status"::text AS "jobStatus",
+         o."status"::text AS "outboxStatus",
+         r."errorCode",
+         r."errorDetails",
+         a."action"::text AS "auditAction",
+         a."newValues"->>'resolutionNote' AS "resolutionNote"
+       FROM "AgentRun" r
+       JOIN "AutomationJob" j ON j."agentRunId"=r."id"
+       JOIN "JobOutbox" o ON o."tenantId"=r."tenantId" AND o."idempotencyKey"=r."idempotencyKey"
+       JOIN "AuditLog" a ON a."tenantId"=r."tenantId" AND a."entityType"='AgentRun'
+         AND a."entityId"=r."id"::text AND a."action"='STATUS_CHANGE'
+       WHERE r."id"=$1::uuid`,
+      [run.rows[0]!.id],
+    ).then((result) => result.rows[0]!);
+    expect(state).toEqual({
+      runStatus: "CANCELLED",
+      jobStatus: "CANCELLED",
+      outboxStatus: "CANCELLED",
+      errorCode: "PROVENANCE_FAILED",
+      errorDetails: "Earlier duplicate attempt failed its strict evidence gate.",
+      auditAction: "STATUS_CHANGE",
+      resolutionNote: "Superseded by a successful, accepted Atlas run.",
+    });
+    await expect(engine.resolveFailedRun(tenantId, userId, run.rows[0]!.id, "Try again later"))
+      .rejects.toThrow(/only failed/i);
+  });
+
+
 });

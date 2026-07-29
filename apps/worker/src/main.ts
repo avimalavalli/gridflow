@@ -6,6 +6,7 @@ import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
 import { GmailSyncProcessor } from "./gmail-sync.js";
 import { AuthEmailProcessor } from "./auth-email.js";
+import { PulseProcessor } from "./pulse.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
@@ -25,10 +26,15 @@ if (initialRecovery.requeued || initialRecovery.deadLettered) {
 const emailProcessor = new EmailAutomationProcessor(database);
 const gmailSync = new GmailSyncProcessor(database);
 const authEmailProcessor = new AuthEmailProcessor(database);
+const pulse = new PulseProcessor(database);
 const recoveredAuthEmails = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredAuthEmails) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: recoveredAuthEmails } });
 const recoveredEmails = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredEmails) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: recoveredEmails } });
+const initialPulse = await pulse.reconcile();
+if (initialPulse.stopped || initialPulse.emailPlanned || initialPulse.linkedinPlanned || initialPulse.obsoleteClosed) {
+  logWorkerEvent({ event: "pulse-reconciled", level: "info", details: initialPulse });
+}
 
 const provider = process.env.OPENAI_API_KEY ? new OpenAIAgentProvider() : null;
 const engine = provider ? new AgentEngine(database, provider) : null;
@@ -98,6 +104,13 @@ if (once) {
         return 0;
       });
       if (emailRecovered) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: emailRecovered } });
+      const pulseResult = await pulse.reconcile().catch((error) => {
+        reportWorkerError("pulse-reconciliation-failed", error);
+        return { stopped: 0, emailPlanned: 0, linkedinPlanned: 0, obsoleteClosed: 0 };
+      });
+      if (pulseResult.stopped || pulseResult.emailPlanned || pulseResult.obsoleteClosed) {
+        logWorkerEvent({ event: "pulse-reconciled", level: "info", details: pulseResult });
+      }
       lastRecoveryAt = Date.now();
     }
     const processed = await runOnce().catch((error) => {

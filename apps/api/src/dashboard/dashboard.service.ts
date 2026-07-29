@@ -64,18 +64,33 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, drafts, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, drafts, pulse, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid AND "researchStatus"='RESEARCHED') AS "companiesResearched",
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid AND "priority"='HIGH') AS "highPriority",
             (SELECT COUNT(*)::int FROM "Contact" WHERE "tenantId"=$1::uuid) AS "contactsFound",
-            (SELECT COUNT(*)::int FROM "OutreachRecord" WHERE "tenantId"=$1::uuid AND "draftStatus"='DRAFT_READY') AS "outreachDraftsReady",
+            (
+              (SELECT COUNT(*) FROM "OutreachRecord" WHERE "tenantId"=$1::uuid AND "draftStatus"='DRAFT_READY')
+              + (SELECT COUNT(*) FROM "ChannelAction" WHERE "tenantId"=$1::uuid AND "channel"='EMAIL' AND "status"='READY')
+            )::int AS "outreachDraftsReady",
             (SELECT COUNT(*)::int FROM "Interaction" WHERE "tenantId"=$1::uuid AND "direction"='INBOUND') AS "replies",
             (SELECT COUNT(*)::int FROM "Opportunity" WHERE "tenantId"=$1::uuid AND "stage" NOT IN ('WON','LOST')) AS "opportunities",
             (SELECT COALESCE(SUM("valueMinor"),0)::int FROM "Opportunity" WHERE "tenantId"=$1::uuid AND "stage" NOT IN ('LOST')) AS "pipelineValueMinor",
-            (SELECT COUNT(*)::int FROM "Task" WHERE "tenantId"=$1::uuid AND "status" IN ('OPEN','IN_PROGRESS') AND "dueAt" < CURRENT_TIMESTAMP) AS "overdueFollowUps",
+            (
+              (SELECT COUNT(*) FROM "Task" WHERE "tenantId"=$1::uuid AND "status" IN ('OPEN','IN_PROGRESS') AND "dueAt" < CURRENT_TIMESTAMP)
+              + (
+                SELECT COUNT(*) FROM "ChannelAction"
+                WHERE "tenantId"=$1::uuid
+                  AND "status" IN ('QUEUED','FOLLOW_UP_DUE')
+                  AND "dueAt"<CURRENT_TIMESTAMP
+                  AND (
+                    "sequenceStep" IN ('PULSE_CONNECTION_CHECK','PULSE_REPLY_CHECK')
+                    OR UPPER(REPLACE(REPLACE("sequenceStep",':DRAFT',''),'-','_')) IN ('FOLLOW_UP_1','FOLLOW_UP_2')
+                  )
+              )
+            )::int AS "overdueFollowUps",
             (SELECT COUNT(*)::int FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "status"='FAILED') AS "automationFailures",
             (SELECT COALESCE(SUM("estimatedCostUsd"),0)::text FROM "AgentRun" WHERE "tenantId"=$1::uuid) AS "estimatedAutomationCostUsd"`,
           [tenantId],
@@ -100,6 +115,37 @@ export class DashboardService {
            JOIN "Company" co ON co."id"=o."companyId"
            WHERE o."tenantId"=$1::uuid AND (o."approvalStatus"='PENDING_REVIEW' OR o."linkedinStatus" IN ('NOT_STARTED','ACCEPTED'))
            ORDER BY o."generatedAt" DESC NULLS LAST LIMIT 6`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
+          `SELECT ca."id",'PULSE' AS "kind",
+                  CASE
+                    WHEN ca."sequenceStep"='PULSE_CONNECTION_CHECK' THEN 'Check LinkedIn connection for ' || c."contactName"
+                    WHEN ca."sequenceStep"='PULSE_REPLY_CHECK' THEN 'Check LinkedIn reply from ' || c."contactName"
+                    WHEN UPPER(ca."sequenceStep") LIKE '%FOLLOW_UP_1%' THEN 'First email follow-up for ' || c."contactName"
+                    ELSE 'Final email follow-up for ' || c."contactName"
+                  END AS "title",
+                  co."companyName" AS "detail",ca."dueAt",'/outreach/' || o."id" AS "href",
+                  CASE
+                    WHEN ca."status"='READY' THEN 'READY'
+                    WHEN ca."dueAt"<CURRENT_TIMESTAMP THEN 'OVERDUE'
+                    WHEN ca."dueAt"<CURRENT_TIMESTAMP+interval '24 hours' THEN 'TODAY'
+                    ELSE 'UPCOMING'
+                  END AS "urgency"
+           FROM "ChannelAction" ca
+           JOIN "OutreachRecord" o ON o."id"=ca."outreachRecordId"
+           JOIN "Contact" c ON c."id"=o."contactId"
+           JOIN "Company" co ON co."id"=o."companyId"
+           WHERE ca."tenantId"=$1::uuid
+             AND ca."status" IN ('READY','QUEUED','FOLLOW_UP_DUE')
+             AND (
+               ca."sequenceStep" IN ('PULSE_CONNECTION_CHECK','PULSE_REPLY_CHECK')
+               OR UPPER(REPLACE(REPLACE(ca."sequenceStep",':DRAFT',''),'-','_')) IN ('FOLLOW_UP_1','FOLLOW_UP_2')
+             )
+           ORDER BY
+             CASE WHEN ca."status"='READY' THEN 0 WHEN ca."dueAt"<CURRENT_TIMESTAMP THEN 1 ELSE 2 END,
+             ca."dueAt" ASC NULLS LAST
+           LIMIT 8`,
           [tenantId],
         ),
         tx.query<ActionRow>(
@@ -132,7 +178,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...drafts.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...drafts.rows, ...pulse.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

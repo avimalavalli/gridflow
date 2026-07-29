@@ -64,6 +64,10 @@ describe("IntegrationsService", () => {
     expect(count.rows[0]?.count).toBe(1);
   });
 
+  it("refuses direct email sending in a LinkedIn-first workspace", async () => {
+    await expect(service.emailAction(identity, outreachId, { action: "SEND_NOW", sequenceStep: "INITIAL" }))
+      .rejects.toThrow("LinkedIn-first workspaces keep email in draft-only mode.");
+  });
 
   it("records LinkedIn actions and exposes the operations queue", async () => {
     await outreachService.linkedinAction(identity.tenantId, identity.userId, outreachId, { action: "CONNECTION_SENT", nextFollowUpAt: new Date(Date.now() + 86_400_000).toISOString() });

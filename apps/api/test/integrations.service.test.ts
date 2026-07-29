@@ -31,9 +31,9 @@ beforeAll(async () => {
     await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
     await tx.query(`INSERT INTO "OutreachPolicy" ("tenantId","emailAutomationMode","approvalMode","dailyEmailLimit","allowedSendingDays","sendingWindowStart","sendingWindowEnd","timezone","updatedAt") VALUES ($1::uuid,'APPROVED_AUTOMATIC','EVERY_MESSAGE',20,'[0,1,2,3,4,5,6]'::jsonb,'00:00','23:59','UTC',CURRENT_TIMESTAMP)`, [tenantId]);
     const company = await tx.query<{ id: string }>(`INSERT INTO "Company" ("tenantId","companyName","website","companyDomain","companyKey","updatedAt") VALUES ($1::uuid,'Example Sponsor','https://example.com','example.com','cmp_example',CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId]);
-    const contact = await tx.query<{ id: string }>(`INSERT INTO "Contact" ("tenantId","companyId","contactName","jobTitle","email","contactKey","updatedAt") VALUES ($1::uuid,$2::uuid,'Alex Smith','Partnerships Director','alex@example.com','con_example',CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, company.rows[0]!.id]);
+    const contact = await tx.query<{ id: string }>(`INSERT INTO "Contact" ("tenantId","companyId","contactName","jobTitle","email","linkedinProfileUrl","contactKey","updatedAt") VALUES ($1::uuid,$2::uuid,'Alex Smith','Partnerships Director','alex@example.com','https://www.linkedin.com/in/alex-smith','con_example',CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, company.rows[0]!.id]);
     const outreach = await tx.query<{ id: string }>(`INSERT INTO "OutreachRecord" ("tenantId","companyId","contactId","outreachName","outreachKey","approvalStatus","draftStatus","updatedAt") VALUES ($1::uuid,$2::uuid,$3::uuid,'Example outreach','out_example','APPROVED','APPROVED',CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, company.rows[0]!.id, contact.rows[0]!.id]);
-    const version = await tx.query<{ id: string }>(`INSERT INTO "OutreachVersion" ("outreachRecordId","versionNumber","emailSubject","emailBody","followUpEmail1","followUpEmail2","callOpener","personalisationEvidence","partnershipPitch","promptVersion","modelUsed") VALUES ($1::uuid,1,'Partnership idea','Hello Alex','Following up','One final note','Hello','Evidence','Pitch','test','fixture') RETURNING "id"`, [outreach.rows[0]!.id]);
+    const version = await tx.query<{ id: string }>(`INSERT INTO "OutreachVersion" ("outreachRecordId","versionNumber","linkedinConnectionNote","linkedinFollowUpMessage","emailSubject","emailBody","followUpEmail1","followUpEmail2","callOpener","personalisationEvidence","partnershipPitch","promptVersion","modelUsed") VALUES ($1::uuid,1,'Hello Alex','Thanks for connecting','Partnership idea','Hello Alex','Following up','One final note','Hello','Evidence','Pitch','test','fixture') RETURNING "id"`, [outreach.rows[0]!.id]);
     await tx.query(`UPDATE "OutreachRecord" SET "currentVersionId"=$2::uuid WHERE "id"=$1::uuid`, [outreach.rows[0]!.id, version.rows[0]!.id]);
     await tx.query(`INSERT INTO "IntegrationAccount" ("tenantId","provider","status","externalEmail","encryptedRefreshToken","updatedAt") VALUES ($1::uuid,'GMAIL','CONNECTED','athlete@example.com','encrypted-for-test',CURRENT_TIMESTAMP)`, [tenantId]);
     identity = { tenantId, userId, role: "OWNER", userEmail: "owner@example.com", userName: "Owner", organisationName: "Test Athlete", organisationSlug: "test-athlete-integrations", sessionId: "test", developmentBootstrap: false };
@@ -66,8 +66,8 @@ describe("IntegrationsService", () => {
 
 
   it("records LinkedIn actions and exposes the operations queue", async () => {
-    await outreachService.linkedinAction(identity.tenantId, outreachId, { action: "CONNECTION_SENT", nextFollowUpAt: new Date(Date.now() + 86_400_000).toISOString() });
-    await outreachService.linkedinAction(identity.tenantId, outreachId, { action: "ACCEPTED", nextFollowUpAt: new Date(Date.now() - 1_000).toISOString() });
+    await outreachService.linkedinAction(identity.tenantId, identity.userId, outreachId, { action: "CONNECTION_SENT", nextFollowUpAt: new Date(Date.now() + 86_400_000).toISOString() });
+    await outreachService.linkedinAction(identity.tenantId, identity.userId, outreachId, { action: "ACCEPTED", nextFollowUpAt: new Date(Date.now() - 1_000).toISOString() });
     const operations = await outreachService.operations(identity.tenantId);
     expect(operations.summary.linkedinDue).toBeGreaterThanOrEqual(1);
     expect(operations.due.some((item: Record<string, unknown>) => item.channel === "LINKEDIN")).toBe(true);

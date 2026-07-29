@@ -57,7 +57,7 @@ const runOnce = async (): Promise<boolean> => {
   if (!engine) return false;
   const result = await engine.processNext();
   if (result.processed) {
-    logWorkerEvent({ event: "agent-job-processed", level: result.status === "DEAD_LETTER" ? "error" : "info", details: result as unknown as Record<string, unknown> });
+    logWorkerEvent({ event: "agent-job-processed", level: result.status === "DEAD_LETTER" ? "error" : result.error ? "warning" : "info", details: result as unknown as Record<string, unknown> });
     return true;
   }
   return false;

@@ -164,9 +164,8 @@ export class OutreachService {
 
   async operations(tenantId: string) {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [summary, due] = await Promise.all([
-        tx.query<{ pendingApproval: number; linkedinDue: number; emailQueued: number; replies: number; failures: number; suppressed: number }>(
-          `SELECT
+      const summary = await tx.query<{ pendingApproval: number; linkedinDue: number; emailQueued: number; replies: number; failures: number; suppressed: number }>(
+        `SELECT
              COUNT(DISTINCT o."id") FILTER (WHERE o."approvalStatus" IN ('PENDING_REVIEW','NEEDS_CHANGES'))::int AS "pendingApproval",
              COUNT(*) FILTER (WHERE ca."channel"='LINKEDIN' AND ca."status" IN ('READY','FOLLOW_UP_DUE') AND COALESCE(ca."dueAt",CURRENT_TIMESTAMP)<=CURRENT_TIMESTAMP)::int AS "linkedinDue",
              COUNT(*) FILTER (WHERE ca."channel"='EMAIL' AND ca."status"='QUEUED')::int AS "emailQueued",
@@ -176,10 +175,10 @@ export class OutreachService {
            FROM "OutreachRecord" o
            LEFT JOIN "ChannelAction" ca ON ca."outreachRecordId"=o."id"
            WHERE o."tenantId"=$1::uuid`,
-          [tenantId],
-        ),
-        tx.query(
-          `SELECT ca."id",ca."channel"::text AS "channel",ca."sequenceStep",ca."status"::text AS "status",ca."dueAt",ca."errorDetails",
+        [tenantId],
+      );
+      const due = await tx.query(
+        `SELECT ca."id",ca."channel"::text AS "channel",ca."sequenceStep",ca."status"::text AS "status",ca."dueAt",ca."errorDetails",
                   o."id" AS "outreachId",o."outreachName",co."companyName",c."contactName",c."linkedinProfileUrl",c."email"
            FROM "ChannelAction" ca
            JOIN "OutreachRecord" o ON o."id"=ca."outreachRecordId"
@@ -191,9 +190,8 @@ export class OutreachService {
            ORDER BY CASE ca."status" WHEN 'FAILED' THEN 0 WHEN 'FOLLOW_UP_DUE' THEN 1 WHEN 'READY' THEN 2 ELSE 3 END,
                     ca."dueAt" ASC NULLS FIRST
            LIMIT 20`,
-          [tenantId],
-        ),
-      ]);
+        [tenantId],
+      );
       return {
         summary: summary.rows[0] ?? { pendingApproval: 0, linkedinDue: 0, emailQueued: 0, replies: 0, failures: 0, suppressed: 0 },
         due: due.rows,
@@ -221,15 +219,15 @@ export class OutreachService {
       const row = record.rows[0];
       if (!row) throw new NotFoundException("Outreach record not found.");
 
-      const [versions, approvals, interactions, evidence, policy, suppression, channelActions] = await Promise.all([
-        tx.query(`SELECT "id","versionNumber","linkedinConnectionNote","linkedinFollowUpMessage","emailSubject","emailBody","callOpener","partnershipPitch","generationNotes","promptVersion","modelUsed","generatedAt" FROM "OutreachVersion" WHERE "outreachRecordId"=$1::uuid ORDER BY "versionNumber" DESC`, [id]),
-        tx.query(`SELECT a."id",a."decision"::text AS "decision",a."comments",a."createdAt",u."name" AS "userName" FROM "ApprovalEvent" a JOIN "User" u ON u."id"=a."userId" WHERE a."outreachRecordId"=$1::uuid ORDER BY a."createdAt" DESC`, [id]),
-        tx.query(`SELECT "id","summary","outcome","direction"::text AS "direction","channel"::text AS "channel","occurredAt" FROM "Interaction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "occurredAt" DESC`, [tenantId, id]),
-        tx.query(`SELECT e."id",e."url",e."title",e."publisher",e."retrievedAt",oe."claimKey" FROM "OutreachEvidence" oe JOIN "EvidenceSource" e ON e."id"=oe."evidenceId" WHERE oe."outreachVersionId"=(SELECT "currentVersionId" FROM "OutreachRecord" WHERE "id"=$1::uuid)`, [id]),
-        tx.query(`SELECT "emailAutomationMode"::text AS "emailAutomationMode","linkedinAcceptanceDelayDays","linkedinNoResponseDelayDays","stopOnReply","stopOnOptOut" FROM "OutreachPolicy" WHERE "tenantId"=$1::uuid`, [tenantId]),
-        tx.query(`SELECT 1 FROM "SuppressionEntry" s JOIN "Contact" c ON c."id"=$2::uuid JOIN "Company" co ON co."id"=c."companyId" WHERE s."tenantId"=$1::uuid AND (LOWER(s."email")=LOWER(c."email") OR s."contactKey"=c."contactKey" OR s."companyKey"=co."companyKey") LIMIT 1`, [tenantId, row.contactId]),
-        tx.query(`SELECT "id","sequenceStep","status"::text AS "status","dueAt","completedAt" FROM "ChannelAction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "createdAt"`, [tenantId, id]),
-      ]);
+      // A tenant transaction owns one PostgreSQL client. Keep its reads sequential:
+      // concurrent client.query() calls are deprecated in pg and can fail under production load.
+      const versions = await tx.query(`SELECT "id","versionNumber","linkedinConnectionNote","linkedinFollowUpMessage","emailSubject","emailBody","callOpener","partnershipPitch","generationNotes","promptVersion","modelUsed","generatedAt" FROM "OutreachVersion" WHERE "outreachRecordId"=$1::uuid ORDER BY "versionNumber" DESC`, [id]);
+      const approvals = await tx.query(`SELECT a."id",a."decision"::text AS "decision",a."comments",a."createdAt",u."name" AS "userName" FROM "ApprovalEvent" a JOIN "User" u ON u."id"=a."userId" WHERE a."outreachRecordId"=$1::uuid ORDER BY a."createdAt" DESC`, [id]);
+      const interactions = await tx.query(`SELECT "id","summary","outcome","direction"::text AS "direction","channel"::text AS "channel","occurredAt" FROM "Interaction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "occurredAt" DESC`, [tenantId, id]);
+      const evidence = await tx.query(`SELECT e."id",e."url",e."title",e."sourceProvider" AS "publisher",e."retrievedAt",oe."claimKey" FROM "OutreachEvidence" oe JOIN "EvidenceSource" e ON e."id"=oe."evidenceId" WHERE oe."outreachVersionId"=(SELECT "currentVersionId" FROM "OutreachRecord" WHERE "id"=$1::uuid)`, [id]);
+      const policy = await tx.query(`SELECT "emailAutomationMode"::text AS "emailAutomationMode","linkedinAcceptanceDelayDays","linkedinNoResponseDelayDays","stopOnReply","stopOnOptOut" FROM "OutreachPolicy" WHERE "tenantId"=$1::uuid`, [tenantId]);
+      const suppression = await tx.query(`SELECT 1 FROM "SuppressionEntry" s JOIN "Contact" c ON c."id"=$2::uuid JOIN "Company" co ON co."id"=c."companyId" WHERE s."tenantId"=$1::uuid AND (LOWER(s."email")=LOWER(c."email") OR s."contactKey"=c."contactKey" OR s."companyKey"=co."companyKey") LIMIT 1`, [tenantId, row.contactId]);
+      const channelActions = await tx.query(`SELECT "id","sequenceStep","status"::text AS "status","dueAt","completedAt" FROM "ChannelAction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "createdAt"`, [tenantId, id]);
 
       const linkedinStatus = row.linkedinStatus as LinkedInState;
       let linkedinBlockedReason: string | null = null;

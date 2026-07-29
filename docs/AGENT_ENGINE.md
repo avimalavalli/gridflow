@@ -1,4 +1,4 @@
-# GridFlow Agent Engine — Milestone 3
+# GridFlow Agent Engine
 
 ## Purpose
 
@@ -9,6 +9,19 @@ The engine preserves the fixed dependency order:
 `Atlas → Sage → Relay → Echo`
 
 Each agent remains independently replaceable and independently retryable.
+
+## Automatic pipeline orchestration
+
+An operator starts the complete workflow from an active Discovery Brief with one action. GridFlow creates a durable `PipelineRun`, queues Atlas, and advances eligible records automatically:
+
+1. Atlas discovers evidenced companies.
+2. Sage researches each new or review-needed company.
+3. Relay runs only for researched HIGH or MEDIUM priority companies.
+4. Echo drafts outreach only for evidenced PRIMARY or SECONDARY contacts with a real contact channel.
+
+Each downstream run retains its own queue job, retry policy, evidence, cost record and audit trail. The pipeline summary reports queued, running, succeeded and failed work across the fan-out. A second click while the same brief is active reuses the existing pipeline rather than creating duplicate work.
+
+Echo stops at draft creation. GridFlow does not send a LinkedIn message, email or call automatically; the relationship moment remains under human control.
 
 ## Agent responsibilities
 
@@ -40,7 +53,7 @@ Enqueueing an agent writes all of the following in one database transaction:
 
 The worker claims one eligible job, updates its heartbeat while running and writes the result transactionally.
 
-Transient failures use exponential retry delays. Exhausted jobs enter `DEAD_LETTER`. Operators can retry failed runs manually. On startup and every minute, the worker recovers running jobs whose heartbeat has expired. Exhausted stale jobs are failed rather than left permanently stuck.
+Transient failures use exponential retry delays. Exhausted jobs enter `DEAD_LETTER`. Operators can retry failed runs manually. Retrying a failed pipeline run safely reopens its parent pipeline, unless a newer run for the same brief is already active. On startup and every minute, the worker recovers running jobs whose heartbeat has expired. Exhausted stale jobs are failed rather than left permanently stuck.
 
 ## Evidence safety
 
@@ -75,6 +88,7 @@ Every run, job, company, contact, evidence record and outreach record carries a 
 The automated suite verifies:
 
 - full Atlas → Sage → Relay → Echo execution
+- one-action automatic handoffs and duplicate pipeline protection
 - company scoring and priority
 - evidence and contact persistence
 - outreach version and channel actions

@@ -1110,10 +1110,10 @@ export class AgentEngine {
   private async applyEcho(tx: SqlExecutor, tenantId: string, agentRunId: string, contactId: string, output: EchoOutput, modelUsed: string): Promise<string> {
     const context = await tx.query<{
       contactName: string; contactKey: string; email: string | null; linkedin: string | null; phone: string | null;
-      companyId: string; companyName: string; emailAutomationMode: string; approvalMode: string;
+      companyId: string; companyName: string; outreachStrategy: string; emailAutomationMode: string; approvalMode: string;
     }>(
       `SELECT c."contactName",c."contactKey",c."email",c."linkedinProfileUrl" AS "linkedin",c."phone",
-              co."id" AS "companyId",co."companyName",p."emailAutomationMode"::text AS "emailAutomationMode",
+              co."id" AS "companyId",co."companyName",p."strategy"::text AS "outreachStrategy",p."emailAutomationMode"::text AS "emailAutomationMode",
               p."approvalMode"::text AS "approvalMode"
        FROM "Contact" c JOIN "Company" co ON co."id"=c."companyId"
        LEFT JOIN "OutreachPolicy" p ON p."tenantId"=c."tenantId"
@@ -1181,7 +1181,7 @@ export class AgentEngine {
       );
     }
     if (row.email) {
-      const automatic = row.emailAutomationMode === "FULL_AUTOMATION" && row.approvalMode === "NONE";
+      const automatic = row.outreachStrategy !== "LINKEDIN_FIRST" && row.emailAutomationMode === "FULL_AUTOMATION" && row.approvalMode === "NONE";
       await tx.query(
         `INSERT INTO "ChannelAction" (
            "tenantId","outreachRecordId","outreachVersionId","contactId","channel","sequenceStep","status","automated","idempotencyKey","updatedAt"

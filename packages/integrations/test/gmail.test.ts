@@ -55,4 +55,12 @@ describe("email policy", () => {
     expect(decideEmailAction(policy, { ...base, approved: false }).action).toBe("WAIT");
     expect(decideEmailAction(policy, { ...base, approved: true }).action).toBe("SEND");
   });
+
+  it("forces LinkedIn-first workspaces into draft-only email", () => {
+    const base = { approved: true, sequenceStep: "INITIAL", emailsSentToday: 0, hasReply: false, hasMeeting: false, isSuppressed: false, hasActiveCompanyContact: false };
+    expect(decideEmailAction({ ...policy, outreachStrategy: "LINKEDIN_FIRST", emailAutomationMode: "FULL_AUTOMATION" }, base)).toMatchObject({
+      allowed: true,
+      action: "CREATE_DRAFT",
+    });
+  });
 });

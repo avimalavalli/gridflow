@@ -229,6 +229,15 @@ enum AutomationJobStatus {
   DEAD_LETTER
 }
 
+enum PipelineRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
 enum SourceType {
   PUBLIC_WEB
   COMPANY_WEBSITE
@@ -414,6 +423,7 @@ model User {
   agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
+  startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
 }
 
 model Organisation {
@@ -456,6 +466,7 @@ model Organisation {
   loginChallenges     AuthLoginChallenge[]
   releaseAcceptances  ReleaseAcceptance[]
   acceptanceChecks    ReleaseAcceptanceCheck[]
+  pipelineRuns        PipelineRun[]
 }
 
 model OrganisationMembership {
@@ -697,6 +708,7 @@ model DiscoveryBrief {
   tenant                Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   companies             Company[]
   agentRuns             AgentRun[]
+  pipelineRuns          PipelineRun[]
 
   @@index([tenantId, active])
   @@index([tenantId, lastRunStatus])
@@ -1193,6 +1205,7 @@ model AgentRun {
   companyId        String?        @db.Uuid
   contactId        String?        @db.Uuid
   outreachRecordId String?        @db.Uuid
+  pipelineRunId    String?        @db.Uuid
   createdAt        DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
   tenant           Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1200,13 +1213,35 @@ model AgentRun {
   company          Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact          Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   outreachRecord   OutreachRecord? @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
+  pipelineRun      PipelineRun?    @relation(fields: [pipelineRunId], references: [id], onDelete: SetNull)
   humanReviewedBy  User?           @relation("AgentRunReviewedBy", fields: [humanReviewedByUserId], references: [id], onDelete: SetNull)
   evidence         EvidenceSource[]
   automationJobs   AutomationJob[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, agentName, status])
+  @@index([tenantId, pipelineRunId, status])
   @@index([tenantId, humanReviewStatus, createdAt])
+}
+
+model PipelineRun {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @db.Uuid
+  discoveryBriefId   String            @db.Uuid
+  startedByUserId    String            @db.Uuid
+  status             PipelineRunStatus @default(QUEUED)
+  errorDetails       String?
+  startedAt          DateTime?         @db.Timestamptz(3)
+  completedAt        DateTime?         @db.Timestamptz(3)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
+  tenant             Organisation      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  discoveryBrief     DiscoveryBrief    @relation(fields: [discoveryBriefId], references: [id], onDelete: Cascade)
+  startedBy          User              @relation("PipelineRunStartedBy", fields: [startedByUserId], references: [id], onDelete: Restrict)
+  agentRuns          AgentRun[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, discoveryBriefId, createdAt])
 }
 
 model AutomationJob {

@@ -75,3 +75,30 @@ export interface EchoOutput {
 }
 
 export type CoreAgentOutput = AtlasOutput | SageOutput | RelayOutput | EchoOutput;
+
+export type SentinelReplyIntent =
+  | "POSITIVE_INTEREST"
+  | "MORE_INFORMATION"
+  | "MEETING_REQUEST"
+  | "REFERRAL"
+  | "OBJECTION"
+  | "NO_BUDGET"
+  | "NOT_NOW"
+  | "NOT_INTERESTED"
+  | "WRONG_CONTACT"
+  | "OUT_OF_OFFICE"
+  | "UNSUBSCRIBE"
+  | "UNKNOWN";
+
+export interface SentinelOutput {
+  intent: SentinelReplyIntent;
+  sentiment: "POSITIVE" | "NEUTRAL" | "NEGATIVE";
+  confidence: number;
+  summary: string;
+  reasoning: string;
+  suggested_next_action: string;
+  explicit_opt_out: boolean;
+  needs_human_review: boolean;
+}
+
+export type AgentOutput = CoreAgentOutput | SentinelOutput;

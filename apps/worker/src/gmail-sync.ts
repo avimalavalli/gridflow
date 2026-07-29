@@ -1,4 +1,4 @@
-import { GmailApiClient, GmailOAuthClient, SecretBox, extractEmailAddress, gmailHeader, type GmailMessageSummary } from "@gridflow/integrations";
+import { GmailApiClient, GmailOAuthClient, SecretBox, extractEmailAddress, gmailHeader, gmailMessageText, type GmailMessageSummary } from "@gridflow/integrations";
 import type { GridFlowDatabase, SqlExecutor } from "@gridflow/database";
 
 interface AccountRow extends Record<string, unknown> {
@@ -108,20 +108,21 @@ export class GmailSyncProcessor {
     return this.database.transaction(async (tx) => {
       const receivedAt=message.internalDate?new Date(Number(message.internalDate)).toISOString():new Date().toISOString();
       const headers=Object.fromEntries((message.payload?.headers??[]).map(h=>[h.name.toLowerCase(),h.value]));
+      const messageText=gmailMessageText(message);
       if (from?.toLowerCase() === ownEmail.toLowerCase()) {
         return this.ingestOutbound(tx, tenantId, ownEmail, to, subject, receivedAt, headers, message);
       }
       const match = await this.match(tx,tenantId,message.threadId,bounce?failed:from);
       if(!match)return "ignored" as const;
       if((await tx.query(`SELECT 1 FROM "EmailMessage" WHERE "tenantId"=$1::uuid AND "providerMessageId"=$2`,[tenantId,message.id])).rows.length)return "ignored" as const;
-      await tx.query(`INSERT INTO "EmailMessage" ("tenantId","outreachRecordId","contactId","providerMessageId","providerThreadId","recipient","sender","subject","direction","status","receivedAt","headers") VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,'INBOUND',$9::"EmailStatus",$10::timestamptz,$11::jsonb)`,[tenantId,match.outreachId,match.contactId,message.id,message.threadId,ownEmail,from??"unknown",subject,bounce?"BOUNCED":"REPLIED",receivedAt,JSON.stringify({...headers,snippet:message.snippet??null})]);
+      await tx.query(`INSERT INTO "EmailMessage" ("tenantId","outreachRecordId","contactId","providerMessageId","providerThreadId","recipient","sender","subject","direction","status","receivedAt","headers") VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,'INBOUND',$9::"EmailStatus",$10::timestamptz,$11::jsonb)`,[tenantId,match.outreachId,match.contactId,message.id,message.threadId,ownEmail,from??"unknown",subject,bounce?"BOUNCED":"REPLIED",receivedAt,JSON.stringify({...headers,snippet:message.snippet??null,body:messageText})]);
       if(bounce){
         await tx.query(`UPDATE "OutreachRecord" SET "emailStatus"='BOUNCED',"echoStatus"='PAUSED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,[match.outreachId]);
         await tx.query(`INSERT INTO "SuppressionEntry" ("tenantId","email","contactKey","companyKey","reason","notes") SELECT $1::uuid,$2,$3,$4,'BOUNCED',$5 WHERE NOT EXISTS (SELECT 1 FROM "SuppressionEntry" WHERE "tenantId"=$1::uuid AND LOWER("email")=LOWER($2) AND "reason"='BOUNCED')`,[tenantId,failed??match.contactEmail,match.contactKey,match.companyKey,`Detected from Gmail message ${message.id}`]);
       }else{
         await tx.query(`UPDATE "OutreachRecord" SET "emailStatus"='REPLIED',"echoStatus"='PAUSED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,[match.outreachId]);
         await tx.query(`UPDATE "Contact" SET "status"='REPLIED',"lastContactAt"=$2::timestamptz,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,[match.contactId,receivedAt]);
-        await tx.query(`INSERT INTO "Interaction" ("tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","providerMessageId","providerThreadId","occurredAt","source") VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','INBOUND',$5,$6,$7,$8,$9::timestamptz,'GMAIL')`,[tenantId,match.companyId,match.contactId,match.outreachId,`Reply received: ${subject}`,message.snippet??null,message.id,message.threadId,receivedAt]);
+        await tx.query(`INSERT INTO "Interaction" ("tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","providerMessageId","providerThreadId","occurredAt","source","sentinelStatus") VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','INBOUND',$5,$6,$7,$8,$9::timestamptz,'GMAIL','QUEUED')`,[tenantId,match.companyId,match.contactId,match.outreachId,`Reply received: ${subject}`,messageText||message.snippet||null,message.id,message.threadId,receivedAt]);
       }
       await tx.query(`UPDATE "ChannelAction" SET "status"=$3::"ChannelActionStatus","completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid AND "channel"='EMAIL' AND "status" IN ('READY','QUEUED','FOLLOW_UP_DUE')`,[tenantId,match.outreachId,bounce?"BOUNCED":"REPLIED"]);
       return bounce?"bounce" as const:"reply" as const;

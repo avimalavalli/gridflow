@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, drafts, pulse, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, drafts, pulse, sentinel, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -104,6 +104,23 @@ export class DashboardService {
            LEFT JOIN "Contact" ct ON ct."id"=t."contactId"
            WHERE t."tenantId"=$1::uuid AND t."status" IN ('OPEN','IN_PROGRESS')
            ORDER BY t."dueAt" ASC NULLS LAST, t."createdAt" ASC LIMIT 8`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
+          `SELECT i."id",'SENTINEL' AS "kind",
+                  CASE
+                    WHEN i."sentinelStatus"='FAILED' THEN 'Sentinel could not classify ' || COALESCE(c."contactName",'an inbound reply')
+                    ELSE 'Review reply from ' || COALESCE(c."contactName",'an unknown contact')
+                  END AS "title",
+                  COALESCE(co."companyName",i."replySummary",i."summary") AS "detail",
+                  i."occurredAt" AS "dueAt",'/sentinel' AS "href",
+                  CASE WHEN i."sentinelStatus"='FAILED' THEN 'FAILED' ELSE 'REVIEW' END AS "urgency"
+           FROM "Interaction" i
+           LEFT JOIN "Contact" c ON c."id"=i."contactId"
+           LEFT JOIN "Company" co ON co."id"=i."companyId"
+           WHERE i."tenantId"=$1::uuid AND i."sentinelStatus" IN ('CLASSIFIED','FAILED')
+           ORDER BY CASE WHEN i."sentinelStatus"='FAILED' THEN 0 ELSE 1 END,i."occurredAt" DESC
+           LIMIT 6`,
           [tenantId],
         ),
         tx.query<ActionRow>(
@@ -178,7 +195,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...drafts.rows, ...pulse.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...drafts.rows, ...pulse.rows, ...sentinel.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

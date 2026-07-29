@@ -1,4 +1,4 @@
-import type { AgentPromptDefinition, CoreAgentName, CoreAgentOutput } from "@gridflow/agents";
+import type { AgentOutput, AgentPromptDefinition, CoreAgentName, CoreAgentOutput } from "@gridflow/agents";
 
 export interface AgentUsage {
   inputTokens: number;
@@ -13,7 +13,7 @@ export interface AgentGenerationRequest {
   idempotencyKey: string;
 }
 
-export interface AgentGenerationResult<TOutput extends CoreAgentOutput = CoreAgentOutput> {
+export interface AgentGenerationResult<TOutput extends AgentOutput = AgentOutput> {
   output: TOutput;
   model: string;
   usage: AgentUsage;
@@ -22,7 +22,7 @@ export interface AgentGenerationResult<TOutput extends CoreAgentOutput = CoreAge
 
 export interface AgentModelProvider {
   readonly name: string;
-  generate<TOutput extends CoreAgentOutput = CoreAgentOutput>(request: AgentGenerationRequest): Promise<AgentGenerationResult<TOutput>>;
+  generate<TOutput extends AgentOutput = AgentOutput>(request: AgentGenerationRequest): Promise<AgentGenerationResult<TOutput>>;
 }
 
 export type FixtureOutputFactory = (input: Record<string, unknown>) => CoreAgentOutput | Promise<CoreAgentOutput>;

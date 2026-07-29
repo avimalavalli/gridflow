@@ -1,6 +1,6 @@
 import AjvModule, { type ErrorObject, type ValidateFunction } from "ajv";
 import addFormatsModule from "ajv-formats";
-import type { AgentPromptDefinition, CoreAgentOutput } from "@gridflow/agents";
+import type { AgentOutput, AgentPromptDefinition } from "@gridflow/agents";
 
 const AjvConstructor = (AjvModule as unknown as { default?: typeof AjvModule }).default ?? AjvModule;
 const addFormats = (addFormatsModule as unknown as { default?: typeof addFormatsModule }).default ?? addFormatsModule;
@@ -32,7 +32,7 @@ export class AgentOutputValidationError extends Error {
   }
 }
 
-export function validateAgentOutput<TOutput extends CoreAgentOutput>(
+export function validateAgentOutput<TOutput extends AgentOutput>(
   definition: AgentPromptDefinition,
   value: unknown,
 ): TOutput {

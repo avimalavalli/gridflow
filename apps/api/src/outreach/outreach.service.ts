@@ -223,7 +223,10 @@ export class OutreachService {
       // concurrent client.query() calls are deprecated in pg and can fail under production load.
       const versions = await tx.query(`SELECT "id","versionNumber","linkedinConnectionNote","linkedinFollowUpMessage","emailSubject","emailBody","callOpener","partnershipPitch","generationNotes","promptVersion","modelUsed","generatedAt" FROM "OutreachVersion" WHERE "outreachRecordId"=$1::uuid ORDER BY "versionNumber" DESC`, [id]);
       const approvals = await tx.query(`SELECT a."id",a."decision"::text AS "decision",a."comments",a."createdAt",u."name" AS "userName" FROM "ApprovalEvent" a JOIN "User" u ON u."id"=a."userId" WHERE a."outreachRecordId"=$1::uuid ORDER BY a."createdAt" DESC`, [id]);
-      const interactions = await tx.query(`SELECT "id","summary","outcome","direction"::text AS "direction","channel"::text AS "channel","occurredAt" FROM "Interaction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "occurredAt" DESC`, [tenantId, id]);
+      const interactions = await tx.query(`SELECT "id","summary","outcome","direction"::text AS "direction","channel"::text AS "channel","occurredAt",
+        "sentinelStatus"::text AS "sentinelStatus","replyIntent"::text AS "replyIntent","replySentiment"::text AS "replySentiment",
+        "replyConfidence","replySummary","sentinelReasoning","suggestedNextAction","sentinelError"
+        FROM "Interaction" WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid ORDER BY "occurredAt" DESC`, [tenantId, id]);
       const evidence = await tx.query(`SELECT e."id",e."url",e."title",e."sourceProvider" AS "publisher",e."retrievedAt",oe."claimKey" FROM "OutreachEvidence" oe JOIN "EvidenceSource" e ON e."id"=oe."evidenceId" WHERE oe."outreachVersionId"=(SELECT "currentVersionId" FROM "OutreachRecord" WHERE "id"=$1::uuid)`, [id]);
       const policy = await tx.query(`SELECT "emailAutomationMode"::text AS "emailAutomationMode","linkedinAcceptanceDelayDays","linkedinNoResponseDelayDays","stopOnReply","stopOnOptOut" FROM "OutreachPolicy" WHERE "tenantId"=$1::uuid`, [tenantId]);
       const suppression = await tx.query(`SELECT 1 FROM "SuppressionEntry" s JOIN "Contact" c ON c."id"=$2::uuid JOIN "Company" co ON co."id"=c."companyId" WHERE s."tenantId"=$1::uuid AND (LOWER(s."email")=LOWER(c."email") OR s."contactKey"=c."contactKey" OR s."companyKey"=co."companyKey") LIMIT 1`, [tenantId, row.contactId]);
@@ -635,8 +638,16 @@ export class OutreachService {
             : "OUTBOUND";
       await tx.query(
         `INSERT INTO "Interaction" (
-           "tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","occurredAt"
-         ) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'LINKEDIN',$5::"InteractionDirection",$6,$7,$8::timestamptz)`,
+           "tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","occurredAt","sentinelStatus","sentinelError"
+         ) VALUES (
+           $1::uuid,$2::uuid,$3::uuid,$4::uuid,'LINKEDIN',$5::"InteractionDirection",$6,$7,$8::timestamptz,
+           CASE
+             WHEN $9='REPLIED' AND NULLIF(BTRIM($7),'') IS NOT NULL THEN 'QUEUED'::"SentinelStatus"
+             WHEN $9='REPLIED' THEN 'FAILED'::"SentinelStatus"
+             ELSE 'NOT_REQUIRED'::"SentinelStatus"
+           END,
+           CASE WHEN $9='REPLIED' AND NULLIF(BTRIM($7),'') IS NULL THEN 'Add the LinkedIn reply text so Sentinel can classify it.' ELSE NULL END
+         )`,
         [
           tenantId,
           row.companyId,
@@ -646,6 +657,7 @@ export class OutreachService {
           `LinkedIn ${input.action.toLowerCase().replaceAll("_", " ")}`,
           input.notes ?? null,
           occurredAt,
+          input.action,
         ],
       );
       await tx.query(

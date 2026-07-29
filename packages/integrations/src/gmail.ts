@@ -219,6 +219,57 @@ export function gmailHeader(message: GmailMessageSummary, name: string): string 
   return found?.value ?? null;
 }
 
+interface GmailPart {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailPart[];
+}
+
+function decodeBody(value: string | undefined): string {
+  if (!value) return "";
+  try {
+    return Buffer.from(value, "base64url").toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+function plainTextFromPart(part: GmailPart | undefined): string {
+  if (!part) return "";
+  if (part.mimeType?.toLowerCase().startsWith("text/plain")) return decodeBody(part.body?.data);
+  for (const child of part.parts ?? []) {
+    const text = plainTextFromPart(child);
+    if (text.trim()) return text;
+  }
+  return "";
+}
+
+function fallbackTextFromPart(part: GmailPart | undefined): string {
+  if (!part) return "";
+  for (const child of part.parts ?? []) {
+    const text = fallbackTextFromPart(child);
+    if (text.trim()) return text;
+  }
+  if (part.mimeType?.toLowerCase().startsWith("text/html")) {
+    return decodeBody(part.body?.data)
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/\s+/g, " ");
+  }
+  return decodeBody(part.body?.data);
+}
+
+export function gmailMessageText(message: GmailMessageSummary): string {
+  const payload = message.payload as GmailPart | undefined;
+  const text = (plainTextFromPart(payload) || fallbackTextFromPart(payload)).replace(/\0/g, "").trim();
+  return (text || message.snippet || "").trim().slice(0, 20_000);
+}
+
 export function extractEmailAddress(value: string | null | undefined): string | null {
   if (!value) return null;
   const angled = value.match(/<([^>]+)>/);

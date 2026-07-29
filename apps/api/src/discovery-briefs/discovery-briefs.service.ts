@@ -13,6 +13,11 @@ export interface DiscoveryBriefListItem extends Record<string, unknown> {
   lastResultCount: number;
   generatedFromOnboarding: boolean;
   generationReason: string | null;
+  latestPipelineId: string | null;
+  latestPipelineStatus: string | null;
+  pipelineTotalRuns: number;
+  pipelineSucceededRuns: number;
+  pipelineFailedRuns: number;
 }
 
 @Injectable()
@@ -22,12 +27,29 @@ export class DiscoveryBriefsService {
   async list(tenantId: string): Promise<DiscoveryBriefListItem[]> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
       const result = await tx.query<DiscoveryBriefListItem>(
-        `SELECT "id", "briefName", "active", "region", "industryFocus", "searchTheme",
-                "companiesPerRun", "lastRunStatus"::text AS "lastRunStatus",
-                "lastResultCount", "generatedFromOnboarding", "generationReason"
-         FROM "DiscoveryBrief"
-         WHERE "tenantId" = $1::uuid
-         ORDER BY "active" DESC, "createdAt" DESC`,
+        `SELECT b."id", b."briefName", b."active", b."region", b."industryFocus", b."searchTheme",
+                b."companiesPerRun", b."lastRunStatus"::text AS "lastRunStatus",
+                b."lastResultCount", b."generatedFromOnboarding", b."generationReason",
+                latest."id" AS "latestPipelineId", latest."status" AS "latestPipelineStatus",
+                COALESCE(latest."totalRuns",0)::int AS "pipelineTotalRuns",
+                COALESCE(latest."succeededRuns",0)::int AS "pipelineSucceededRuns",
+                COALESCE(latest."failedRuns",0)::int AS "pipelineFailedRuns"
+         FROM "DiscoveryBrief" b
+         LEFT JOIN LATERAL (
+           SELECT p."id",p."status"::text AS "status",
+                  COUNT(ar."id")::int AS "totalRuns",
+                  COUNT(ar."id") FILTER (WHERE ar."status"='SUCCEEDED')::int AS "succeededRuns",
+                  COUNT(ar."id") FILTER (WHERE ar."status"='FAILED')::int AS "failedRuns",
+                  p."createdAt"
+           FROM "PipelineRun" p
+           LEFT JOIN "AgentRun" ar ON ar."pipelineRunId"=p."id"
+           WHERE p."tenantId"=$1::uuid AND p."discoveryBriefId"=b."id"
+           GROUP BY p."id"
+           ORDER BY p."createdAt" DESC
+           LIMIT 1
+         ) latest ON true
+         WHERE b."tenantId" = $1::uuid
+         ORDER BY b."active" DESC, b."createdAt" DESC`,
         [tenantId],
       );
       return result.rows;

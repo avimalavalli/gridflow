@@ -6,6 +6,7 @@ export interface EnqueueAgentRequest {
   companyId?: string;
   contactId?: string;
   forceRegenerate?: boolean;
+  pipelineRunId?: string;
 }
 
 export interface EnqueuedAgentRun {
@@ -29,6 +30,34 @@ export interface ProcessResult {
   agentRunId?: string;
   status?: "SUCCEEDED" | "RETRY_QUEUED" | "DEAD_LETTER";
   error?: string;
+}
+
+export interface StartedPipelineRun {
+  id: string;
+  discoveryBriefId: string;
+  status: string;
+  atlasRunId: string | null;
+  reused: boolean;
+}
+
+export interface PipelineRunListItem extends Record<string, unknown> {
+  id: string;
+  discoveryBriefId: string;
+  briefName: string;
+  status: string;
+  errorDetails: string | null;
+  totalRuns: number;
+  queuedRuns: number;
+  runningRuns: number;
+  succeededRuns: number;
+  failedRuns: number;
+  atlasRuns: number;
+  sageRuns: number;
+  relayRuns: number;
+  echoRuns: number;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
 }
 
 export interface AgentRunListItem extends Record<string, unknown> {
@@ -55,5 +84,6 @@ export interface AgentRunListItem extends Record<string, unknown> {
   companyId: string | null;
   contactId: string | null;
   outreachRecordId: string | null;
+  pipelineRunId: string | null;
   createdAt: Date;
 }

@@ -23,7 +23,15 @@ import {
 } from "@gridflow/domain";
 import type { AgentModelProvider } from "@gridflow/integrations";
 import { errorDetails, json, runKey, saveEvidence } from "./helpers.js";
-import type { AgentRunListItem, EnqueueAgentRequest, EnqueuedAgentRun, ProcessResult, ResolvedAgentRun } from "./types.js";
+import type {
+  AgentRunListItem,
+  EnqueueAgentRequest,
+  EnqueuedAgentRun,
+  PipelineRunListItem,
+  ProcessResult,
+  ResolvedAgentRun,
+  StartedPipelineRun,
+} from "./types.js";
 
 interface ClaimedJob extends Record<string, unknown> {
   id: string;
@@ -57,6 +65,18 @@ export class AgentEngine {
     return this.database.transaction(async (tx) => {
       await setTenantContext(tx, tenantId);
       await this.assertDependency(tx, tenantId, request);
+      if (request.pipelineRunId) {
+        const pipeline = await tx.query<{ id: string; status: string }>(
+          `SELECT "id","status"::text AS "status" FROM "PipelineRun"
+           WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+          [tenantId, request.pipelineRunId],
+        );
+        const pipelineRow = pipeline.rows[0];
+        if (!pipelineRow) throw new Error("Pipeline run was not found.");
+        if (!["QUEUED", "RUNNING"].includes(pipelineRow.status)) {
+          throw new Error(`Pipeline run cannot queue work while it is ${pipelineRow.status}.`);
+        }
+      }
 
       const active = await tx.query<{ id: string; status: string; idempotencyKey: string }>(
         `SELECT "id", "status"::text AS "status", "idempotencyKey"
@@ -89,11 +109,11 @@ export class AgentEngine {
       const run = await tx.query<IdRow>(
         `INSERT INTO "AgentRun" (
            "tenantId","agentName","status","idempotencyKey","input","promptVersion",
-           "discoveryBriefId","companyId","contactId","createdAt","updatedAt"
-         ) VALUES ($1::uuid,$2::"AgentName",'QUEUED',$3,$4::jsonb,$5,$6::uuid,$7::uuid,$8::uuid,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+           "discoveryBriefId","companyId","contactId","pipelineRunId","createdAt","updatedAt"
+         ) VALUES ($1::uuid,$2::"AgentName",'QUEUED',$3,$4::jsonb,$5,$6::uuid,$7::uuid,$8::uuid,$9::uuid,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
          RETURNING "id"`,
         [tenantId, request.agentName, idempotencyKey, json(input), promptByAgent[request.agentName].version,
-          request.discoveryBriefId ?? null, request.companyId ?? null, request.contactId ?? null],
+          request.discoveryBriefId ?? null, request.companyId ?? null, request.contactId ?? null, request.pipelineRunId ?? null],
       );
       const agentRunId = run.rows[0]?.id;
       if (!agentRunId) throw new Error("Agent run could not be created.");
@@ -103,7 +123,12 @@ export class AgentEngine {
            "tenantId","agentRunId","queueName","jobName","idempotencyKey","payload","status","maxAttempts","updatedAt"
          ) VALUES ($1::uuid,$2::uuid,'core-agents',$3,$4,$5::jsonb,'QUEUED',3,CURRENT_TIMESTAMP)
          RETURNING "id"`,
-        [tenantId, agentRunId, request.agentName, idempotencyKey, json({ agentRunId, tenantId, userId })],
+        [tenantId, agentRunId, request.agentName, idempotencyKey, json({
+          agentRunId,
+          tenantId,
+          userId,
+          pipelineRunId: request.pipelineRunId ?? null,
+        })],
       );
       const automationJobId = job.rows[0]?.id;
       if (!automationJobId) throw new Error("Automation job could not be created.");
@@ -112,15 +137,127 @@ export class AgentEngine {
         `INSERT INTO "JobOutbox" (
            "tenantId","queueName","jobName","idempotencyKey","payload","status","updatedAt"
          ) VALUES ($1::uuid,'core-agents',$2,$3,$4::jsonb,'QUEUED',CURRENT_TIMESTAMP)`,
-        [tenantId, request.agentName, idempotencyKey, json({ automationJobId, agentRunId, tenantId })],
+        [tenantId, request.agentName, idempotencyKey, json({
+          automationJobId,
+          agentRunId,
+          tenantId,
+          pipelineRunId: request.pipelineRunId ?? null,
+        })],
       );
       await this.markQueuedState(tx, tenantId, request);
       await tx.query(
         `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","newValues")
          VALUES ($1::uuid,$2::uuid,'CREATE','AgentRun',$3::uuid,$4::jsonb)`,
-        [tenantId, userId, agentRunId, json({ agentName: request.agentName, idempotencyKey })],
+        [tenantId, userId, agentRunId, json({
+          agentName: request.agentName,
+          idempotencyKey,
+          pipelineRunId: request.pipelineRunId ?? null,
+        })],
       );
       return { id: agentRunId, agentName: request.agentName, status: "QUEUED", idempotencyKey, reused: false };
+    });
+  }
+
+  async startPipeline(tenantId: string, userId: string, discoveryBriefId: string): Promise<StartedPipelineRun> {
+    const pipeline = await this.database.transaction(async (tx) => {
+      await setTenantContext(tx, tenantId);
+      const brief = await tx.query<{ id: string; active: boolean }>(
+        `SELECT "id","active" FROM "DiscoveryBrief" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+        [tenantId, discoveryBriefId],
+      );
+      const briefRow = brief.rows[0];
+      if (!briefRow) throw new Error("Discovery Brief was not found.");
+      if (!briefRow.active) throw new Error("Activate the Discovery Brief before starting its pipeline.");
+
+      const active = await tx.query<{ id: string; status: string; atlasRunId: string | null }>(
+        `SELECT p."id",p."status"::text AS "status",
+                (SELECT ar."id" FROM "AgentRun" ar WHERE ar."pipelineRunId"=p."id" AND ar."agentName"='ATLAS'
+                 ORDER BY ar."createdAt" ASC LIMIT 1) AS "atlasRunId"
+         FROM "PipelineRun" p
+         WHERE p."tenantId"=$1::uuid AND p."discoveryBriefId"=$2::uuid AND p."status" IN ('QUEUED','RUNNING')
+         ORDER BY p."createdAt" DESC LIMIT 1`,
+        [tenantId, discoveryBriefId],
+      );
+      if (active.rows[0]) return { ...active.rows[0], reused: true };
+
+      const created = await tx.query<{ id: string }>(
+        `INSERT INTO "PipelineRun" ("tenantId","discoveryBriefId","startedByUserId","status","startedAt","updatedAt")
+         VALUES ($1::uuid,$2::uuid,$3::uuid,'QUEUED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+         RETURNING "id"`,
+        [tenantId, discoveryBriefId, userId],
+      );
+      const id = created.rows[0]?.id;
+      if (!id) throw new Error("Pipeline run could not be created.");
+      await tx.query(
+        `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","newValues")
+         VALUES ($1::uuid,$2::uuid,'AUTOMATION_RUN','PipelineRun',$3::uuid,$4::jsonb)`,
+        [tenantId, userId, id, json({ discoveryBriefId, mode: "FULL_PIPELINE" })],
+      );
+      return { id, status: "QUEUED", atlasRunId: null, reused: false };
+    });
+
+    if (pipeline.reused) {
+      return {
+        id: pipeline.id,
+        discoveryBriefId,
+        status: pipeline.status,
+        atlasRunId: pipeline.atlasRunId,
+        reused: true,
+      };
+    }
+
+    try {
+      const atlas = await this.enqueue(tenantId, userId, {
+        agentName: "ATLAS",
+        discoveryBriefId,
+        pipelineRunId: pipeline.id,
+      });
+      await this.database.transaction(async (tx) => {
+        await setTenantContext(tx, tenantId);
+        await tx.query(
+          `UPDATE "PipelineRun" SET "status"='RUNNING',"startedAt"=COALESCE("startedAt",CURRENT_TIMESTAMP),
+             "errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+          [tenantId, pipeline.id],
+        );
+      });
+      return {
+        id: pipeline.id,
+        discoveryBriefId,
+        status: "RUNNING",
+        atlasRunId: atlas.id,
+        reused: false,
+      };
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      await this.failPipeline(tenantId, pipeline.id, details);
+      throw error;
+    }
+  }
+
+  async listPipelines(tenantId: string, limit = 20): Promise<PipelineRunListItem[]> {
+    return this.database.transaction(async (tx) => {
+      await setTenantContext(tx, tenantId);
+      const result = await tx.query<PipelineRunListItem>(
+        `SELECT p."id",p."discoveryBriefId",b."briefName",p."status"::text AS "status",p."errorDetails",
+                COUNT(ar."id")::int AS "totalRuns",
+                COUNT(ar."id") FILTER (WHERE ar."status"='QUEUED')::int AS "queuedRuns",
+                COUNT(ar."id") FILTER (WHERE ar."status"='RUNNING')::int AS "runningRuns",
+                COUNT(ar."id") FILTER (WHERE ar."status"='SUCCEEDED')::int AS "succeededRuns",
+                COUNT(ar."id") FILTER (WHERE ar."status"='FAILED')::int AS "failedRuns",
+                COUNT(ar."id") FILTER (WHERE ar."agentName"='ATLAS')::int AS "atlasRuns",
+                COUNT(ar."id") FILTER (WHERE ar."agentName"='SAGE')::int AS "sageRuns",
+                COUNT(ar."id") FILTER (WHERE ar."agentName"='RELAY')::int AS "relayRuns",
+                COUNT(ar."id") FILTER (WHERE ar."agentName"='ECHO')::int AS "echoRuns",
+                p."startedAt",p."completedAt",p."createdAt"
+         FROM "PipelineRun" p
+         JOIN "DiscoveryBrief" b ON b."id"=p."discoveryBriefId"
+         LEFT JOIN "AgentRun" ar ON ar."pipelineRunId"=p."id"
+         WHERE p."tenantId"=$1::uuid
+         GROUP BY p."id",b."briefName"
+         ORDER BY p."createdAt" DESC LIMIT $2`,
+        [tenantId, Math.max(1, Math.min(limit, 100))],
+      );
+      return result.rows;
     });
   }
 
@@ -144,7 +281,7 @@ export class AgentEngine {
                 "startedAt", "completedAt", "errorCode", "errorDetails", "retryCount", "totalTokens",
                 "estimatedCostUsd"::text AS "estimatedCostUsd", "qualityStatus", "qualityScore", "qualityReport",
                 "humanReviewStatus", "humanReviewNotes", "humanReviewedAt", "humanReviewedByUserId", "discoveryBriefId", "companyId", "contactId",
-                "outreachRecordId", "createdAt"
+                "outreachRecordId", "pipelineRunId", "createdAt"
          FROM "AgentRun" WHERE "tenantId"=$1::uuid ORDER BY "createdAt" DESC LIMIT $2`,
         [tenantId, Math.max(1, Math.min(limit, 200))],
       );
@@ -156,15 +293,40 @@ export class AgentEngine {
     return this.database.transaction(async (tx) => {
       await setTenantContext(tx, tenantId);
       const run = await tx.query<{
-        id: string; agentName: CoreAgentName; status: string; idempotencyKey: string;
+        id: string;
+        agentName: CoreAgentName;
+        status: string;
+        idempotencyKey: string;
+        pipelineRunId: string | null;
+        discoveryBriefId: string | null;
       }>(
-        `SELECT "id", "agentName"::text AS "agentName", "status"::text AS "status", "idempotencyKey"
-         FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+        `SELECT ar."id", ar."agentName"::text AS "agentName", ar."status"::text AS "status",
+                ar."idempotencyKey", ar."pipelineRunId", p."discoveryBriefId"
+         FROM "AgentRun" ar
+         LEFT JOIN "PipelineRun" p ON p."id"=ar."pipelineRunId"
+         WHERE ar."tenantId"=$1::uuid AND ar."id"=$2::uuid`,
         [tenantId, agentRunId],
       );
       const row = run.rows[0];
       if (!row) throw new Error("Agent run was not found.");
       if (row.status !== "FAILED") throw new Error("Only failed agent runs can be retried manually.");
+      if (row.pipelineRunId && row.discoveryBriefId) {
+        const competing = await tx.query<{ id: string }>(
+          `SELECT "id" FROM "PipelineRun"
+           WHERE "tenantId"=$1::uuid AND "discoveryBriefId"=$2::uuid
+             AND "status" IN ('QUEUED','RUNNING') AND "id"<>$3::uuid
+           LIMIT 1`,
+          [tenantId, row.discoveryBriefId, row.pipelineRunId],
+        );
+        if (competing.rows[0]) {
+          throw new Error("A newer pipeline is already running for this Discovery Brief. Let it finish before retrying the older run.");
+        }
+        await tx.query(
+          `UPDATE "PipelineRun" SET "status"='RUNNING',"completedAt"=NULL,"errorDetails"=NULL,
+             "updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+          [tenantId, row.pipelineRunId],
+        );
+      }
 
       await tx.query(
         `UPDATE "AgentRun" SET "status"='QUEUED', "errorCode"=NULL, "errorDetails"=NULL,
@@ -414,6 +576,22 @@ export class AgentEngine {
           [job.tenantId, run.idempotencyKey, json({ automationJobId: job.id })],
         );
       });
+      const pipelineRunId = typeof job.payload.pipelineRunId === "string" ? job.payload.pipelineRunId : null;
+      if (pipelineRunId) {
+        try {
+          await this.advancePipeline(job, run, pipelineRunId);
+        } catch (continuationError) {
+          const continuationFailure = errorDetails(continuationError);
+          await this.failPipeline(job.tenantId, pipelineRunId, continuationFailure.details);
+          return {
+            processed: true,
+            jobId: job.id,
+            agentRunId: job.agentRunId,
+            status: "SUCCEEDED",
+            error: `Pipeline continuation stopped: ${continuationFailure.details}`,
+          };
+        }
+      }
       return { processed: true, jobId: job.id, agentRunId: job.agentRunId, status: "SUCCEEDED" };
     } catch (error) {
       const failure = errorDetails(error);
@@ -455,6 +633,8 @@ export class AgentEngine {
           );
         }
       });
+      const pipelineRunId = typeof job.payload.pipelineRunId === "string" ? job.payload.pipelineRunId : null;
+      if (pipelineRunId) await this.refreshPipelineStatus(job.tenantId, pipelineRunId);
       return { processed: true, jobId: job.id, agentRunId: job.agentRunId, status: willRetry ? "RETRY_QUEUED" : "DEAD_LETTER", error: failure.details };
     } finally {
       clearInterval(heartbeat);
@@ -467,6 +647,155 @@ export class AgentEngine {
       await tx.query(`UPDATE "AgentRun" SET "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid AND "status"='RUNNING'`, [job.agentRunId]);
       await tx.query(`UPDATE "AutomationJob" SET "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid AND "status"='RUNNING'`, [job.id]);
     }).catch(() => undefined);
+  }
+
+  private async advancePipeline(
+    job: ClaimedJob,
+    run: { discoveryBriefId: string | null; companyId: string | null; contactId: string | null },
+    pipelineRunId: string,
+  ): Promise<void> {
+    const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
+    if (!userId) throw new Error("Pipeline continuation is missing the initiating user.");
+
+    if (job.jobName === "ATLAS") {
+      const companyIds = await this.database.transaction(async (tx) => {
+        await setTenantContext(tx, job.tenantId);
+        const result = await tx.query<{ id: string }>(
+          `SELECT DISTINCT c."id"
+           FROM "Company" c
+           JOIN "CompanyEvidence" ce ON ce."companyId"=c."id"
+           JOIN "EvidenceSource" e ON e."id"=ce."evidenceId"
+           WHERE c."tenantId"=$1::uuid AND e."agentRunId"=$2::uuid
+             AND c."researchStatus" IN ('UNRESEARCHED','NEED_REVIEW')
+           ORDER BY c."id"`,
+          [job.tenantId, job.agentRunId],
+        );
+        return result.rows.map((row) => row.id);
+      });
+      for (const companyId of companyIds) {
+        await this.enqueue(job.tenantId, userId, { agentName: "SAGE", companyId, pipelineRunId });
+      }
+      await this.refreshPipelineStatus(job.tenantId, pipelineRunId);
+      return;
+    }
+
+    if (job.jobName === "SAGE") {
+      if (!run.companyId) throw new Error("Sage pipeline continuation is missing its company.");
+      const eligible = await this.database.transaction(async (tx) => {
+        await setTenantContext(tx, job.tenantId);
+        const result = await tx.query<{ eligible: boolean }>(
+          `SELECT ("researchStatus"='RESEARCHED' AND "priority" IN ('HIGH','MEDIUM')
+                   AND "contactDiscoveryStatus"='NOT_STARTED') AS "eligible"
+           FROM "Company" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+          [job.tenantId, run.companyId],
+        );
+        return result.rows[0]?.eligible ?? false;
+      });
+      if (eligible) {
+        await this.enqueue(job.tenantId, userId, {
+          agentName: "RELAY",
+          companyId: run.companyId,
+          pipelineRunId,
+        });
+      }
+      await this.refreshPipelineStatus(job.tenantId, pipelineRunId);
+      return;
+    }
+
+    if (job.jobName === "RELAY") {
+      const contactIds = await this.database.transaction(async (tx) => {
+        await setTenantContext(tx, job.tenantId);
+        const result = await tx.query<{ id: string }>(
+          `SELECT DISTINCT c."id"
+           FROM "Contact" c
+           JOIN "Company" co ON co."id"=c."companyId"
+           JOIN "ContactEvidence" ce ON ce."contactId"=c."id"
+           JOIN "EvidenceSource" e ON e."id"=ce."evidenceId"
+           WHERE c."tenantId"=$1::uuid AND e."agentRunId"=$2::uuid
+             AND c."status"='NOT_CONTACTED'
+             AND c."contactPriority" IN ('PRIMARY','SECONDARY')
+             AND c."echoStatus" IN ('NOT_STARTED','FAILED')
+             AND co."priority" IN ('HIGH','MEDIUM')
+             AND (c."email" IS NOT NULL OR c."linkedinProfileUrl" IS NOT NULL OR c."phone" IS NOT NULL)
+           ORDER BY c."id"`,
+          [job.tenantId, job.agentRunId],
+        );
+        return result.rows.map((row) => row.id);
+      });
+      for (const contactId of contactIds) {
+        await this.enqueue(job.tenantId, userId, { agentName: "ECHO", contactId, pipelineRunId });
+      }
+      await this.refreshPipelineStatus(job.tenantId, pipelineRunId);
+      return;
+    }
+
+    await this.refreshPipelineStatus(job.tenantId, pipelineRunId);
+  }
+
+  private async refreshPipelineStatus(tenantId: string, pipelineRunId: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await setTenantContext(tx, tenantId);
+      const counts = await tx.query<{
+        active: number;
+        succeeded: number;
+        failed: number;
+        total: number;
+      }>(
+        `SELECT
+           COUNT(*) FILTER (WHERE "status" IN ('QUEUED','RUNNING'))::int AS "active",
+           COUNT(*) FILTER (WHERE "status"='SUCCEEDED')::int AS "succeeded",
+           COUNT(*) FILTER (WHERE "status"='FAILED')::int AS "failed",
+           COUNT(*)::int AS "total"
+         FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "pipelineRunId"=$2::uuid`,
+        [tenantId, pipelineRunId],
+      );
+      const row = counts.rows[0] ?? { active: 0, succeeded: 0, failed: 0, total: 0 };
+      const status = row.active > 0
+        ? "RUNNING"
+        : row.failed > 0
+          ? row.succeeded > 0 ? "PARTIAL" : "FAILED"
+          : row.total > 0 ? "SUCCEEDED" : "FAILED";
+      await tx.query(
+        `UPDATE "PipelineRun" SET "status"=$3::"PipelineRunStatus",
+           "completedAt"=CASE WHEN $3='RUNNING' THEN NULL ELSE CURRENT_TIMESTAMP END,
+           "errorDetails"=CASE WHEN $3 IN ('SUCCEEDED','RUNNING') THEN NULL ELSE "errorDetails" END,
+           "updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "id"=$2::uuid AND "status"<>'CANCELLED'`,
+        [tenantId, pipelineRunId, status],
+      );
+    });
+  }
+
+  private async failPipeline(tenantId: string, pipelineRunId: string, details: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await setTenantContext(tx, tenantId);
+      const queued = await tx.query<{ idempotencyKey: string }>(
+        `UPDATE "AgentRun" SET "status"='CANCELLED',"completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "pipelineRunId"=$2::uuid AND "status"='QUEUED'
+         RETURNING "idempotencyKey"`,
+        [tenantId, pipelineRunId],
+      );
+      const keys = queued.rows.map((row) => row.idempotencyKey);
+      if (keys.length) {
+        await tx.query(
+          `UPDATE "AutomationJob" SET "status"='CANCELLED',"completedAt"=CURRENT_TIMESTAMP,
+             "errorDetails"=$3,"updatedAt"=CURRENT_TIMESTAMP
+           WHERE "tenantId"=$1::uuid AND "idempotencyKey"=ANY($2::text[]) AND "status"='QUEUED'`,
+          [tenantId, keys, details],
+        );
+        await tx.query(
+          `UPDATE "JobOutbox" SET "status"='CANCELLED',"errorDetails"=$3,"updatedAt"=CURRENT_TIMESTAMP
+           WHERE "tenantId"=$1::uuid AND "idempotencyKey"=ANY($2::text[]) AND "status"='QUEUED'`,
+          [tenantId, keys, details],
+        );
+      }
+      await tx.query(
+        `UPDATE "PipelineRun" SET "status"='FAILED',"errorDetails"=$3,
+           "completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+        [tenantId, pipelineRunId, details],
+      );
+    });
   }
 
   private async loadRun(tenantId: string, agentRunId: string): Promise<{ input: Record<string, unknown>; idempotencyKey: string; discoveryBriefId: string | null; companyId: string | null; contactId: string | null }> {

@@ -109,6 +109,10 @@ export class AgentRunsService {
     return (await this.engine()).retryRun(tenantId, userId, agentRunId);
   }
 
+  async resolveFailed(tenantId: string, userId: string, agentRunId: string, resolutionNote: string) {
+    return (await this.engine()).resolveFailedRun(tenantId, userId, agentRunId, resolutionNote);
+  }
+
   async review(
     tenantId: string,
     userId: string,

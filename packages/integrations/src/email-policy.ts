@@ -2,6 +2,7 @@ export type EmailAutomationMode = "MANUAL" | "DRAFT_ONLY" | "APPROVED_AUTOMATIC"
 export type ApprovalMode = "EVERY_MESSAGE" | "INITIAL_ONLY" | "HIGH_VALUE_ONLY" | "NONE";
 
 export interface EmailPolicyInput {
+  outreachStrategy?: string;
   emailAutomationMode: EmailAutomationMode;
   approvalMode: ApprovalMode;
   dailyEmailLimit: number;
@@ -85,6 +86,9 @@ export function decideEmailAction(policy: EmailPolicyInput, context: EmailSafety
   }
   if (approvalRequired(policy, context) && !context.approved) {
     return { allowed: false, action: "WAIT", reason: "Message requires approval before email action." };
+  }
+  if (policy.outreachStrategy === "LINKEDIN_FIRST") {
+    return { allowed: true, action: "CREATE_DRAFT", reason: "LinkedIn-first workspaces keep email in draft-only mode." };
   }
   if (policy.emailAutomationMode === "MANUAL") return { allowed: true, action: "MANUAL", reason: "Manual email mode is enabled." };
   if (policy.emailAutomationMode === "DRAFT_ONLY") return { allowed: true, action: "CREATE_DRAFT", reason: "Draft-only mode is enabled." };

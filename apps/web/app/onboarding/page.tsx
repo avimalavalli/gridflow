@@ -45,7 +45,7 @@ const initialProfile: OnboardingForm = {
   preferredIndustries: [],
   excludedIndustries: [],
   outreachStrategy: "LINKEDIN_FIRST",
-  emailAutomationMode: "APPROVED_AUTOMATIC",
+  emailAutomationMode: "DRAFT_ONLY",
   currentSeries: "",
   currentTeam: "",
   futureGoals: "",

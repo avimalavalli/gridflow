@@ -627,7 +627,7 @@ model OutreachPolicy {
   id                          String              @id @default(uuid()) @db.Uuid
   tenantId                    String              @unique @db.Uuid
   strategy                    OutreachStrategy    @default(LINKEDIN_FIRST)
-  emailAutomationMode         EmailAutomationMode @default(APPROVED_AUTOMATIC)
+  emailAutomationMode         EmailAutomationMode @default(DRAFT_ONLY)
   approvalMode                ApprovalMode        @default(EVERY_MESSAGE)
   dailyEmailLimit             Int                 @default(20)
   allowedSendingDays          Json                @default("[1,2,3,4,5]")

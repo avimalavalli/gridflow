@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
-import { OutreachService, type OutreachDecisionInput, type UpdateOutreachVersionInput, type LinkedInActionInput } from "./outreach.service.js";
+import { LinkedInActionDto, OutreachDecisionDto, UpdateOutreachVersionDto } from "./outreach.dto.js";
+import { OutreachService } from "./outreach.service.js";
 
 @Controller("outreach")
 export class OutreachController {
@@ -26,23 +27,23 @@ export class OutreachController {
   }
 
   @Patch(":id/version")
-  async updateVersion(@Req() request: Request, @Param("id") id: string, @Body() body: UpdateOutreachVersionInput) {
+  async updateVersion(@Req() request: Request, @Param("id") id: string, @Body() body: UpdateOutreachVersionDto) {
     const identity = await this.context.resolve(request);
     this.context.assertOperator(identity);
-    return this.outreach.updateVersion(identity.tenantId, id, body);
+    return this.outreach.updateVersion(identity.tenantId, identity.userId, id, body);
   }
 
   @Post(":id/decision")
-  async decision(@Req() request: Request, @Param("id") id: string, @Body() body: OutreachDecisionInput) {
+  async decision(@Req() request: Request, @Param("id") id: string, @Body() body: OutreachDecisionDto) {
     const identity = await this.context.resolve(request);
     this.context.assertOperator(identity);
     return this.outreach.decision(identity.tenantId, identity.userId, id, body);
   }
 
   @Post(":id/linkedin-action")
-  async linkedinAction(@Req() request: Request, @Param("id") id: string, @Body() body: LinkedInActionInput) {
+  async linkedinAction(@Req() request: Request, @Param("id") id: string, @Body() body: LinkedInActionDto) {
     const identity = await this.context.resolve(request);
     this.context.assertOperator(identity);
-    return this.outreach.linkedinAction(identity.tenantId, id, body);
+    return this.outreach.linkedinAction(identity.tenantId, identity.userId, id, body);
   }
 }

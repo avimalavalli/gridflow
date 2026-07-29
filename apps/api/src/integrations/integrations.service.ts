@@ -51,6 +51,7 @@ interface EmailContextRow extends Record<string, unknown> {
   followUpEmail2: string | null;
   opportunityValueMinor: number | null;
   senderEmail: string | null;
+  outreachStrategy: string;
   emailAutomationMode: EmailPolicyInput["emailAutomationMode"];
   approvalMode: EmailPolicyInput["approvalMode"];
   dailyEmailLimit: number;
@@ -232,7 +233,7 @@ export class IntegrationsService {
       return this.queueEmailAction(identity, context, sequenceStep, dueAt, safety.action === "CREATE_DRAFT");
     }
 
-    if (action === "SEND_NOW" && safety.action === "WAIT") throw new BadRequestException(safety.reason);
+    if (action === "SEND_NOW" && !["SEND", "MANUAL"].includes(safety.action)) throw new BadRequestException(safety.reason);
     const gmail = await this.gmailClient(identity.tenantId);
     const thread = await this.latestThread(identity.tenantId, outreachId);
     const raw = buildMimeMessage({
@@ -374,7 +375,7 @@ export class IntegrationsService {
         `SELECT o."id" AS "outreachId",o."outreachKey",o."outreachName",o."approvalStatus"::text AS "approvalStatus",o."emailStatus"::text AS "emailStatus",o."currentVersionId",
                 co."id" AS "companyId",co."companyKey",co."companyName",c."id" AS "contactId",c."contactKey",c."contactName",c."email" AS "contactEmail",c."status"::text AS "contactStatus",
                 v."emailSubject",v."emailBody",v."followUpEmail1",v."followUpEmail2",op."valueMinor" AS "opportunityValueMinor",
-                ia."externalEmail" AS "senderEmail",p."emailAutomationMode"::text AS "emailAutomationMode",p."approvalMode"::text AS "approvalMode",
+                ia."externalEmail" AS "senderEmail",p."strategy"::text AS "outreachStrategy",p."emailAutomationMode"::text AS "emailAutomationMode",p."approvalMode"::text AS "approvalMode",
                 p."dailyEmailLimit",p."allowedSendingDays",p."sendingWindowStart",p."sendingWindowEnd",p."timezone",p."stopOnReply",p."stopOnMeeting",p."stopOnOptOut",
                 p."simultaneousCompanyContacts",p."highValueApprovalMinor"
          FROM "OutreachRecord" o JOIN "Company" co ON co."id"=o."companyId" JOIN "Contact" c ON c."id"=o."contactId"
@@ -404,6 +405,7 @@ export class IntegrationsService {
         tx.query(`SELECT 1 FROM "Contact" WHERE "tenantId"=$1::uuid AND "companyId"=$2::uuid AND "id"<>$3::uuid AND "status" IN ('REPLIED','MEETING_SCHEDULED','ACTIVE_CONVERSATION') LIMIT 1`, [tenantId, context.companyId, context.contactId]),
       ]);
       return decideEmailAction({
+        outreachStrategy: context.outreachStrategy,
         emailAutomationMode: context.emailAutomationMode,
         approvalMode: context.approvalMode,
         dailyEmailLimit: context.dailyEmailLimit,

@@ -78,6 +78,27 @@ afterAll(async () => {
 });
 
 describe("LinkedIn-first outreach workbench", () => {
+  it("loads the complete workbench detail from one tenant transaction", async () => {
+    await service.decision(tenantId, userId, outreachId, { decision: "APPROVED", comments: "Ready for review." });
+    const detail = await service.detail(tenantId, outreachId);
+    expect(detail.outreach).toMatchObject({
+      id: outreachId,
+      contactName: "Jordan Lee",
+      approvalStatus: "APPROVED",
+      linkedinStatus: "NOT_STARTED",
+    });
+    expect(detail.workflow).toMatchObject({
+      allowedLinkedinActions: ["CONNECTION_SENT", "PAUSED"],
+      nextLinkedinAction: "CONNECTION_SENT",
+      suppressed: false,
+    });
+    expect(detail.policy).toMatchObject({
+      emailAutomationMode: "DRAFT_ONLY",
+      linkedinAcceptanceDelayDays: 2,
+      linkedinNoResponseDelayDays: 6,
+    });
+  });
+
   it("blocks an unapproved connection action", async () => {
     await expect(service.linkedinAction(tenantId, userId, outreachId, { action: "CONNECTION_SENT" })).rejects.toBeInstanceOf(BadRequestException);
   });

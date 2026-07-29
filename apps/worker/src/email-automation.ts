@@ -41,6 +41,7 @@ interface ExecutionRow extends Record<string, unknown> {
   tokenExpiresAt: Date | null;
   integrationId: string;
   opportunityValueMinor: number | null;
+  outreachStrategy: string;
   emailAutomationMode: EmailPolicyInput["emailAutomationMode"];
   approvalMode: EmailPolicyInput["approvalMode"];
   dailyEmailLimit: number;
@@ -135,7 +136,7 @@ export class EmailAutomationProcessor {
               o."approvalStatus"::text AS "approvalStatus",o."emailStatus"::text AS "emailStatus",c."email" AS "contactEmail",c."contactKey",c."status"::text AS "contactStatus",
               co."id" AS "companyId",co."companyKey",v."emailSubject",v."emailBody",v."followUpEmail1",v."followUpEmail2",op."valueMinor" AS "opportunityValueMinor",
               ia."id" AS "integrationId",ia."externalEmail" AS "senderEmail",ia."encryptedAccessToken",ia."encryptedRefreshToken",ia."tokenExpiresAt",
-              p."emailAutomationMode"::text AS "emailAutomationMode",p."approvalMode"::text AS "approvalMode",p."dailyEmailLimit",p."allowedSendingDays",
+              p."strategy"::text AS "outreachStrategy",p."emailAutomationMode"::text AS "emailAutomationMode",p."approvalMode"::text AS "approvalMode",p."dailyEmailLimit",p."allowedSendingDays",
               p."sendingWindowStart",p."sendingWindowEnd",p."timezone",p."stopOnReply",p."stopOnMeeting",p."stopOnOptOut",p."simultaneousCompanyContacts",p."highValueApprovalMinor"
        FROM "ChannelAction" ca JOIN "OutreachRecord" o ON o."id"=ca."outreachRecordId" JOIN "OutreachVersion" v ON v."id"=ca."outreachVersionId"
        JOIN "Contact" c ON c."id"=ca."contactId" JOIN "Company" co ON co."id"=o."companyId" LEFT JOIN "Opportunity" op ON op."id"=o."opportunityId"
@@ -193,6 +194,7 @@ export class EmailAutomationProcessor {
       this.database.query(`SELECT 1 FROM "Contact" WHERE "tenantId"=$1::uuid AND "companyId"=$2::uuid AND "id"<>$3::uuid AND "status" IN ('REPLIED','MEETING_SCHEDULED','ACTIVE_CONVERSATION') LIMIT 1`, [row.tenantId,row.companyId,row.contactId]),
     ]);
     return decideEmailAction({
+      outreachStrategy: row.outreachStrategy,
       emailAutomationMode: row.emailAutomationMode,
       approvalMode: row.approvalMode,
       dailyEmailLimit: row.dailyEmailLimit,

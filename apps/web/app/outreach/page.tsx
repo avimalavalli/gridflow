@@ -13,7 +13,7 @@ interface Outreach {
   id: string; outreachName: string; companyName: string; companyId: string; contactName: string; contactId: string;
   draftStatus: string; approvalStatus: string; linkedinStatus: string; emailStatus: string; versionNumber: number | null;
   linkedinConnectionNote: string | null; emailSubject: string | null; generatedAt: string | null; nextFollowUpAt: string | null;
-  preferredChannel: string; contactEmail: string | null; linkedinProfileUrl: string | null;
+  preferredChannel: string; contactEmail: string | null; linkedinProfileUrl: string | null; workbenchStage: string;
 }
 
 interface Operations {
@@ -23,7 +23,17 @@ interface Operations {
 
 const dt = (value: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 
-export default async function OutreachPage() {
+const views = [
+  { key: "review", label: "Review", stages: ["REVIEW", "NEEDS_CHANGES"] },
+  { key: "ready", label: "Ready", stages: ["READY", "FOLLOW_UP"] },
+  { key: "waiting", label: "Waiting", stages: ["WAITING"] },
+  { key: "replied", label: "Replied", stages: ["REPLIED"] },
+  { key: "closed", label: "Closed", stages: ["CLOSED", "BLOCKED"] },
+  { key: "all", label: "All", stages: [] },
+] as const;
+
+export default async function OutreachPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const selectedView = (await searchParams).view ?? "review";
   let outreach: Outreach[] = [];
   let operations: Operations = { summary: { pendingApproval: 0, linkedinDue: 0, emailQueued: 0, replies: 0, failures: 0, suppressed: 0 }, due: [] };
   let error = "";
@@ -46,10 +56,13 @@ export default async function OutreachPage() {
     { label: "Failures", value: operations.summary.failures, icon: AlertTriangle, tone: operations.summary.failures ? "red" : "neutral" },
     { label: "Suppressed", value: operations.summary.suppressed, icon: ShieldOff, tone: "neutral" },
   ];
+  const selected = views.find((view) => view.key === selectedView) ?? views[0];
+  const visibleOutreach = selected.stages.length ? outreach.filter((item) => (selected.stages as readonly string[]).includes(item.workbenchStage)) : outreach;
+  const viewCounts = Object.fromEntries(views.map((view) => [view.key, view.stages.length ? outreach.filter((item) => (view.stages as readonly string[]).includes(item.workbenchStage)).length : outreach.length]));
 
   return (
     <Shell title="Outreach">
-      <PageHead eyebrow="Execution workbench" title="Review, approve and execute personalised outreach" description="Echo creates the draft. GridFlow enforces the athlete's approval, channel, sending-window and suppression rules before execution." action={<Link className="button button-primary" href="/contacts"><Send size={14} /> Find eligible contacts</Link>} />
+      <PageHead eyebrow="LinkedIn-first workbench" title="One queue. One safe next action." description="Echo writes the draft. You approve it and send on LinkedIn yourself. GridFlow handles order, timing, follow-up reminders, suppression and the audit trail." action={<Link className="button button-primary" href="/contacts"><Send size={14} /> Find eligible contacts</Link>} />
       {error ? <DataUnavailable message={error} /> : outreach.length === 0 ? <section className="card"><EmptyState title="No outreach has been generated" copy="Run Echo on a primary or secondary contact at a qualified company." action={<Link className="button button-primary" href="/contacts">Open contacts</Link>} /></section> : (
         <div className="stack">
           <section className="metric-grid six-up">
@@ -69,15 +82,21 @@ export default async function OutreachPage() {
           </section> : null}
 
           <section className="card flush">
-            <div className="table-wrap"><table><thead><tr><th>Contact</th><th>Company</th><th>Draft</th><th>LinkedIn</th><th>Email</th><th>Next action</th><th>Channels</th><th></th></tr></thead><tbody>{outreach.map((item) => <tr key={item.id}>
+            <div className="section-header" style={{ padding: "18px 18px 0" }}>
+              <div><div className="eyebrow">Workflow views</div><h2>{selected.label} queue</h2></div>
+              <div className="channel-actions">
+                {views.map((view) => <Link className={`button ${view.key === selected.key ? "button-primary" : "button-secondary"}`} href={`/outreach?view=${view.key}`} key={view.key}>{view.label} <span className="badge neutral">{viewCounts[view.key]}</span></Link>)}
+              </div>
+            </div>
+            {visibleOutreach.length === 0 ? <div style={{ padding: 18 }}><EmptyState title={`Nothing in ${selected.label.toLowerCase()}`} copy="GridFlow will place records here automatically when they reach this stage." /></div> : <div className="table-wrap"><table><thead><tr><th>Contact</th><th>Company</th><th>Draft</th><th>LinkedIn</th><th>Email</th><th>Next action</th><th>Channels</th><th></th></tr></thead><tbody>{visibleOutreach.map((item) => <tr key={item.id}>
               <td><Link className="table-link" href={`/outreach/${item.id}`}><div className="table-primary">{item.contactName}</div><div className="table-sub">{item.outreachName} · v{item.versionNumber ?? 0}</div></Link></td>
               <td><Link className="table-link" href={`/companies/${item.companyId}`}><div className="table-primary">{item.companyName}</div></Link></td>
               <td><StatusBadge value={item.approvalStatus} /><div className="table-sub">{item.draftStatus.replaceAll("_", " ")}</div></td>
               <td><StatusBadge value={item.linkedinStatus} /></td><td><StatusBadge value={item.emailStatus} /></td>
-              <td>{item.nextFollowUpAt ? <><div className="table-primary">{dt(item.nextFollowUpAt)}</div><div className="table-sub">Scheduled follow-up</div></> : <span className="table-sub">Review required</span>}</td>
+              <td>{item.nextFollowUpAt ? <><div className="table-primary">{dt(item.nextFollowUpAt)}</div><div className="table-sub">{item.workbenchStage.replaceAll("_", " ")}</div></> : <><div className="table-primary">{item.workbenchStage.replaceAll("_", " ")}</div><div className="table-sub">Open for guided action</div></>}</td>
               <td><div className="row-actions" style={{ justifyContent: "flex-start" }}>{item.linkedinProfileUrl ? <Linkedin size={14} /> : null}{item.contactEmail ? <Mail size={14} /> : null}<span className="table-sub">{item.preferredChannel.replaceAll("_", " ")}</span></div></td>
               <td><Link className="icon-button" href={`/outreach/${item.id}`}><ArrowUpRight size={14} /></Link></td>
-            </tr>)}</tbody></table></div>
+            </tr>)}</tbody></table></div>}
           </section>
         </div>
       )}

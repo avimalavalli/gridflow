@@ -23,7 +23,7 @@ import {
 } from "@gridflow/domain";
 import type { AgentModelProvider } from "@gridflow/integrations";
 import { errorDetails, json, runKey, saveEvidence } from "./helpers.js";
-import type { AgentRunListItem, EnqueueAgentRequest, EnqueuedAgentRun, ProcessResult } from "./types.js";
+import type { AgentRunListItem, EnqueueAgentRequest, EnqueuedAgentRun, ProcessResult, ResolvedAgentRun } from "./types.js";
 
 interface ClaimedJob extends Record<string, unknown> {
   id: string;
@@ -186,6 +186,66 @@ export class AgentEngine {
         [tenantId, userId, agentRunId, json({ retry: true })],
       );
       return { id: row.id, agentName: row.agentName, status: "QUEUED", idempotencyKey: row.idempotencyKey, reused: true };
+    });
+  }
+
+
+  async resolveFailedRun(
+    tenantId: string,
+    userId: string,
+    agentRunId: string,
+    resolutionNote: string,
+  ): Promise<ResolvedAgentRun> {
+    const cleanNote = resolutionNote.trim();
+    if (cleanNote.length < 12) throw new Error("Add a clear resolution note before dismissing a failed run.");
+
+    return this.database.transaction(async (tx) => {
+      await setTenantContext(tx, tenantId);
+      const run = await tx.query<{
+        id: string;
+        agentName: CoreAgentName;
+        status: string;
+        idempotencyKey: string;
+        errorCode: string | null;
+        errorDetails: string | null;
+      }>(
+        `SELECT "id", "agentName"::text AS "agentName", "status"::text AS "status", "idempotencyKey",
+                "errorCode", "errorDetails"
+         FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+        [tenantId, agentRunId],
+      );
+      const row = run.rows[0];
+      if (!row) throw new Error("Agent run was not found.");
+      if (row.status !== "FAILED") throw new Error("Only failed agent runs can be dismissed as resolved.");
+
+      await tx.query(
+        `UPDATE "AgentRun" SET "status"='CANCELLED', "updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "id"=$2::uuid AND "status"='FAILED'`,
+        [tenantId, agentRunId],
+      );
+      await tx.query(
+        `UPDATE "AutomationJob" SET "status"='CANCELLED', "updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid AND "status" IN ('FAILED','DEAD_LETTER')`,
+        [tenantId, agentRunId],
+      );
+      await tx.query(
+        `UPDATE "JobOutbox" SET "status"='CANCELLED', "updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "idempotencyKey"=$2 AND "status" IN ('FAILED','DEAD_LETTER')`,
+        [tenantId, row.idempotencyKey],
+      );
+      await tx.query(
+        `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","oldValues","newValues")
+         VALUES ($1::uuid,$2::uuid,'STATUS_CHANGE','AgentRun',$3::uuid,$4::jsonb,$5::jsonb)`,
+        [
+          tenantId,
+          userId,
+          agentRunId,
+          json({ status: row.status, errorCode: row.errorCode, errorDetails: row.errorDetails }),
+          json({ status: "CANCELLED", resolutionNote: cleanNote }),
+        ],
+      );
+
+      return { id: row.id, agentName: row.agentName, status: "CANCELLED", resolutionNote: cleanNote };
     });
   }
 

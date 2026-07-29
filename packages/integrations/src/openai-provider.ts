@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { CoreAgentOutput } from "@gridflow/agents";
+import type { AgentOutput, CoreAgentOutput } from "@gridflow/agents";
 import type { AgentGenerationRequest, AgentGenerationResult, AgentModelProvider } from "./provider.js";
 import { validateAgentOutput } from "./validation.js";
 import { assertEvidenceBackedByWebSearch } from "./evidence-provenance.js";
@@ -37,7 +37,7 @@ export class OpenAIAgentProvider implements AgentModelProvider {
     });
   }
 
-  async generate<TOutput extends CoreAgentOutput = CoreAgentOutput>(
+  async generate<TOutput extends AgentOutput = AgentOutput>(
     request: AgentGenerationRequest,
   ): Promise<AgentGenerationResult<TOutput>> {
     const response = await this.client.responses.create({
@@ -81,7 +81,9 @@ export class OpenAIAgentProvider implements AgentModelProvider {
     const estimated = cost(inputTokens, this.inputCost) + cost(outputTokens, this.outputCost);
 
     const validated = validateAgentOutput<TOutput>(request.definition, parsed);
-    if (request.definition.webSearchAllowed) assertEvidenceBackedByWebSearch(validated, response.output);
+    if (request.definition.webSearchAllowed) {
+      assertEvidenceBackedByWebSearch(validated as CoreAgentOutput, response.output);
+    }
 
     return {
       output: validated,

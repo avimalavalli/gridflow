@@ -285,6 +285,36 @@ enum InteractionDirection {
   INTERNAL
 }
 
+enum ReplyIntent {
+  POSITIVE_INTEREST
+  MORE_INFORMATION
+  MEETING_REQUEST
+  REFERRAL
+  OBJECTION
+  NO_BUDGET
+  NOT_NOW
+  NOT_INTERESTED
+  WRONG_CONTACT
+  OUT_OF_OFFICE
+  UNSUBSCRIBE
+  UNKNOWN
+}
+
+enum ReplySentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+enum SentinelStatus {
+  NOT_REQUIRED
+  QUEUED
+  PROCESSING
+  CLASSIFIED
+  REVIEWED
+  FAILED
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -421,6 +451,7 @@ model User {
   loginChallenges AuthLoginChallenge[]
   authEmailOutbox AuthEmailOutbox[]
   agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
+  sentinelReviews Interaction[] @relation("SentinelReviewedBy")
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
   startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
@@ -1083,14 +1114,27 @@ model Interaction {
   providerThreadId  String?
   occurredAt       DateTime             @default(now()) @db.Timestamptz(3)
   source           SourceType           @default(MANUAL)
+  sentinelStatus   SentinelStatus       @default(NOT_REQUIRED)
+  replyIntent      ReplyIntent?
+  replySentiment   ReplySentiment?
+  replyConfidence  Float?
+  replySummary     String?
+  sentinelReasoning String?
+  suggestedNextAction String?
+  sentinelError    String?
+  sentinelStartedAt DateTime?          @db.Timestamptz(3)
+  sentinelReviewedAt DateTime?          @db.Timestamptz(3)
+  sentinelReviewedByUserId String?       @db.Uuid
   createdAt        DateTime             @default(now()) @db.Timestamptz(3)
   tenant           Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   company          Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact          Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
   outreachRecord   OutreachRecord?      @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
   opportunity      Opportunity?         @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  sentinelReviewedBy User?              @relation("SentinelReviewedBy", fields: [sentinelReviewedByUserId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, occurredAt])
+  @@index([tenantId, sentinelStatus, occurredAt])
 }
 
 model Task {

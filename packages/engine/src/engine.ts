@@ -5,6 +5,7 @@ import {
   relayPrompt,
   sagePrompt,
   type AtlasOutput,
+  type CoreAgentOutput,
   type CoreAgentName,
   type EchoOutput,
   type RelayOutput,
@@ -544,7 +545,7 @@ export class AgentEngine {
       if (!provider) throw new Error("No agent model provider is configured for this worker.");
       const run = await this.loadRun(job.tenantId, job.agentRunId);
       const definition = promptByAgent[job.jobName];
-      const result = await provider.generate({ definition, input: run.input, idempotencyKey: run.idempotencyKey });
+      const result = await provider.generate<CoreAgentOutput>({ definition, input: run.input, idempotencyKey: run.idempotencyKey });
       const quality = assertAgentQuality(job.jobName, result.output);
       await this.database.transaction(async (tx) => {
         await setTenantContext(tx, job.tenantId);

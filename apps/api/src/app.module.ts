@@ -22,6 +22,7 @@ import { OperationsModule } from "./operations/operations.module.js";
 import { ReleaseAcceptanceModule } from "./release-acceptance/release-acceptance.module.js";
 import { PipelinesModule } from "./pipelines/pipelines.module.js";
 import { PulseModule } from "./pulse/pulse.module.js";
+import { SentinelModule } from "./sentinel/sentinel.module.js";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { PulseModule } from "./pulse/pulse.module.js";
     ReleaseAcceptanceModule,
     PipelinesModule,
     PulseModule,
+    SentinelModule,
   ],
 })
 export class AppModule {}

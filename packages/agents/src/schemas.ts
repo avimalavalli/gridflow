@@ -150,3 +150,44 @@ export const echoOutputSchema = {
     generation_notes: { type: "string" },
   },
 } as const;
+
+export const sentinelOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "intent",
+    "sentiment",
+    "confidence",
+    "summary",
+    "reasoning",
+    "suggested_next_action",
+    "explicit_opt_out",
+    "needs_human_review",
+  ],
+  properties: {
+    intent: {
+      type: "string",
+      enum: [
+        "POSITIVE_INTEREST",
+        "MORE_INFORMATION",
+        "MEETING_REQUEST",
+        "REFERRAL",
+        "OBJECTION",
+        "NO_BUDGET",
+        "NOT_NOW",
+        "NOT_INTERESTED",
+        "WRONG_CONTACT",
+        "OUT_OF_OFFICE",
+        "UNSUBSCRIBE",
+        "UNKNOWN",
+      ],
+    },
+    sentiment: { type: "string", enum: ["POSITIVE", "NEUTRAL", "NEGATIVE"] },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    summary: { type: "string", minLength: 1, maxLength: 600 },
+    reasoning: { type: "string", minLength: 1, maxLength: 1_200 },
+    suggested_next_action: { type: "string", minLength: 1, maxLength: 600 },
+    explicit_opt_out: { type: "boolean" },
+    needs_human_review: { type: "boolean" },
+  },
+} as const;

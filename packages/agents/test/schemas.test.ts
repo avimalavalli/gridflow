@@ -4,6 +4,7 @@ import {
   echoOutputSchema,
   relayOutputSchema,
   sageOutputSchema,
+  sentinelOutputSchema,
 } from "../src/schemas.js";
 
 const structuredOutputFormats = new Set([
@@ -46,6 +47,7 @@ describe("agent response schemas", () => {
       sageOutputSchema,
       relayOutputSchema,
       echoOutputSchema,
+      sentinelOutputSchema,
     ]) {
       expect(collectFormats(schema).every((format) => structuredOutputFormats.has(format))).toBe(true);
     }

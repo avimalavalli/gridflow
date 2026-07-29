@@ -8,6 +8,7 @@ import {
   decideEmailAction,
   extractEmailAddress,
   gmailHeader,
+  gmailMessageText,
   verifyGmailOAuthState,
   type EmailPolicyInput,
   type GmailMessageSummary,
@@ -505,6 +506,7 @@ export class IntegrationsService {
     return this.database.tenantTransaction(tenantId, async (tx) => {
       const occurredAt = message.internalDate ? new Date(Number(message.internalDate)).toISOString() : new Date().toISOString();
       const headers = Object.fromEntries((message.payload?.headers ?? []).map((header) => [header.name.toLowerCase(), header.value]));
+      const messageText = gmailMessageText(message);
       if (from?.toLowerCase() === ownEmail.toLowerCase()) {
         return this.ingestOutboundGmailMessage(tx, tenantId, ownEmail, to, subject, occurredAt, headers, message);
       }
@@ -515,7 +517,7 @@ export class IntegrationsService {
       await tx.query(
         `INSERT INTO "EmailMessage" ("tenantId","outreachRecordId","contactId","providerMessageId","providerThreadId","recipient","sender","subject","direction","status","receivedAt","headers")
          VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,'INBOUND',$9::"EmailStatus",$10::timestamptz,$11::jsonb)`,
-        [tenantId, match.outreachId, match.contactId, message.id, message.threadId, ownEmail, from ?? "unknown", subject, isBounce ? "BOUNCED" : "REPLIED", occurredAt, JSON.stringify({ ...headers, snippet: message.snippet ?? null })],
+        [tenantId, match.outreachId, match.contactId, message.id, message.threadId, ownEmail, from ?? "unknown", subject, isBounce ? "BOUNCED" : "REPLIED", occurredAt, JSON.stringify({ ...headers, snippet: message.snippet ?? null, body: messageText })],
       );
       if (isBounce) {
         await tx.query(`UPDATE "OutreachRecord" SET "emailStatus"='BOUNCED',"echoStatus"='PAUSED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [match.outreachId]);
@@ -532,9 +534,9 @@ export class IntegrationsService {
         await tx.query(`UPDATE "OutreachRecord" SET "emailStatus"='REPLIED',"echoStatus"='PAUSED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [match.outreachId]);
         await tx.query(`UPDATE "Contact" SET "status"='REPLIED',"lastContactAt"=$2::timestamptz,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [match.contactId, occurredAt]);
         await tx.query(
-          `INSERT INTO "Interaction" ("tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","providerMessageId","providerThreadId","occurredAt","source")
-           VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','INBOUND',$5,$6,$7,$8,$9::timestamptz,'GMAIL')`,
-          [tenantId, match.companyId, match.contactId, match.outreachId, `Reply received: ${subject}`, message.snippet ?? null, message.id, message.threadId, occurredAt],
+          `INSERT INTO "Interaction" ("tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","outcome","providerMessageId","providerThreadId","occurredAt","source","sentinelStatus")
+           VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','INBOUND',$5,$6,$7,$8,$9::timestamptz,'GMAIL','QUEUED')`,
+          [tenantId, match.companyId, match.contactId, match.outreachId, `Reply received: ${subject}`, messageText || message.snippet || null, message.id, message.threadId, occurredAt],
         );
       }
       await tx.query(

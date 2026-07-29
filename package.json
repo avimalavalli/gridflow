@@ -29,7 +29,7 @@
     "backup:verify": "node scripts/verify-backup.mjs",
     "db:schema-check": "node scripts/validate-prisma-schema.mjs",
     "test:packages": "npm run test:packages:light && npm run test:persistence",
-    "test:api": "vitest run apps/api/test --pool=vmForks --maxWorkers=1 --no-file-parallelism --testTimeout=20000",
+    "test:api": "vitest run apps/api/test --pool=forks --maxWorkers=1 --no-file-parallelism --testTimeout=20000",
     "test:worker": "vitest run apps/worker/test --pool=vmForks --maxWorkers=1 --no-file-parallelism --testTimeout=20000",
     "agents:evaluate": "npm run build --workspace @gridflow/agents && node scripts/evaluate-agent-fixtures.mjs",
     "backup:restore-check": "npm run build --workspace @gridflow/database && node scripts/restore-rehearsal.mjs",

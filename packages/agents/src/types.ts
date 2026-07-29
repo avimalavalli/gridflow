@@ -1,7 +1,8 @@
 export type CoreAgentName = "ATLAS" | "SAGE" | "RELAY" | "ECHO";
+export type AgentPromptName = CoreAgentName | "SENTINEL";
 
 export interface AgentPromptDefinition {
-  name: CoreAgentName;
+  name: AgentPromptName;
   version: string;
   provenance: "RECONSTRUCTED" | "MIGRATED_VERBATIM";
   responsibility: string;

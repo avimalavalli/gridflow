@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMimeMessage, createGmailOAuthState, extractEmailAddress, verifyGmailOAuthState } from "../src/gmail.js";
+import { buildMimeMessage, createGmailOAuthState, extractEmailAddress, gmailMessageText, verifyGmailOAuthState } from "../src/gmail.js";
 import { SecretBox } from "../src/token-crypto.js";
 import { decideEmailAction } from "../src/email-policy.js";
 
@@ -27,6 +27,27 @@ describe("Gmail integration primitives", () => {
 
   it("extracts addresses from display-name headers", () => {
     expect(extractEmailAddress('Commercial Director <Person@Example.com>')).toBe("person@example.com");
+  });
+
+  it("extracts a nested plain-text reply body instead of relying on the Gmail snippet", () => {
+    expect(gmailMessageText({
+      id: "reply",
+      threadId: "thread",
+      snippet: "Truncated preview",
+      payload: {
+        mimeType: "multipart/alternative",
+        parts: [
+          {
+            mimeType: "text/html",
+            body: { data: Buffer.from("<p>HTML reply</p>").toString("base64url") },
+          },
+          {
+            mimeType: "text/plain",
+            body: { data: Buffer.from("Yes, please send the partnership deck.").toString("base64url") },
+          },
+        ],
+      },
+    })).toBe("Yes, please send the partnership deck.");
   });
 });
 

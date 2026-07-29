@@ -78,7 +78,7 @@ afterEach(async () => {
 });
 
 describe("GridFlow core agent engine", () => {
-  it("runs Atlas → Sage → Relay → Echo with durable records and no duplicates", async () => {
+  it("runs Atlas → Sage → Relay → Echo automatically from one durable pipeline", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-engine-"));
     database = await createDatabase("pglite://memory");
     await migrateDatabase(database);
@@ -98,24 +98,31 @@ describe("GridFlow core agent engine", () => {
     });
 
     const engine = new AgentEngine(database, new FixtureAgentProvider({ ATLAS: atlas, SAGE: sage, RELAY: relay, ECHO: echo }));
-    await engine.enqueue(identity.tenantId, identity.userId, { agentName: "ATLAS", discoveryBriefId: identity.briefId });
-    expect((await engine.processNext()).status).toBe("SUCCEEDED");
+    const pipeline = await engine.startPipeline(identity.tenantId, identity.userId, identity.briefId);
+    expect(pipeline).toMatchObject({ discoveryBriefId: identity.briefId, status: "RUNNING", reused: false });
+    expect(pipeline.atlasRunId).toBeTruthy();
+    const duplicate = await engine.startPipeline(identity.tenantId, identity.userId, identity.briefId);
+    expect(duplicate).toMatchObject({ id: pipeline.id, reused: true });
+
+    const processed = [];
+    for (let iteration = 0; iteration < 10; iteration += 1) {
+      const result = await engine.processNext();
+      if (!result.processed) break;
+      processed.push(result);
+    }
+    expect(processed).toHaveLength(4);
+    expect(processed.every((result) => result.status === "SUCCEEDED")).toBe(true);
 
     const company = await database.transaction(async (tx) => {
       await setTenantContext(tx, identity.tenantId);
       return (await tx.query<{ id: string }>(`SELECT "id" FROM "Company" WHERE "tenantId"=$1::uuid AND "companyKey"='example.com'`, [identity.tenantId])).rows[0]!;
     });
-    await engine.enqueue(identity.tenantId, identity.userId, { agentName: "SAGE", companyId: company.id });
-    expect((await engine.processNext()).status).toBe("SUCCEEDED");
-    await engine.enqueue(identity.tenantId, identity.userId, { agentName: "RELAY", companyId: company.id });
-    expect((await engine.processNext()).status).toBe("SUCCEEDED");
 
     const contact = await database.transaction(async (tx) => {
       await setTenantContext(tx, identity.tenantId);
       return (await tx.query<{ id: string }>(`SELECT "id" FROM "Contact" WHERE "tenantId"=$1::uuid AND "contactKey"='alex example|example.com'`, [identity.tenantId])).rows[0]!;
     });
-    await engine.enqueue(identity.tenantId, identity.userId, { agentName: "ECHO", contactId: contact.id });
-    expect((await engine.processNext()).status).toBe("SUCCEEDED");
+    expect(contact.id).toBeTruthy();
 
     const result = await database.transaction(async (tx) => {
       await setTenantContext(tx, identity.tenantId);
@@ -128,6 +135,47 @@ describe("GridFlow core agent engine", () => {
     expect(result.company.score).toBeGreaterThanOrEqual(80);
     expect(result.outreach).toEqual({ records: 1, versions: 1, actions: 2 });
     expect((await engine.listRuns(identity.tenantId)).filter((run) => run.status === "SUCCEEDED")).toHaveLength(4);
+    expect(await engine.listPipelines(identity.tenantId)).toEqual([
+      expect.objectContaining({
+        id: pipeline.id,
+        status: "SUCCEEDED",
+        totalRuns: 4,
+        succeededRuns: 4,
+        failedRuns: 0,
+        atlasRuns: 1,
+        sageRuns: 1,
+        relayRuns: 1,
+        echoRuns: 1,
+      }),
+    ]);
+
+    const echoRunId = await database.transaction(async (tx) => {
+      await setTenantContext(tx, identity.tenantId);
+      const run = await tx.query<{ id: string }>(
+        `SELECT "id" FROM "AgentRun" WHERE "pipelineRunId"=$1::uuid AND "agentName"='ECHO'`,
+        [pipeline.id],
+      );
+      const id = run.rows[0]!.id;
+      await tx.query(`UPDATE "AgentRun" SET "status"='FAILED' WHERE "id"=$1::uuid`, [id]);
+      await tx.query(`UPDATE "AutomationJob" SET "status"='DEAD_LETTER' WHERE "agentRunId"=$1::uuid`, [id]);
+      await tx.query(`UPDATE "JobOutbox" SET "status"='DEAD_LETTER' WHERE "tenantId"=$1::uuid AND "idempotencyKey"=(SELECT "idempotencyKey" FROM "AgentRun" WHERE "id"=$2::uuid)`, [identity.tenantId, id]);
+      await tx.query(`UPDATE "PipelineRun" SET "status"='PARTIAL',"completedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [pipeline.id]);
+      return id;
+    });
+
+    expect(await engine.retryRun(identity.tenantId, identity.userId, echoRunId)).toMatchObject({
+      id: echoRunId,
+      status: "QUEUED",
+    });
+    expect((await engine.listPipelines(identity.tenantId))[0]).toMatchObject({ id: pipeline.id, status: "RUNNING" });
+    expect((await engine.processNext()).status).toBe("SUCCEEDED");
+    expect((await engine.listPipelines(identity.tenantId))[0]).toMatchObject({
+      id: pipeline.id,
+      status: "SUCCEEDED",
+      totalRuns: 4,
+      succeededRuns: 4,
+      failedRuns: 0,
+    });
   });
   it("recovers stale running jobs and dead-letters exhausted jobs", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-stale-job-"));

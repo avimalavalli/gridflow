@@ -21,6 +21,7 @@ import { IntegrationsModule } from "./integrations/integrations.module.js";
 import { OperationsModule } from "./operations/operations.module.js";
 import { ReleaseAcceptanceModule } from "./release-acceptance/release-acceptance.module.js";
 import { PipelinesModule } from "./pipelines/pipelines.module.js";
+import { PulseModule } from "./pulse/pulse.module.js";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PipelinesModule } from "./pipelines/pipelines.module.js";
     OperationsModule,
     ReleaseAcceptanceModule,
     PipelinesModule,
+    PulseModule,
   ],
 })
 export class AppModule {}

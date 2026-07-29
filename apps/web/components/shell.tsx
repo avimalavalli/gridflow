@@ -24,6 +24,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  TimerReset,
   UsersRound,
   X,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Companies", href: "/companies", icon: Building2, keywords: "brands prospects sponsors organisations" },
       { label: "Contacts", href: "/contacts", icon: ContactRound, keywords: "people decision makers leads" },
       { label: "Outreach", href: "/outreach", icon: Send, keywords: "linkedin email drafts messages approval" },
+      { label: "Pulse", href: "/pulse", icon: TimerReset, keywords: "follow ups timing reminders cadence stopped sequences" },
       { label: "Opportunities", href: "/opportunities", icon: Handshake, keywords: "pipeline deals sponsorship revenue" },
     ],
   },

@@ -22,7 +22,7 @@ function objectValue(value: unknown): Record<string, unknown> {
 export class GmailSyncProcessor {
   constructor(private readonly database: GridFlowDatabase) {}
 
-  async syncNext(): Promise<{ processed: boolean; tenantId?: string; checked?: number; replies?: number; bounces?: number }> {
+  async syncNext(): Promise<{ processed: boolean; tenantId?: string; checked?: number; sent?: number; replies?: number; bounces?: number }> {
     const account = await this.nextAccount();
     if (!account) return { processed: false };
     try {
@@ -60,10 +60,12 @@ export class GmailSyncProcessor {
       }
 
       ids = [...new Set(ids)].slice(0, 500);
+      let sent = 0;
       let replies = 0;
       let bounces = 0;
       for (const id of ids) {
         const result = await this.ingest(account.tenantId, account.externalEmail, await gmail.message(id));
+        if (result === "sent") sent += 1;
         if (result === "reply") replies += 1;
         if (result === "bounce") bounces += 1;
       }
@@ -71,11 +73,11 @@ export class GmailSyncProcessor {
         `UPDATE "IntegrationAccount" SET "metadata"=$2::jsonb,"lastSyncedAt"=CURRENT_TIMESTAMP,"status"='CONNECTED',"errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
         [account.id, JSON.stringify({ ...currentMetadata, historyId: latestHistoryId })],
       );
-      return { processed: true, tenantId: account.tenantId, checked: ids.length, replies, bounces };
+      return { processed: true, tenantId: account.tenantId, checked: ids.length, sent, replies, bounces };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown Gmail sync error";
       await this.database.query(`UPDATE "IntegrationAccount" SET "status"='ERROR',"errorDetails"=$2,"lastSyncedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [account.id, message.slice(0, 2000)]);
-      return { processed: true, tenantId: account.tenantId, checked: 0, replies: 0, bounces: 0 };
+      return { processed: true, tenantId: account.tenantId, checked: 0, sent: 0, replies: 0, bounces: 0 };
     }
   }
 
@@ -97,18 +99,21 @@ export class GmailSyncProcessor {
     return refreshed.access_token;
   }
 
-  private async ingest(tenantId: string, ownEmail: string, message: GmailMessageSummary): Promise<"reply"|"bounce"|"ignored"> {
+  private async ingest(tenantId: string, ownEmail: string, message: GmailMessageSummary): Promise<"sent"|"reply"|"bounce"|"ignored"> {
     const from = extractEmailAddress(gmailHeader(message,"From"));
+    const to = extractEmailAddress(gmailHeader(message,"To"));
     const failed = extractEmailAddress(gmailHeader(message,"X-Failed-Recipients"));
     const subject = gmailHeader(message,"Subject") ?? "(no subject)";
     const bounce = Boolean(failed) || Boolean(from && /mailer-daemon|postmaster/i.test(from)) || /delivery status notification|undeliverable|delivery failure/i.test(subject);
-    if (from?.toLowerCase() === ownEmail.toLowerCase()) return "ignored";
     return this.database.transaction(async (tx) => {
+      const receivedAt=message.internalDate?new Date(Number(message.internalDate)).toISOString():new Date().toISOString();
+      const headers=Object.fromEntries((message.payload?.headers??[]).map(h=>[h.name.toLowerCase(),h.value]));
+      if (from?.toLowerCase() === ownEmail.toLowerCase()) {
+        return this.ingestOutbound(tx, tenantId, ownEmail, to, subject, receivedAt, headers, message);
+      }
       const match = await this.match(tx,tenantId,message.threadId,bounce?failed:from);
       if(!match)return "ignored" as const;
       if((await tx.query(`SELECT 1 FROM "EmailMessage" WHERE "tenantId"=$1::uuid AND "providerMessageId"=$2`,[tenantId,message.id])).rows.length)return "ignored" as const;
-      const receivedAt=message.internalDate?new Date(Number(message.internalDate)).toISOString():new Date().toISOString();
-      const headers=Object.fromEntries((message.payload?.headers??[]).map(h=>[h.name.toLowerCase(),h.value]));
       await tx.query(`INSERT INTO "EmailMessage" ("tenantId","outreachRecordId","contactId","providerMessageId","providerThreadId","recipient","sender","subject","direction","status","receivedAt","headers") VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,'INBOUND',$9::"EmailStatus",$10::timestamptz,$11::jsonb)`,[tenantId,match.outreachId,match.contactId,message.id,message.threadId,ownEmail,from??"unknown",subject,bounce?"BOUNCED":"REPLIED",receivedAt,JSON.stringify({...headers,snippet:message.snippet??null})]);
       if(bounce){
         await tx.query(`UPDATE "OutreachRecord" SET "emailStatus"='BOUNCED',"echoStatus"='PAUSED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,[match.outreachId]);
@@ -121,6 +126,95 @@ export class GmailSyncProcessor {
       await tx.query(`UPDATE "ChannelAction" SET "status"=$3::"ChannelActionStatus","completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid AND "channel"='EMAIL' AND "status" IN ('READY','QUEUED','FOLLOW_UP_DUE')`,[tenantId,match.outreachId,bounce?"BOUNCED":"REPLIED"]);
       return bounce?"bounce" as const:"reply" as const;
     });
+  }
+
+  private async ingestOutbound(
+    tx: SqlExecutor,
+    tenantId: string,
+    ownEmail: string,
+    recipient: string | null,
+    subject: string,
+    sentAt: string,
+    headers: Record<string, string>,
+    message: GmailMessageSummary,
+  ): Promise<"sent"|"ignored"> {
+    const matched = await tx.query<{
+      emailMessageId: string;
+      outreachId: string;
+      versionId: string | null;
+      contactId: string;
+      companyId: string;
+      contactEmail: string;
+      storedHeaders: unknown;
+      status: string;
+    }>(
+      `SELECT em."id" AS "emailMessageId",em."outreachRecordId" AS "outreachId",em."outreachVersionId" AS "versionId",
+              c."id" AS "contactId",co."id" AS "companyId",c."email" AS "contactEmail",em."headers" AS "storedHeaders",em."status"::text AS "status"
+       FROM "EmailMessage" em
+       JOIN "OutreachRecord" o ON o."id"=em."outreachRecordId"
+       JOIN "Contact" c ON c."id"=o."contactId"
+       JOIN "Company" co ON co."id"=o."companyId"
+       WHERE em."tenantId"=$1::uuid AND em."direction"='OUTBOUND'
+         AND (em."providerMessageId"=$2 OR em."providerThreadId"=$3)
+         AND ($4::text IS NULL OR LOWER(c."email")=LOWER($4))
+       ORDER BY CASE WHEN em."providerMessageId"=$2 THEN 0 ELSE 1 END,em."createdAt" DESC
+       LIMIT 1`,
+      [tenantId, message.id, message.threadId, recipient],
+    );
+    const match = matched.rows[0];
+    if (!match || match.status === "SENT") return "ignored";
+
+    const action = await tx.query<{ id: string; sequenceStep: string }>(
+      `SELECT "id","sequenceStep" FROM "ChannelAction"
+       WHERE "tenantId"=$1::uuid AND "outreachRecordId"=$2::uuid AND "channel"='EMAIL'
+         AND ("providerMessageId"=$3 OR "providerThreadId"=$4 OR "status"='READY')
+       ORDER BY CASE WHEN "providerMessageId"=$3 THEN 0 WHEN "providerThreadId"=$4 THEN 1 ELSE 2 END,"createdAt" DESC
+       LIMIT 1`,
+      [tenantId, match.outreachId, message.id, message.threadId],
+    );
+    const storedHeaders = objectValue(match.storedHeaders);
+    const rawStep = action.rows[0]?.sequenceStep ?? (typeof storedHeaders.sequenceStep === "string" ? storedHeaders.sequenceStep : "INITIAL");
+    const sequenceStep = rawStep.replace(/:DRAFT$/i, "").toUpperCase().replaceAll("-", "_");
+
+    await tx.query(
+      `UPDATE "EmailMessage"
+       SET "status"='SENT',"sentAt"=$2::timestamptz,"providerMessageId"=$3,"providerThreadId"=$4,
+           "recipient"=COALESCE($5,"recipient"),"sender"=$6,"subject"=$7,"headers"=$8::jsonb
+       WHERE "id"=$1::uuid`,
+      [match.emailMessageId, sentAt, message.id, message.threadId, recipient, ownEmail, subject, JSON.stringify({ ...storedHeaders, ...headers, sequenceStep })],
+    );
+    if (action.rows[0]) {
+      await tx.query(
+        `UPDATE "ChannelAction"
+         SET "status"='SENT',"completedAt"=$2::timestamptz,"providerMessageId"=$3,"providerThreadId"=$4,
+             "sequenceStep"=$5,"errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "id"=$1::uuid`,
+        [action.rows[0].id, sentAt, message.id, message.threadId, sequenceStep],
+      );
+    }
+    await tx.query(
+      `UPDATE "OutreachRecord"
+       SET "emailStatus"='SENT',"sentAt"=COALESCE("sentAt",$2::timestamptz),"updatedAt"=CURRENT_TIMESTAMP
+       WHERE "id"=$1::uuid`,
+      [match.outreachId, sentAt],
+    );
+    await tx.query(
+      `UPDATE "Contact"
+       SET "status"=CASE WHEN "status"='NOT_CONTACTED' THEN 'CONTACTED'::"ContactStatus" ELSE "status" END,
+           "lastContactAt"=$2::timestamptz,"updatedAt"=CURRENT_TIMESTAMP
+       WHERE "id"=$1::uuid`,
+      [match.contactId, sentAt],
+    );
+    await tx.query(
+      `INSERT INTO "Interaction" (
+         "tenantId","companyId","contactId","outreachRecordId","channel","direction","summary","providerMessageId","providerThreadId","occurredAt","source"
+       ) SELECT $1::uuid,$2::uuid,$3::uuid,$4::uuid,'EMAIL','OUTBOUND',$5,$6,$7,$8::timestamptz,'GMAIL'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM "Interaction" WHERE "tenantId"=$1::uuid AND "providerMessageId"=$6
+         )`,
+      [tenantId, match.companyId, match.contactId, match.outreachId, `Email ${sequenceStep.toLowerCase().replaceAll("_"," ")} sent from Gmail`, message.id, message.threadId, sentAt],
+    );
+    return "sent";
   }
 
   private async match(tx:SqlExecutor,tenantId:string,threadId:string,email:string|null){

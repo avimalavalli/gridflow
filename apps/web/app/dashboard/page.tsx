@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         <div className="split-layout">
           <div className="stack">
             <section className="card">
-              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/tasks">All tasks <ArrowUpRight size={14}/></Link></div>
+              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines Pulse follow-ups, due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/pulse">Open Pulse <ArrowUpRight size={14}/></Link></div>
               {snapshot.actions.length === 0 ? <EmptyState title="Your queue is clear" copy="New follow-ups, approvals and system issues will appear here." /> : <div className="queue">{snapshot.actions.map((action) => <Link href={action.href} className="queue-item" key={`${action.kind}-${action.id}`}><div className="queue-main"><div className="queue-title">{action.title}</div><div className="queue-copy">{action.detail || "Open the record for the full context."}{action.dueAt ? ` · ${dateTime(action.dueAt)}` : ""}</div></div><div className="queue-meta"><StatusBadge value={action.urgency}/><ArrowUpRight size={13}/></div></Link>)}</div>}
             </section>
 

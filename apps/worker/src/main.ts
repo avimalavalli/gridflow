@@ -8,6 +8,7 @@ import { GmailSyncProcessor } from "./gmail-sync.js";
 import { AuthEmailProcessor } from "./auth-email.js";
 import { PulseProcessor } from "./pulse.js";
 import { SentinelProcessor } from "./sentinel.js";
+import { NovaProcessor } from "./nova.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
@@ -42,6 +43,9 @@ const engine = provider ? new AgentEngine(database, provider) : null;
 const sentinel = new SentinelProcessor(database, provider);
 const recoveredSentinel = await sentinel.recoverStale(Number(process.env.SENTINEL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredSentinel) logWorkerEvent({ event: "stale-sentinel-replies-recovered", level: "warning", details: { count: recoveredSentinel } });
+const nova = new NovaProcessor(database, provider);
+const recoveredNova = await nova.recoverStale(Number(process.env.NOVA_STALE_AFTER_MINUTES ?? 10));
+if (recoveredNova) logWorkerEvent({ event: "stale-nova-strategies-recovered", level: "warning", details: { count: recoveredNova } });
 logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: provider?.name ?? null, agentProcessingEnabled: Boolean(provider), emailAutomationEnabled: true } });
 const healthServer = once ? null : await startWorkerHealthServer({
   port: Math.max(1, Number(process.env.PORT ?? 3_002)),
@@ -65,6 +69,15 @@ const runOnce = async (): Promise<boolean> => {
       event: "sentinel-reply-processed",
       level: reply.status === "FAILED" ? "error" : reply.status === "RETRY_QUEUED" ? "warning" : "info",
       details: reply as unknown as Record<string, unknown>,
+    });
+    return true;
+  }
+  const strategy = await nova.processNext();
+  if (strategy.processed) {
+    logWorkerEvent({
+      event: "nova-strategy-processed",
+      level: strategy.status === "FAILED" ? "error" : strategy.status === "RETRY_QUEUED" ? "warning" : "info",
+      details: strategy as unknown as Record<string, unknown>,
     });
     return true;
   }
@@ -122,6 +135,11 @@ if (once) {
         return 0;
       });
       if (sentinelRecovered) logWorkerEvent({ event: "stale-sentinel-replies-recovered", level: "warning", details: { count: sentinelRecovered } });
+      const novaRecovered = await nova.recoverStale(Number(process.env.NOVA_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
+        reportWorkerError("stale-nova-recovery-failed", error);
+        return 0;
+      });
+      if (novaRecovered) logWorkerEvent({ event: "stale-nova-strategies-recovered", level: "warning", details: { count: novaRecovered } });
       const pulseResult = await pulse.reconcile().catch((error) => {
         reportWorkerError("pulse-reconciliation-failed", error);
         return { stopped: 0, emailPlanned: 0, linkedinPlanned: 0, obsoleteClosed: 0 };

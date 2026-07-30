@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   atlasOutputSchema,
   echoOutputSchema,
+  novaOutputSchema,
   relayOutputSchema,
   sageOutputSchema,
   sentinelOutputSchema,
@@ -48,6 +49,7 @@ describe("agent response schemas", () => {
       relayOutputSchema,
       echoOutputSchema,
       sentinelOutputSchema,
+      novaOutputSchema,
     ]) {
       expect(collectFormats(schema).every((format) => structuredOutputFormats.has(format))).toBe(true);
     }

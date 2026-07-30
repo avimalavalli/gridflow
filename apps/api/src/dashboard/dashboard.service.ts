@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, drafts, pulse, sentinel, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, sentinel, outreach, pulse, nova, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -166,6 +166,23 @@ export class DashboardService {
           [tenantId],
         ),
         tx.query<ActionRow>(
+          `SELECT i."id",'NOVA' AS "kind",
+                  CASE
+                    WHEN i."novaStatus"='FAILED' THEN 'Nova could not prepare the next move for ' || COALESCE(c."contactName",'an inbound reply')
+                    ELSE 'Review Nova plan for ' || COALESCE(c."contactName",'an inbound reply')
+                  END AS "title",
+                  COALESCE(co."companyName",i."novaRelationshipReason",i."replySummary") AS "detail",
+                  i."occurredAt" AS "dueAt",'/nova' AS "href",
+                  CASE WHEN i."novaStatus"='FAILED' THEN 'FAILED' ELSE 'REVIEW' END AS "urgency"
+           FROM "Interaction" i
+           LEFT JOIN "Contact" c ON c."id"=i."contactId"
+           LEFT JOIN "Company" co ON co."id"=i."companyId"
+           WHERE i."tenantId"=$1::uuid AND i."novaStatus" IN ('READY','FAILED')
+           ORDER BY CASE WHEN i."novaStatus"='FAILED' THEN 0 ELSE 1 END,i."occurredAt" DESC
+           LIMIT 6`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
           `SELECT a."id", 'AGENT_FAILURE' AS "kind", a."agentName"::text || ' needs attention' AS "title",
                   COALESCE(a."errorCode", a."errorDetails", 'Agent run failed') AS "detail", a."updatedAt" AS "dueAt",
                   '/agent-runs' AS "href", 'FAILED' AS "urgency"
@@ -195,7 +212,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...drafts.rows, ...pulse.rows, ...sentinel.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

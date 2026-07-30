@@ -315,6 +315,28 @@ enum SentinelStatus {
   FAILED
 }
 
+enum NovaStatus {
+  NOT_REQUIRED
+  QUEUED
+  PROCESSING
+  READY
+  REVIEWED
+  REJECTED
+  FAILED
+}
+
+enum NovaRelationshipAction {
+  CONTINUE
+  PAUSE
+  CLOSE
+}
+
+enum NovaResponseChannel {
+  EMAIL
+  LINKEDIN
+  NONE
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -452,6 +474,7 @@ model User {
   authEmailOutbox AuthEmailOutbox[]
   agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
   sentinelReviews Interaction[] @relation("SentinelReviewedBy")
+  novaReviews     Interaction[] @relation("NovaReviewedBy")
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
   startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
@@ -1125,6 +1148,32 @@ model Interaction {
   sentinelStartedAt DateTime?          @db.Timestamptz(3)
   sentinelReviewedAt DateTime?          @db.Timestamptz(3)
   sentinelReviewedByUserId String?       @db.Uuid
+  novaStatus       NovaStatus            @default(NOT_REQUIRED)
+  novaRelationshipAction NovaRelationshipAction?
+  novaRelationshipReason String?
+  novaResponseRequired Boolean           @default(false)
+  novaResponseChannel NovaResponseChannel?
+  novaDraftSubject String?
+  novaDraftBody    String?
+  novaObjectionStrategy String?
+  novaShouldCreateOpportunity Boolean    @default(false)
+  novaOpportunityName String?
+  novaOpportunityStage OpportunityStage?
+  novaOpportunityProbability Int?
+  novaOpportunityRationale String?
+  novaShouldRecommendMeeting Boolean     @default(false)
+  novaMeetingTitle String?
+  novaMeetingObjective String?
+  novaMeetingDurationMinutes Int?
+  novaMeetingAgenda String?
+  novaMeetingRationale String?
+  novaReasoning     String?
+  novaConfidence    Float?
+  novaError         String?
+  novaStartedAt     DateTime?            @db.Timestamptz(3)
+  novaReviewedAt    DateTime?            @db.Timestamptz(3)
+  novaReviewedByUserId String?            @db.Uuid
+  novaAppliedAt     DateTime?            @db.Timestamptz(3)
   createdAt        DateTime             @default(now()) @db.Timestamptz(3)
   tenant           Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   company          Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
@@ -1132,9 +1181,11 @@ model Interaction {
   outreachRecord   OutreachRecord?      @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
   opportunity      Opportunity?         @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   sentinelReviewedBy User?              @relation("SentinelReviewedBy", fields: [sentinelReviewedByUserId], references: [id], onDelete: SetNull)
+  novaReviewedBy    User?                @relation("NovaReviewedBy", fields: [novaReviewedByUserId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, occurredAt])
   @@index([tenantId, sentinelStatus, occurredAt])
+  @@index([tenantId, novaStatus, occurredAt])
 }
 
 model Task {

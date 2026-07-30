@@ -130,7 +130,9 @@ export class SentinelService {
       await tx.query(
         `UPDATE "Interaction"
          SET "sentinelStatus"='REVIEWED',"replyIntent"=$3::"ReplyIntent",
-             "sentinelReviewedAt"=CURRENT_TIMESTAMP,"sentinelReviewedByUserId"=$4::uuid
+             "sentinelReviewedAt"=CURRENT_TIMESTAMP,"sentinelReviewedByUserId"=$4::uuid,
+             "novaStatus"=CASE WHEN $3::"ReplyIntent"='UNSUBSCRIBE' THEN 'NOT_REQUIRED'::"NovaStatus" ELSE 'QUEUED'::"NovaStatus" END,
+             "novaError"=NULL,"novaStartedAt"=NULL
          WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
         [tenantId, interactionId, intent, userId],
       );
@@ -164,7 +166,13 @@ export class SentinelService {
           JSON.stringify({ sentinelStatus: "REVIEWED", replyIntent: intent, decision: input.decision, notes }),
         ],
       );
-      return { id: interactionId, status: "REVIEWED", intent, decision: input.decision };
+      return {
+        id: interactionId,
+        status: "REVIEWED",
+        intent,
+        decision: input.decision,
+        novaStatus: intent === "UNSUBSCRIBE" ? "NOT_REQUIRED" : "QUEUED",
+      };
     });
   }
 

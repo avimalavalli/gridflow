@@ -1,0 +1,32 @@
+name: Apply Nova Phase 3C
+
+on:
+  push:
+    branches:
+      - agent/build-nova-phase-3c
+    paths:
+      - .github/workflows/phase3c-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: agent/build-nova-phase-3c
+          persist-credentials: true
+      - name: Apply reviewed Nova patch
+        shell: bash
+        run: |
+          base64 --decode .github/phase3c.patch.b64 | gzip --decompress > /tmp/phase3c.patch
+          git config user.name "GridFlow Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git am /tmp/phase3c.patch
+          git rm .github/phase3c.patch.b64 .github/workflows/phase3c-bootstrap.yml
+          git commit -m "chore: remove Phase 3C bootstrap"
+          git push origin HEAD:agent/build-nova-phase-3c

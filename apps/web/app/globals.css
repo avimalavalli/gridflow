@@ -522,3 +522,20 @@ tbody tr:last-child td { border-bottom: 0; }
 .not-found-page > span { width:58px;height:58px;display:grid;place-items:center;border-radius:17px;background:var(--blue-soft);color:var(--blue);margin-bottom:15px; }.not-found-page h1{margin:5px 0 8px;font-size:28px;letter-spacing:-.8px}.not-found-page p{margin:0 0 18px;color:var(--muted);font-size:11px}
 @media(max-width:680px){.route-loading-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.route-error{grid-template-columns:1fr;margin:18px 0}.route-error .button{width:100%;justify-content:center}}
 .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+
+/* Phase 3C: Nova reply strategy */
+.nova-card { display:grid; gap:17px; }
+.nova-safety { display:flex; align-items:flex-start; gap:10px; border-color:#b9d9ff; background:linear-gradient(135deg,#eef7ff,#fff); color:#31536f; }
+.nova-safety svg { flex:0 0 auto; margin-top:1px; color:var(--blue); }
+.nova-context-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr); gap:14px; }
+.nova-editor { border-top:1px solid var(--line); padding-top:17px; }
+.nova-check { display:flex!important; flex-direction:row!important; align-items:center; gap:9px!important; padding:11px 12px; border:1px solid var(--line); border-radius:11px; background:var(--panel-subtle); }
+.nova-check input,.nova-rec-head input { width:17px; height:17px; flex:0 0 auto; }
+.nova-recommendations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+.nova-recommendation { display:grid; align-content:start; gap:12px; padding:14px; border:1px solid var(--line); border-radius:14px; background:var(--panel-subtle); }
+.nova-recommendation.active { border-color:#b9d9ff; background:linear-gradient(180deg,#f5faff,#fff); }
+.nova-rec-head { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:9px; color:var(--muted); }
+.nova-rec-head svg { color:var(--blue); }
+.nova-recommendation p { margin:0; color:var(--muted); font-size:11px; }
+.nova-recommendation textarea { min-height:76px; }
+@media(max-width:850px){.nova-context-grid,.nova-recommendations{grid-template-columns:1fr}.nova-card .section-header{display:grid}}

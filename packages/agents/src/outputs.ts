@@ -101,4 +101,31 @@ export interface SentinelOutput {
   needs_human_review: boolean;
 }
 
-export type AgentOutput = CoreAgentOutput | SentinelOutput;
+export type NovaRelationshipAction = "CONTINUE" | "PAUSE" | "CLOSE";
+export type NovaResponseChannel = "EMAIL" | "LINKEDIN" | "NONE";
+
+export interface NovaOutput {
+  relationship_action: NovaRelationshipAction;
+  relationship_reason: string;
+  response_required: boolean;
+  response_channel: NovaResponseChannel;
+  draft_subject: string;
+  draft_body: string;
+  objection_strategy: string;
+  should_create_opportunity: boolean;
+  opportunity_name: string;
+  opportunity_stage: "INTERESTED" | "DISCOVERY_CALL" | "NEEDS_ANALYSIS" | "ON_HOLD";
+  opportunity_probability: number;
+  opportunity_rationale: string;
+  should_recommend_meeting: boolean;
+  meeting_title: string;
+  meeting_objective: string;
+  meeting_duration_minutes: number;
+  meeting_agenda: string;
+  meeting_rationale: string;
+  reasoning: string;
+  confidence: number;
+  needs_human_review: true;
+}
+
+export type AgentOutput = CoreAgentOutput | SentinelOutput | NovaOutput;

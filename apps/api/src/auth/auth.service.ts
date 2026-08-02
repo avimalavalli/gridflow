@@ -58,6 +58,23 @@ interface MembershipRow extends Record<string, unknown> {
   organisationSlug: string;
   organisationType: string;
   role: SessionIdentity["role"];
+  organisationAccessStatus: SessionIdentity["organisationAccessStatus"];
+  accessStatusReason: string | null;
+  productPlan: SessionIdentity["productPlan"] | null;
+  entitlementStatus: SessionIdentity["entitlementStatus"] | null;
+  researchCreditsGranted: number | null;
+  researchCreditsUsed: number | null;
+  researchCreditsUnlimited: boolean | null;
+}
+
+interface ActivationRow extends Record<string, unknown> {
+  id: string;
+  plan: "CORE" | "ULTRA";
+  status: string;
+  researchCreditsGranted: number;
+  seatLimit: number;
+  expiresAt: Date | string;
+  email: string;
 }
 
 const dummyPasswordHash = hashPassword("GridFlow timing equalisation password only");
@@ -78,12 +95,30 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterDto, request: Request, response: Response) {
-    this.assertRegistrationAllowed(input.betaCode);
+    this.assertRegistrationAllowed(input.betaCode, input.activationToken);
     const email = normaliseEmail(input.email);
     const passwordHash = await hashPassword(input.password);
     const organisationSlug = createOrganisationSlug(input.organisationName);
 
     const created = await this.database.transaction(async (tx) => {
+      let activation: ActivationRow | null = null;
+      if (apiConfig.signupMode === "ACTIVATION") {
+        const result = await tx.query<ActivationRow>(
+          `SELECT "id","email","plan"::text AS "plan","status"::text AS "status",
+                  "researchCreditsGranted","seatLimit","expiresAt"
+           FROM "ActivationGrant" WHERE "tokenHash"=$1 FOR UPDATE`,
+          [hashOpaqueToken(input.activationToken!)],
+        );
+        activation = result.rows[0] ?? null;
+        if (!activation || activation.status !== "ISSUED" || normaliseEmail(activation.email) !== email) {
+          throw new ForbiddenException("This activation link is invalid, already used or belongs to another email address.");
+        }
+        if (new Date(activation.expiresAt).getTime() <= Date.now()) {
+          await tx.query(`UPDATE "ActivationGrant" SET "status"='EXPIRED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [activation.id]);
+          throw new ForbiddenException("This GridFlow activation link has expired.");
+        }
+      }
+
       const existing = await tx.query(`SELECT 1 FROM "User" WHERE "email" = $1`, [email]);
       if (existing.rows.length > 0) {
         throw new ConflictException("An account already exists for this email address.");
@@ -100,10 +135,10 @@ export class AuthService {
       if (!userId) throw new Error("GridFlow could not create the user.");
 
       const organisationResult = await tx.query<{ id: string }>(
-        `INSERT INTO "Organisation" ("name", "slug", "type", "updatedAt")
-         VALUES ($1, $2, $3::"OrganisationType", CURRENT_TIMESTAMP)
+        `INSERT INTO "Organisation" ("name", "slug", "type", "accessStatus", "updatedAt")
+         VALUES ($1, $2, $3::"OrganisationType", $4::"OrganisationAccessStatus", CURRENT_TIMESTAMP)
          RETURNING "id"`,
-        [input.organisationName.trim(), organisationSlug, input.organisationType ?? "DRIVER"],
+        [input.organisationName.trim(), organisationSlug, input.organisationType ?? "DRIVER", activation ? "PENDING_APPROVAL" : "ACTIVE"],
       );
       const organisationId = organisationResult.rows[0]?.id;
       if (!organisationId) throw new Error("GridFlow could not create the organisation.");
@@ -114,7 +149,36 @@ export class AuthService {
         [organisationId, userId],
       );
 
-      return { userId, organisationId };
+      await tx.query(
+        `INSERT INTO "ProductEntitlement" (
+           "tenantId","plan","status","agentExecutionMode","researchCreditsGranted",
+           "researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt"
+         ) VALUES (
+           $1::uuid,$2::"ProductPlan",$3::"EntitlementStatus",$4::"AgentExecutionMode",$5,$6,$7,
+           CASE WHEN $3='ACTIVE' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           CASE WHEN $3='ACTIVE' THEN CURRENT_TIMESTAMP ELSE NULL END,CURRENT_TIMESTAMP
+         )`,
+        [
+          organisationId,
+          activation?.plan ?? "CORE",
+          activation ? "PENDING" : "ACTIVE",
+          activation?.plan === "ULTRA" || !activation ? "MANAGED" : "BYO_GEMINI",
+          activation?.researchCreditsGranted ?? 0,
+          activation ? false : true,
+          activation?.seatLimit ?? 10,
+        ],
+      );
+
+      if (activation) {
+        await tx.query(
+          `UPDATE "ActivationGrant" SET "status"='REDEEMED',"organisationId"=$2::uuid,
+             "redeemedByUserId"=$3::uuid,"redeemedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+           WHERE "id"=$1::uuid`,
+          [activation.id, organisationId, userId],
+        );
+      }
+
+      return { userId, organisationId, pendingApproval: Boolean(activation) };
     });
 
     await this.sessions.create(created.userId, created.organisationId, request, response);
@@ -317,6 +381,15 @@ export class AuthService {
       }
 
       const email = normaliseEmail(invitation.email);
+      const capacity = await tx.query<{ members: number; seatLimit: number }>(
+        `SELECT
+           (SELECT COUNT(*)::int FROM "OrganisationMembership" WHERE "organisationId"=$1::uuid) AS "members",
+           COALESCE((SELECT "seatLimit" FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid),1)::int AS "seatLimit"`,
+        [invitation.organisationId],
+      );
+      if ((capacity.rows[0]?.members ?? 0) >= (capacity.rows[0]?.seatLimit ?? 1)) {
+        throw new BadRequestException("This GridFlow organisation has reached its licensed team seat limit.");
+      }
       const userResult = await tx.query<UserRow>(
         `SELECT "id", "email", "name", "passwordHash", "status"
          FROM "User" WHERE "email" = $1`,
@@ -552,10 +625,16 @@ export class AuthService {
     );
   }
 
-  private assertRegistrationAllowed(betaCode: string | undefined): void {
+  private assertRegistrationAllowed(betaCode: string | undefined, activationToken: string | undefined): void {
     if (apiConfig.signupMode === "OPEN") return;
     if (apiConfig.signupMode === "CLOSED") {
       throw new ForbiddenException("New athlete registration is currently closed.");
+    }
+    if (apiConfig.signupMode === "ACTIVATION") {
+      if (!activationToken || activationToken.length < 20) {
+        throw new ForbiddenException("A valid GridFlow purchase activation link is required.");
+      }
+      return;
     }
     if (!betaCode || betaCode !== apiConfig.privateBetaCode) {
       throw new ForbiddenException("A valid private beta access code is required.");
@@ -570,11 +649,22 @@ export class AuthService {
            o."name" AS "organisationName",
            o."slug" AS "organisationSlug",
            o."type" AS "organisationType",
+           o."accessStatus"::text AS "organisationAccessStatus",
+           o."accessStatusReason",
+           pe."plan"::text AS "productPlan",
+           CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
+             THEN 'EXPIRED' ELSE pe."status"::text END AS "entitlementStatus",
+           pe."researchCreditsGranted",
+           pe."researchCreditsUsed",
+           pe."researchCreditsUnlimited",
            m."role"
          FROM "OrganisationMembership" m
          JOIN "Organisation" o ON o."id" = m."organisationId"
+         LEFT JOIN "ProductEntitlement" pe ON pe."tenantId"=m."organisationId"
          WHERE m."userId" = $1::uuid
-         ORDER BY m."createdAt" ASC`,
+         ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+                    AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP) THEN 0 ELSE 1 END,
+                  m."createdAt" ASC`,
         [userId],
       ),
     );
@@ -601,6 +691,7 @@ export class AuthService {
       activeOrganisation,
       organisations: memberships,
       signupMode: apiConfig.signupMode,
+      platformAdmin: apiConfig.platformAdminEmails.includes(user.email.toLowerCase()),
       security: { mfaEnabled: user.mfaEnabled },
     };
   }

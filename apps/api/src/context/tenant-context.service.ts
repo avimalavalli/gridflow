@@ -21,12 +21,24 @@ export class TenantContextService {
 
   async resolve(request: Request): Promise<RequestIdentity> {
     const session = await this.sessions.resolve(request);
-    if (session) return { ...session, developmentBootstrap: false };
+    if (session) {
+      if (session.organisationAccessStatus !== "ACTIVE" || session.entitlementStatus !== "ACTIVE") {
+        throw new ForbiddenException("This GridFlow organisation is not active. Open the access-status page for details.");
+      }
+      return { ...session, developmentBootstrap: false };
+    }
 
     if (!apiConfig.devBootstrap) {
       throw new UnauthorizedException("Authentication is required.");
     }
 
+    return this.ensureDevelopmentIdentity();
+  }
+
+  async resolveAnyAccess(request: Request): Promise<RequestIdentity> {
+    const session = await this.sessions.resolve(request);
+    if (session) return { ...session, developmentBootstrap: false };
+    if (!apiConfig.devBootstrap) throw new UnauthorizedException("Authentication is required.");
     return this.ensureDevelopmentIdentity();
   }
 
@@ -49,6 +61,10 @@ export class TenantContextService {
 
   assertOwner(identity: RequestIdentity): void {
     this.assertRole(identity, ["OWNER"], "Only the organisation owner can approve or release GridFlow.");
+  }
+
+  assertPlatformAdmin(identity: RequestIdentity): void {
+    if (!identity.platformAdmin) throw new ForbiddenException("Platform administrator access is required.");
   }
 
   private async ensureDevelopmentIdentity(): Promise<RequestIdentity> {
@@ -92,6 +108,14 @@ export class TenantContextService {
         [tenantId, userId],
       );
 
+      await tx.query(
+        `INSERT INTO "ProductEntitlement" (
+           "tenantId","plan","status","agentExecutionMode","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt"
+         ) VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',true,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+         ON CONFLICT ("tenantId") DO NOTHING`,
+        [tenantId],
+      );
+
       return {
         sessionId: "development-bootstrap",
         tenantId,
@@ -101,6 +125,10 @@ export class TenantContextService {
         userName: apiConfig.devUserName,
         organisationName: apiConfig.devOrganisationName,
         organisationSlug: apiConfig.devOrganisationSlug,
+        organisationAccessStatus: "ACTIVE",
+        productPlan: "CORE",
+        entitlementStatus: "ACTIVE",
+        platformAdmin: true,
         developmentBootstrap: true,
       };
     });

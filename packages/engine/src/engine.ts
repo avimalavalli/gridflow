@@ -22,7 +22,7 @@ import {
   preferredChannel,
   companyKey,
 } from "@gridflow/domain";
-import type { AgentModelProvider } from "@gridflow/integrations";
+import { isAgentProviderResolver, type AgentModelProvider, type AgentModelProviderResolver } from "@gridflow/integrations";
 import { errorDetails, json, runKey, saveEvidence } from "./helpers.js";
 import type {
   AgentRunListItem,
@@ -56,7 +56,7 @@ const promptByAgent = {
 export class AgentEngine {
   constructor(
     private readonly database: GridFlowDatabase,
-    private readonly provider?: AgentModelProvider,
+    private readonly provider?: AgentModelProvider | AgentModelProviderResolver,
   ) {}
 
   async enqueue(tenantId: string, userId: string, request: EnqueueAgentRequest): Promise<EnqueuedAgentRun> {
@@ -65,6 +65,7 @@ export class AgentEngine {
 
     return this.database.transaction(async (tx) => {
       await setTenantContext(tx, tenantId);
+      await this.assertActiveAccess(tx, tenantId);
       await this.assertDependency(tx, tenantId, request);
       if (request.pipelineRunId) {
         const pipeline = await tx.query<{ id: string; status: string }>(
@@ -118,6 +119,9 @@ export class AgentEngine {
       );
       const agentRunId = run.rows[0]?.id;
       if (!agentRunId) throw new Error("Agent run could not be created.");
+      if (this.isResearchAgent(request.agentName)) {
+        await this.reserveResearchCredit(tx, tenantId, agentRunId);
+      }
 
       const job = await tx.query<IdRow>(
         `INSERT INTO "AutomationJob" (
@@ -162,6 +166,7 @@ export class AgentEngine {
   async startPipeline(tenantId: string, userId: string, discoveryBriefId: string): Promise<StartedPipelineRun> {
     const pipeline = await this.database.transaction(async (tx) => {
       await setTenantContext(tx, tenantId);
+      await this.assertActiveAccess(tx, tenantId);
       const brief = await tx.query<{ id: string; active: boolean }>(
         `SELECT "id","active" FROM "DiscoveryBrief" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
         [tenantId, discoveryBriefId],
@@ -293,6 +298,7 @@ export class AgentEngine {
   async retryRun(tenantId: string, userId: string, agentRunId: string): Promise<EnqueuedAgentRun> {
     return this.database.transaction(async (tx) => {
       await setTenantContext(tx, tenantId);
+      await this.assertActiveAccess(tx, tenantId);
       const run = await tx.query<{
         id: string;
         agentName: CoreAgentName;
@@ -311,6 +317,9 @@ export class AgentEngine {
       const row = run.rows[0];
       if (!row) throw new Error("Agent run was not found.");
       if (row.status !== "FAILED") throw new Error("Only failed agent runs can be retried manually.");
+      if (this.isResearchAgent(row.agentName)) {
+        await this.reserveResearchCredit(tx, tenantId, agentRunId);
+      }
       if (row.pipelineRunId && row.discoveryBriefId) {
         const competing = await tx.query<{ id: string }>(
           `SELECT "id" FROM "PipelineRun"
@@ -455,6 +464,9 @@ export class AgentEngine {
             tenantRequeued += 1;
           } else {
             await this.applyFailureState(tx, tenant.id, job.agentRunId, job.jobName, details);
+            if (this.isResearchAgent(job.jobName)) {
+              await this.refundResearchCredit(tx, tenant.id, job.agentRunId);
+            }
             await tx.query(
               `UPDATE "AutomationJob" SET "status"='DEAD_LETTER',"errorDetails"=$2,"completedAt"=CURRENT_TIMESTAMP,
                  "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid AND "status"='RUNNING'`,
@@ -541,15 +553,30 @@ export class AgentEngine {
     const heartbeat = setInterval(() => { void this.heartbeat(job); }, 10_000);
     heartbeat.unref?.();
     try {
-      const provider = this.provider;
-      if (!provider) throw new Error("No agent model provider is configured for this worker.");
       const run = await this.loadRun(job.tenantId, job.agentRunId);
       const definition = promptByAgent[job.jobName];
+      const provider = await this.resolveProvider(job.tenantId, job.jobName, definition.webSearchAllowed);
+      if (!provider) throw new Error("No agent model provider is configured for this worker.");
       const result = await provider.generate<CoreAgentOutput>({ definition, input: run.input, idempotencyKey: run.idempotencyKey });
       const quality = assertAgentQuality(job.jobName, result.output);
       await this.database.transaction(async (tx) => {
         await setTenantContext(tx, job.tenantId);
+        const access = await tx.query<{ active: boolean }>(
+          `SELECT (o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+                   AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP)) AS "active"
+           FROM "Organisation" o JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
+           WHERE o."id"=$1::uuid FOR SHARE OF o,pe`,
+          [job.tenantId],
+        );
+        if (!access.rows[0]?.active) throw new Error("Organisation access stopped while this agent was running.");
         const outreachRecordId = await this.applyOutput(tx, job.tenantId, job.agentRunId, job.jobName, run, result.output, result.model);
+        if (this.isResearchAgent(job.jobName)) {
+          await tx.query(
+            `UPDATE "ResearchCreditReservation" SET "status"='CONSUMED',"consumedAt"=CURRENT_TIMESTAMP
+             WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid AND "status"='RESERVED'`,
+            [job.tenantId, job.agentRunId],
+          );
+        }
         await tx.query(
           `UPDATE "AgentRun" SET "status"='SUCCEEDED', "output"=$2::jsonb, "modelUsed"=$3,
              "inputTokens"=$4,"outputTokens"=$5,"totalTokens"=$6,"estimatedCostUsd"=$7,
@@ -618,6 +645,9 @@ export class AgentEngine {
             [job.tenantId, job.id, failure.details],
           );
         } else {
+          if (this.isResearchAgent(job.jobName)) {
+            await this.refundResearchCredit(tx, job.tenantId, job.agentRunId);
+          }
           await tx.query(
             `UPDATE "AgentRun" SET "status"='FAILED',"errorCode"=$2,"errorDetails"=$3,"retryCount"=$4,
                "completedAt"=CURRENT_TIMESTAMP,"heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
@@ -648,6 +678,87 @@ export class AgentEngine {
       await tx.query(`UPDATE "AgentRun" SET "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid AND "status"='RUNNING'`, [job.agentRunId]);
       await tx.query(`UPDATE "AutomationJob" SET "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid AND "status"='RUNNING'`, [job.id]);
     }).catch(() => undefined);
+  }
+
+  private async resolveProvider(tenantId: string, agentName: CoreAgentName, webSearchRequired: boolean): Promise<AgentModelProvider | null> {
+    if (!this.provider) return null;
+    if (isAgentProviderResolver(this.provider)) {
+      return this.provider.resolve({ tenantId, agentName, webSearchRequired });
+    }
+    return this.provider;
+  }
+
+  private isResearchAgent(agentName: CoreAgentName): boolean {
+    return agentName === "ATLAS" || agentName === "SAGE" || agentName === "RELAY";
+  }
+
+  private async assertActiveAccess(tx: SqlExecutor, tenantId: string): Promise<void> {
+    const access = await tx.query<{ active: boolean }>(
+      `SELECT (o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+               AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP)) AS "active"
+       FROM "Organisation" o
+       JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
+       WHERE o."id"=$1::uuid`,
+      [tenantId],
+    );
+    if (!access.rows[0]?.active) {
+      throw new Error("This GridFlow organisation is not approved for agent execution.");
+    }
+  }
+
+  private async reserveResearchCredit(tx: SqlExecutor, tenantId: string, agentRunId: string): Promise<void> {
+    const reservation = await tx.query<{ status: string }>(
+      `SELECT "status"::text AS "status" FROM "ResearchCreditReservation"
+       WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid FOR UPDATE`,
+      [tenantId, agentRunId],
+    );
+    const current = reservation.rows[0]?.status;
+    if (current === "RESERVED" || current === "CONSUMED") return;
+    const entitlement = await tx.query(
+      `UPDATE "ProductEntitlement" SET
+         "researchCreditsUsed"=CASE WHEN "researchCreditsUnlimited" THEN "researchCreditsUsed" ELSE "researchCreditsUsed"+1 END,
+         "updatedAt"=CURRENT_TIMESTAMP
+       WHERE "tenantId"=$1::uuid AND "status"='ACTIVE'
+         AND ("researchCreditsUnlimited" OR "researchCreditsUsed"<"researchCreditsGranted")`,
+      [tenantId],
+    );
+    if (entitlement.rowCount !== 1) {
+      throw new Error("No research credits remain. Add a one-off research credit pack before running Atlas, Sage or Relay.");
+    }
+    if (current === "REFUNDED") {
+      await tx.query(
+        `UPDATE "ResearchCreditReservation" SET "status"='RESERVED',"reservedAt"=CURRENT_TIMESTAMP,
+           "consumedAt"=NULL,"refundedAt"=NULL WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid`,
+        [tenantId, agentRunId],
+      );
+    } else {
+      await tx.query(
+        `INSERT INTO "ResearchCreditReservation" ("tenantId","agentRunId","amount","status")
+         VALUES ($1::uuid,$2::uuid,1,'RESERVED')`,
+        [tenantId, agentRunId],
+      );
+    }
+  }
+
+  private async refundResearchCredit(tx: SqlExecutor, tenantId: string, agentRunId: string): Promise<void> {
+    const reservation = await tx.query<{ amount: number }>(
+      `SELECT "amount" FROM "ResearchCreditReservation"
+       WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid AND "status"='RESERVED' FOR UPDATE`,
+      [tenantId, agentRunId],
+    );
+    const amount = reservation.rows[0]?.amount;
+    if (!amount) return;
+    await tx.query(
+      `UPDATE "ProductEntitlement" SET
+         "researchCreditsUsed"=CASE WHEN "researchCreditsUnlimited" THEN "researchCreditsUsed" ELSE GREATEST(0,"researchCreditsUsed"-$2) END,
+         "updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid`,
+      [tenantId, amount],
+    );
+    await tx.query(
+      `UPDATE "ResearchCreditReservation" SET "status"='REFUNDED',"refundedAt"=CURRENT_TIMESTAMP
+       WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid AND "status"='RESERVED'`,
+      [tenantId, agentRunId],
+    );
   }
 
   private async advancePipeline(

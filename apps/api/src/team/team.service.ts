@@ -54,7 +54,11 @@ export class TeamService {
          ORDER BY "createdAt" DESC`,
         [identity.tenantId],
       );
-      return { members: members.rows, invitations: invitations.rows };
+      const entitlement = await tx.query<{ plan: string; seatLimit: number }>(
+        `SELECT "plan"::text AS "plan","seatLimit" FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid`,
+        [identity.tenantId],
+      );
+      return { members: members.rows, invitations: invitations.rows, entitlement: entitlement.rows[0] ?? { plan: "CORE", seatLimit: 1 } };
     });
 
     return {
@@ -77,6 +81,16 @@ export class TeamService {
     const expiresAt = new Date(Date.now() + apiConfig.invitationDays * 24 * 60 * 60 * 1000);
 
     const invitation = await this.database.transaction(async (tx) => {
+      const capacity = await tx.query<{ used: number; seatLimit: number }>(
+        `SELECT
+           ((SELECT COUNT(*) FROM "OrganisationMembership" WHERE "organisationId"=$1::uuid)
+             +(SELECT COUNT(*) FROM "OrganisationInvitation" WHERE "organisationId"=$1::uuid AND "status"='PENDING' AND "email"<>$2))::int AS "used",
+           COALESCE((SELECT "seatLimit" FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid),1)::int AS "seatLimit"`,
+        [identity.tenantId, email],
+      );
+      if ((capacity.rows[0]?.used ?? 0) >= (capacity.rows[0]?.seatLimit ?? 1)) {
+        throw new ConflictException("This GridFlow licence has reached its team seat limit.");
+      }
       const existingMember = await tx.query(
         `SELECT 1
          FROM "OrganisationMembership" m

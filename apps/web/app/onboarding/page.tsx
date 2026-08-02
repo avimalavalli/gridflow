@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, ExternalLink, KeyRound } from "lucide-react";
 import {
   recommendDiscoveryBriefs,
   type AthleteProfileInput,
@@ -64,6 +65,22 @@ export default function OnboardingPage() {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [savedRecommendations, setSavedRecommendations] = useState<DiscoveryBriefRecommendation[]>([]);
+  const [aiSetup, setAiSetup] = useState<"loading" | "required" | "connected" | "managed" | "error">("loading");
+  const [geminiKey, setGeminiKey] = useState("");
+  const [acceptedGeminiTerms, setAcceptedGeminiTerms] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/backend/ai-settings", { credentials: "include" })
+      .then(async (response) => {
+        const body = await response.json() as { gemini?: { connected?: boolean }; entitlement?: { requiresGemini?: boolean }; message?: string };
+        if (!response.ok) throw new Error(body.message ?? "AI setup could not be loaded.");
+        if (!active) return;
+        setAiSetup(body.gemini?.connected ? "connected" : body.entitlement?.requiresGemini ? "required" : "managed");
+      })
+      .catch(() => { if (active) setAiSetup("error"); });
+    return () => { active = false; };
+  }, []);
 
   const recommendations = useMemo(
     () => (profile.name.trim() ? recommendDiscoveryBriefs(profile) : []),
@@ -76,6 +93,27 @@ export default function OnboardingPage() {
     setMessage("");
 
     try {
+      if (aiSetup === "loading" || aiSetup === "error") {
+        throw new Error("GridFlow could not confirm your AI setup. Refresh the page and try again.");
+      }
+      if (aiSetup === "required") {
+        if (geminiKey.trim().length < 20 || !acceptedGeminiTerms) {
+          throw new Error("Connect your free Gemini key and accept the free-tier data notice before finishing onboarding.");
+        }
+        const aiResponse = await fetch("/backend/ai-settings/gemini", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ apiKey: geminiKey, acceptFreeTierDataTerms: acceptedGeminiTerms }),
+        });
+        const aiBody = await aiResponse.json() as { message?: string | string[] };
+        if (!aiResponse.ok) {
+          throw new Error(Array.isArray(aiBody.message) ? aiBody.message.join(" ") : aiBody.message ?? "GridFlow could not verify the Gemini key.");
+        }
+        setGeminiKey("");
+        setAcceptedGeminiTerms(false);
+        setAiSetup("connected");
+      }
       const response = await fetch("/backend/onboarding/complete", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -156,6 +194,25 @@ export default function OnboardingPage() {
             <div className="field"><label>Daily email cap</label><input type="number" min={0} value={profile.dailyEmailLimit} onChange={(e) => setProfile({ ...profile, dailyEmailLimit: Number(e.target.value) })} /><small>0 means the user has not set a GridFlow cap.</small></div>
             <div className="field"><label>Timezone</label><input value={profile.timezone} onChange={(e) => setProfile({ ...profile, timezone: e.target.value })} /></div>
             <div className="field"><label>Outreach tone</label><input value={profile.tone} onChange={(e) => setProfile({ ...profile, tone: e.target.value })} /></div>
+          </div>
+
+          <div className="section-title section-gap">
+            <span>04</span>
+            <div><h2>AI connection</h2><p>Core uses your free Gemini key for drafting and reply intelligence. Evidence research remains managed by GridFlow.</p></div>
+          </div>
+          <div className="form-grid">
+            {aiSetup === "loading" ? <div className="field full notice">Checking your GridFlow plan and AI connection…</div> : null}
+            {aiSetup === "error" ? <div className="field full notice notice-error">AI setup could not be loaded. Refresh this page before saving onboarding.</div> : null}
+            {aiSetup === "managed" ? <div className="field full notice notice-success"><CheckCircle2 size={15}/> Managed AI is included for this organisation. You do not need to add a key.</div> : null}
+            {aiSetup === "connected" ? <div className="field full notice notice-success"><CheckCircle2 size={15}/> Gemini is connected and encrypted. You can rotate or delete it later in AI Setup.</div> : null}
+            {aiSetup === "required" ? <>
+              <div className="field full gemini-onboarding-guide">
+                <div><KeyRound size={18}/><strong>Create your free key</strong><p>Open Google AI Studio, sign in, choose Create API key, then copy it once. Never send the key by email or support chat.</p></div>
+                <a className="button button-secondary" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Open Google AI Studio <ExternalLink size={13}/></a>
+              </div>
+              <div className="field full"><label>Gemini API key</label><input type="password" autoComplete="off" value={geminiKey} onChange={(event)=>setGeminiKey(event.target.value)} placeholder="Paste the key from Google AI Studio"/><small>GridFlow verifies it server-side, encrypts it with AES-256-GCM and never displays it again.</small></div>
+              <label className="field full checkbox-row"><input type="checkbox" checked={acceptedGeminiTerms} onChange={(event)=>setAcceptedGeminiTerms(event.target.checked)}/><span>I understand that Google’s free tier may process prompts under its free-tier data terms. I will not put confidential contracts or payment information into AI prompts.</span></label>
+            </> : null}
             <div className="field full action-row"><button disabled={status === "saving"} className="button button-primary button-large" type="submit">{status === "saving" ? "Saving GridFlow profile..." : "Save profile and build my strategy"}</button></div>
             {message ? <div className={`field full notice ${status === "error" ? "notice-error" : "notice-success"}`}>{message}</div> : null}
           </div>

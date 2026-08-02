@@ -22,6 +22,7 @@ import {
   VerifyMfaSetupDto,
 } from "./auth.dto.js";
 import { AuthService } from "./auth.service.js";
+import { apiConfig } from "../config.js";
 
 @Controller("auth")
 export class AuthController {
@@ -29,6 +30,11 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly context: TenantContextService,
   ) {}
+
+  @Get("registration")
+  registration() {
+    return { signupMode: apiConfig.signupMode };
+  }
 
   @Post("register")
   async register(
@@ -107,7 +113,7 @@ export class AuthController {
 
   @Get("me")
   async me(@Req() request: Request) {
-    const identity = await this.context.resolve(request);
+    const identity = await this.context.resolveAnyAccess(request);
     return this.auth.me(identity);
   }
 

@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Milestone 9 live-acceptance codebase: a database-backed, multi-organisation product with a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, controlled outreach operations, human AI-quality acceptance, account security and release operations and a hard Launch Control gate.
+This repository contains the Phase 4A product-access codebase: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, controlled outreach operations, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -15,6 +15,9 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 ## Main capabilities
 
 - Registration, secure sessions, password recovery, lockout and authenticator MFA.
+- Email-bound, expiring, one-use purchase activations with private owner approval, suspension and revocation.
+- One-time-fee GridFlow Core entitlements and renewable 30-day GridFlow Ultra managed-service terms.
+- Encrypted customer Gemini keys for non-web agents; managed credits for evidence-first Atlas, Sage and Relay research.
 - Separate athlete/team organisations, roles, invitations and organisation switching.
 - Personalised commercial profiles, markets, outreach policies and Discovery Briefs.
 - Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings.

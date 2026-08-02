@@ -20,6 +20,7 @@ type DefaultCheck = {
 const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "database_health", category: "INFRASTRUCTURE", title: "Database health", description: "The primary database accepts queries and the release schema is available.", required: true, automated: true },
   { key: "production_security", category: "SECURITY", title: "Production authentication security", description: "Development bootstrap is disabled, secure cookies are enabled and encryption keys meet minimum length.", required: true, automated: true },
+  { key: "product_access_configuration", category: "SECURITY", title: "Paid activation control", description: "Production registration requires one-time activations, a platform administrator is allowlisted and customer AI keys can be encrypted.", required: true, automated: true },
   { key: "release_metadata", category: "INFRASTRUCTURE", title: "Release metadata", description: "The release version and source commit are recorded in the running environment.", required: true, automated: true },
   { key: "build_validation", category: "QA", title: "Production build validation", description: "API, worker and web production builds have passed for this exact commit.", required: true, automated: true },
   { key: "ci_validation", category: "QA", title: "Continuous integration", description: "The full release CI workflow has passed for this exact commit.", required: true, automated: true },
@@ -345,6 +346,11 @@ export class ReleaseAcceptanceService {
       production_security: productionSecurity
         ? { status: "PASS", detail: apiConfig.nodeEnv === "production" ? "Production authentication controls are enabled." : "Development environment; production controls will be enforced by preflight." }
         : { status: "BLOCKED", detail: "Disable development bootstrap, enable secure cookies and provide a strong AUTH_ENCRYPTION_KEY." },
+      product_access_configuration: apiConfig.nodeEnv !== "production" || (
+        apiConfig.signupMode === "ACTIVATION" && apiConfig.platformAdminEmails.length > 0 && configured(process.env.INTEGRATION_ENCRYPTION_KEY)
+      )
+        ? { status: "PASS", detail: apiConfig.nodeEnv === "production" ? "Activation-only signup, platform administration and encrypted customer credentials are configured." : "Development environment; paid access controls are checked in production." }
+        : { status: "BLOCKED", detail: "Set AUTH_SIGNUP_MODE=ACTIVATION, PLATFORM_ADMIN_EMAILS and INTEGRATION_ENCRYPTION_KEY in production." },
       release_metadata: releaseMetadataConfigured()
         ? { status: "PASS", detail: `Release ${currentReleaseVersion()} at commit ${currentReleaseCommit()?.slice(0, 12)}.` }
         : { status: "BLOCKED", detail: "GRIDFLOW_RELEASE and a deployed commit identifier are required." },

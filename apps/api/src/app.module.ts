@@ -24,6 +24,8 @@ import { PipelinesModule } from "./pipelines/pipelines.module.js";
 import { PulseModule } from "./pulse/pulse.module.js";
 import { SentinelModule } from "./sentinel/sentinel.module.js";
 import { NovaModule } from "./nova/nova.module.js";
+import { PlatformModule } from "./platform/platform.module.js";
+import { AiSettingsModule } from "./ai-settings/ai-settings.module.js";
 
 @Module({
   imports: [
@@ -52,6 +54,8 @@ import { NovaModule } from "./nova/nova.module.js";
     PulseModule,
     SentinelModule,
     NovaModule,
+    PlatformModule,
+    AiSettingsModule,
   ],
 })
 export class AppModule {}

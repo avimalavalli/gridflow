@@ -41,8 +41,8 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 DATABASE_SSL=false
 DATABASE_POOL_MAX=10
 GRIDFLOW_DEV_BOOTSTRAP=false
-AUTH_SIGNUP_MODE=CODE
-AUTH_PRIVATE_BETA_CODE=<strong-random-value-at-least-12-characters>
+AUTH_SIGNUP_MODE=ACTIVATION
+PLATFORM_ADMIN_EMAILS=<comma-separated-owner-account-emails>
 AUTH_SESSION_COOKIE_NAME=gridflow_session
 AUTH_SECURE_COOKIES=true
 TRUST_PROXY=true
@@ -52,7 +52,7 @@ AUTH_FROM_EMAIL=GridFlow <no-reply@your-verified-domain>
 RESEND_API_KEY=<secret>
 ```
 
-Add the OpenAI, Google OAuth, integration encryption, release, alerting and backup variables from `.env.example` before enabling those modules. Use the private PostgreSQL reference from the PostgreSQL service in the same Railway environment. Railway private database traffic does not require application-level SSL, so `DATABASE_SSL=false` avoids a TLS mismatch on the internal address.
+Add the OpenAI, Google OAuth, integration encryption, release, alerting and backup variables from `.env.example` before enabling those modules. `INTEGRATION_ENCRYPTION_KEY` is mandatory for customer Gemini keys and must be identical on the API and worker. Use the private PostgreSQL reference from the PostgreSQL service in the same Railway environment. Railway private database traffic does not require application-level SSL, so `DATABASE_SSL=false` avoids a TLS mismatch on the internal address.
 
 ## Required worker variables
 
@@ -70,6 +70,7 @@ AUTH_FROM_EMAIL=GridFlow <no-reply@your-verified-domain>
 RESEND_API_KEY=<same-value-as-api>
 OPENAI_API_KEY=<secret>
 OPENAI_AGENT_MODEL=<approved-model>
+GEMINI_AGENT_MODEL=gemini-3.5-flash-lite
 OPENAI_TIMEOUT_MS=900000
 GOOGLE_OAUTH_CLIENT_ID=<secret>
 GOOGLE_OAUTH_CLIENT_SECRET=<secret>
@@ -85,6 +86,8 @@ GOOGLE_OAUTH_REDIRECT_URI=https://<api-public-domain>/api/v1/integrations/gmail/
 5. Deploy the web service and open `/login`.
 6. Confirm Railway marks the web deployment healthy using `/backend/health/live`, which verifies both the web runtime and its API connection.
 7. From the public web domain, request `/backend/health/ready`. It must return the API readiness JSON, not an HTML `502` page.
-8. Register or sign in with the private-beta account and confirm `/backend/auth/me` returns the active organisation.
+8. Sign in with the allowlisted owner account and confirm **Platform Admin** appears.
+9. Create an activation for a controlled test email, register once, confirm it stays locked, then approve it in Platform Admin.
+10. Confirm Core onboarding requires and verifies the customer's own Gemini key, while Atlas/Sage/Relay use managed research credits.
 
 The web service is the only service that needs to be public for normal app use. Give the API a temporary Railway domain only when configuring or accepting Google OAuth; normal web-to-API traffic stays on Railway's private network.

@@ -32,8 +32,8 @@ At minimum, production requires:
 ```bash
 NODE_ENV=production
 GRIDFLOW_DEV_BOOTSTRAP=false
-AUTH_SIGNUP_MODE=CODE
-AUTH_PRIVATE_BETA_CODE=<strong random value>
+AUTH_SIGNUP_MODE=ACTIVATION
+PLATFORM_ADMIN_EMAILS=<comma-separated owner account emails>
 AUTH_SECURE_COOKIES=true
 TRUST_PROXY=true
 WEB_ORIGIN=https://app.example.com
@@ -46,6 +46,7 @@ AUTH_FROM_EMAIL=GridFlow <no-reply@example.com>
 RESEND_API_KEY=<secret>
 OPENAI_API_KEY=<secret>
 OPENAI_AGENT_MODEL=<approved model>
+GEMINI_AGENT_MODEL=gemini-3.5-flash-lite
 GOOGLE_OAUTH_CLIENT_ID=<secret>
 GOOGLE_OAUTH_CLIENT_SECRET=<secret>
 GOOGLE_OAUTH_REDIRECT_URI=https://api.example.com/api/v1/integrations/gmail/callback

@@ -8,6 +8,7 @@ interface LoginResponse {
   mfaRequired?: boolean;
   challengeToken?: string;
   message?: string | string[];
+  activeOrganisation?: { organisationAccessStatus?: string; entitlementStatus?: string };
 }
 
 async function responseBody(response: Response): Promise<LoginResponse> {
@@ -47,7 +48,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
         setPassword("");
         return;
       }
-      router.push("/");
+      router.push(body.activeOrganisation?.organisationAccessStatus === "ACTIVE" && body.activeOrganisation?.entitlementStatus === "ACTIVE" ? "/" : "/pending-approval");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "GridFlow could not sign you in.");
@@ -69,7 +70,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
       });
       const body = await responseBody(response);
       if (!response.ok) throw new Error(Array.isArray(body.message) ? body.message.join(" ") : body.message ?? "Verification failed.");
-      router.push("/");
+      router.push(body.activeOrganisation?.organisationAccessStatus === "ACTIVE" && body.activeOrganisation?.entitlementStatus === "ACTIVE" ? "/" : "/pending-approval");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "GridFlow could not verify the code.");

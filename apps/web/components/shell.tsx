@@ -26,13 +26,15 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  KeyRound,
+  LockKeyhole,
   TimerReset,
   UsersRound,
   X,
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 
-type NavigationItem = { label: string; href: string; icon: LucideIcon; keywords: string; roles?: readonly string[] };
+type NavigationItem = { label: string; href: string; icon: LucideIcon; keywords: string; roles?: readonly string[]; platformAdminOnly?: boolean };
 
 const navigation: readonly { label: string; items: readonly NavigationItem[] }[] = [
   {
@@ -68,9 +70,11 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
     items: [
       { label: "Team & Access", href: "/team", icon: UsersRound, keywords: "members roles organisations invites" },
       { label: "Settings", href: "/settings", icon: Settings, keywords: "profile strategy preferences policy" },
+      { label: "AI Setup", href: "/settings/ai", icon: KeyRound, keywords: "gemini api key provider credits artificial intelligence" },
       { label: "Migration", href: "/migration", icon: DatabaseZap, keywords: "airtable import data" },
       { label: "Operations", href: "/operations", icon: Activity, keywords: "release health monitoring quality failures readiness", roles: ["OWNER", "ADMIN"] },
       { label: "Launch Control", href: "/launch", icon: Rocket, keywords: "release acceptance launch checklist production approval", roles: ["OWNER", "ADMIN"] },
+      { label: "Platform Admin", href: "/platform", icon: LockKeyhole, keywords: "customer activation approval core ultra licences", platformAdminOnly: true },
     ],
   },
 ] as const;
@@ -78,6 +82,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
 type AuthSummary = {
   user: { name: string; email: string };
   activeOrganisation: { organisationName: string; organisationType: string; role: string };
+  platformAdmin?: boolean;
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -132,9 +137,11 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
   const visibleNavigation = useMemo(() => {
     const role = auth?.activeOrganisation.role;
     return navigation
-      .map((section) => ({ ...section, items: section.items.filter((item) => !item.roles || (role ? item.roles.includes(role) : false)) }))
+      .map((section) => ({ ...section, items: section.items.filter((item) =>
+        (!item.roles || (role ? item.roles.includes(role) : false)) && (!item.platformAdminOnly || auth?.platformAdmin === true),
+      ) }))
       .filter((section) => section.items.length > 0);
-  }, [auth?.activeOrganisation.role]);
+  }, [auth?.activeOrganisation.role, auth?.platformAdmin]);
 
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();

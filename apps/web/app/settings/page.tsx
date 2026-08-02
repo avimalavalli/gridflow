@@ -44,7 +44,7 @@ export default async function SettingsPage() {
 
   return (
     <Shell title="Settings">
-      <PageHead title="Commercial controls" description="Athlete strategy, outreach policy and connected delivery accounts for this organisation." action={<a className="button button-primary" href="/onboarding">Edit onboarding</a>} />
+      <PageHead title="Commercial controls" description="Athlete strategy, outreach policy and connected delivery accounts for this organisation." action={<div className="channel-actions"><a className="button button-secondary" href="/settings/ai">AI setup</a><a className="button button-primary" href="/onboarding">Edit onboarding</a></div>} />
       {error ? <DataUnavailable message={error} /> : (
         <div className="stack">
           {!data?.profile ? <section className="card"><div className="empty">Complete onboarding to create the athlete profile and policy.</div></section> : (

@@ -1,4 +1,4 @@
-# GridFlow implementation status — Milestone 9
+# GridFlow implementation status — Phase 4A
 
 ## Built and verified
 
@@ -14,13 +14,16 @@
 - **Launch Control** with automated release gates, manual live-acceptance evidence, owner approval, approval revocation when conditions change and final release recording.
 - CI evidence, production preflight, schema checks and deterministic agent-quality regression fixtures.
 - Route loading, error recovery and not-found product states.
+- Paid, email-bound one-time activations with platform-owner approval and immediate access suspension/revocation.
+- Core one-time entitlements, renewable Ultra terms, seat limits and atomic managed-research credits.
+- Encrypted tenant Gemini keys, onboarding guidance and per-capability Gemini/managed-provider routing.
 
 ## Validation result
 
-- 45 automated tests passed across 18 files.
+- 81 automated tests passed across 33 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 48 models and 6 registered migrations.
-- TypeScript, ESLint, API build, worker build and Next.js production build passed.
+- Database schema check passed: 54 models and 11 registered migrations.
+- TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 
 The dependency audit endpoint returned HTTP 502. No dependency was added; a fresh successful audit remains required before public release.

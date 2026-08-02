@@ -9,6 +9,7 @@ import { AuthEmailProcessor } from "./auth-email.js";
 import { PulseProcessor } from "./pulse.js";
 import { SentinelProcessor } from "./sentinel.js";
 import { NovaProcessor } from "./nova.js";
+import { TenantAgentProviderResolver } from "./tenant-agent-provider.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
@@ -38,18 +39,19 @@ if (initialPulse.stopped || initialPulse.emailPlanned || initialPulse.linkedinPl
   logWorkerEvent({ event: "pulse-reconciled", level: "info", details: initialPulse });
 }
 
-const provider = process.env.OPENAI_API_KEY ? new OpenAIAgentProvider() : null;
-const engine = provider ? new AgentEngine(database, provider) : null;
+const managedProvider = process.env.OPENAI_API_KEY ? new OpenAIAgentProvider() : null;
+const provider = new TenantAgentProviderResolver(database, managedProvider);
+const engine = new AgentEngine(database, provider);
 const sentinel = new SentinelProcessor(database, provider);
 const recoveredSentinel = await sentinel.recoverStale(Number(process.env.SENTINEL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredSentinel) logWorkerEvent({ event: "stale-sentinel-replies-recovered", level: "warning", details: { count: recoveredSentinel } });
 const nova = new NovaProcessor(database, provider);
 const recoveredNova = await nova.recoverStale(Number(process.env.NOVA_STALE_AFTER_MINUTES ?? 10));
 if (recoveredNova) logWorkerEvent({ event: "stale-nova-strategies-recovered", level: "warning", details: { count: recoveredNova } });
-logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: provider?.name ?? null, agentProcessingEnabled: Boolean(provider), emailAutomationEnabled: true } });
+logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: "tenant-routed", managedResearchProvider: managedProvider?.name ?? null, agentProcessingEnabled: true, emailAutomationEnabled: true } });
 const healthServer = once ? null : await startWorkerHealthServer({
   port: Math.max(1, Number(process.env.PORT ?? 3_002)),
-  agentProvider: provider?.name ?? null,
+  agentProvider: "tenant-routed",
 });
 
 const runOnce = async (): Promise<boolean> => {
@@ -86,7 +88,6 @@ const runOnce = async (): Promise<boolean> => {
     logWorkerEvent({ event: "email-action-processed", level: "info", details: email as unknown as Record<string, unknown> });
     return true;
   }
-  if (!engine) return false;
   const result = await engine.processNext();
   if (result.processed) {
     logWorkerEvent({ event: "agent-job-processed", level: result.status === "DEAD_LETTER" ? "error" : result.error ? "warning" : "info", details: result as unknown as Record<string, unknown> });
@@ -113,7 +114,7 @@ if (once) {
   let lastRecoveryAt = Date.now();
   while (!stopping) {
     if (Date.now() - lastRecoveryAt >= 60_000) {
-      if (engine) {
+      {
         const recovered = await engine.recoverStaleJobs(Number(process.env.AGENT_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
           reportWorkerError("stale-agent-job-recovery-failed", error);
           return { requeued: 0, deadLettered: 0 };

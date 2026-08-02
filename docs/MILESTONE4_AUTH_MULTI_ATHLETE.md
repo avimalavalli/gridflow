@@ -21,6 +21,7 @@ This milestone turns GridFlow from a private development identity into an accoun
 
 - `OPEN`: users can create a new athlete/team organisation;
 - `CODE`: a private-beta code is required;
+- `ACTIVATION`: an email-bound one-time purchase activation is required and the new organisation stays locked for platform-owner approval;
 - `CLOSED`: no new organisations may register.
 
 Production defaults to `CODE` and refuses to start without a sufficiently strong beta code.

@@ -89,6 +89,7 @@ describe("GridFlow core agent engine", () => {
       const userId = user.rows[0]!.id; const tenantId = org.rows[0]!.id;
       await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
       await setTenantContext(tx, tenantId);
+      await tx.query(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',true,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, [tenantId]);
       await tx.query(`INSERT INTO "DriverProfile" ("tenantId","athleteName","sport","countryOfResidence","currentProgramme","futureGoals","onboardingStatus","updatedAt") VALUES ($1::uuid,'Test Athlete','GT racing','United Kingdom','UK GT programme','European endurance racing','COMPLETED',CURRENT_TIMESTAMP)`, [tenantId]);
       await tx.query(`INSERT INTO "OutreachPolicy" ("tenantId","strategy","emailAutomationMode","approvalMode","updatedAt") VALUES ($1::uuid,'PARALLEL','FULL_AUTOMATION','NONE',CURRENT_TIMESTAMP)`, [tenantId]);
       await tx.query(`INSERT INTO "DiscoveryPreference" ("tenantId","preferredIndustries","excludedIndustries","updatedAt") VALUES ($1::uuid,'["Engineering"]'::jsonb,'[]'::jsonb,CURRENT_TIMESTAMP)`, [tenantId]);
@@ -188,6 +189,7 @@ describe("GridFlow core agent engine", () => {
       const userId = user.rows[0]!.id; const tenantId = org.rows[0]!.id;
       await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
       await setTenantContext(tx, tenantId);
+      await tx.query(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsGranted","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',1,false,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, [tenantId]);
       await tx.query(`INSERT INTO "DriverProfile" ("tenantId","athleteName","sport","countryOfResidence","currentProgramme","futureGoals","onboardingStatus","updatedAt") VALUES ($1::uuid,'Stale Athlete','GT racing','United Kingdom','UK GT programme','European endurance racing','COMPLETED',CURRENT_TIMESTAMP)`, [tenantId]);
       const brief = await tx.query<{ id: string }>(`INSERT INTO "DiscoveryBrief" ("tenantId","briefName","active","region","industryFocus","searchTheme","companiesPerRun","updatedAt") VALUES ($1::uuid,'UK Engineering','true','United Kingdom','Engineering','Find realistic UK engineering SMEs.',5,CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId]);
       return { tenantId, userId, briefId: brief.rows[0]!.id };
@@ -220,6 +222,16 @@ describe("GridFlow core agent engine", () => {
       return (await tx.query<{ runStatus: string; jobStatus: string }>(`SELECT r."status"::text AS "runStatus",j."status"::text AS "jobStatus" FROM "AgentRun" r JOIN "AutomationJob" j ON j."agentRunId"=r."id" WHERE r."id"=$1::uuid`, [run.id])).rows[0]!;
     });
     expect(states).toEqual({ runStatus: "FAILED", jobStatus: "DEAD_LETTER" });
+    const refunded = await database.transaction(async (tx) => {
+      await setTenantContext(tx, identity.tenantId);
+      return (await tx.query<{ used: number; reservationStatus: string }>(
+        `SELECT pe."researchCreditsUsed" AS "used",r."status"::text AS "reservationStatus"
+         FROM "ProductEntitlement" pe JOIN "ResearchCreditReservation" r ON r."tenantId"=pe."tenantId"
+         WHERE pe."tenantId"=$1::uuid AND r."agentRunId"=$2::uuid`,
+        [identity.tenantId, run.id],
+      )).rows[0]!;
+    });
+    expect(refunded).toEqual({ used: 0, reservationStatus: "REFUNDED" });
 
     const retried = await engine.retryRun(identity.tenantId, identity.userId, run.id);
     expect(retried).toMatchObject({ id: run.id, status: "QUEUED", reused: true });
@@ -231,15 +243,21 @@ describe("GridFlow core agent engine", () => {
         jobStatus: string;
         outboxStatus: string;
         auditAction: string;
+        creditsUsed: number;
+        reservationStatus: string;
       }>(
         `SELECT
            r."status"::text AS "runStatus",
            j."status"::text AS "jobStatus",
            o."status"::text AS "outboxStatus",
-           a."action"::text AS "auditAction"
+           a."action"::text AS "auditAction",
+           pe."researchCreditsUsed" AS "creditsUsed",
+           cr."status"::text AS "reservationStatus"
          FROM "AgentRun" r
          JOIN "AutomationJob" j ON j."agentRunId"=r."id"
          JOIN "JobOutbox" o ON o."tenantId"=r."tenantId" AND o."idempotencyKey"=r."idempotencyKey"
+         JOIN "ProductEntitlement" pe ON pe."tenantId"=r."tenantId"
+         JOIN "ResearchCreditReservation" cr ON cr."agentRunId"=r."id"
          JOIN "AuditLog" a ON a."tenantId"=r."tenantId" AND a."entityType"='AgentRun'
            AND a."entityId"=r."id"::text AND a."newValues"->>'retry'='true'
          WHERE r."id"=$1::uuid`,
@@ -251,6 +269,8 @@ describe("GridFlow core agent engine", () => {
       jobStatus: "QUEUED",
       outboxStatus: "QUEUED",
       auditAction: "AUTOMATION_RUN",
+      creditsUsed: 1,
+      reservationStatus: "RESERVED",
     });
   });
 

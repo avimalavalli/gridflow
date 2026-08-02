@@ -1,6 +1,6 @@
 import { sentinelPrompt, type SentinelOutput } from "@gridflow/agents";
 import { setTenantContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
-import type { AgentModelProvider } from "@gridflow/integrations";
+import { isAgentProviderResolver, type AgentModelProvider, type AgentModelProviderResolver } from "@gridflow/integrations";
 
 interface SentinelCandidate extends Record<string, unknown> {
   id: string;
@@ -66,7 +66,7 @@ function validateSafety(output: SentinelOutput): SentinelOutput {
 export class SentinelProcessor {
   constructor(
     private readonly database: GridFlowDatabase,
-    private readonly provider: AgentModelProvider | null,
+    private readonly provider: AgentModelProvider | AgentModelProviderResolver | null,
   ) {}
 
   async recoverStale(minutes = 10): Promise<number> {
@@ -108,7 +108,9 @@ export class SentinelProcessor {
     };
 
     try {
-      const result = await this.provider.generate<SentinelOutput>({
+      const provider = await this.resolveProvider(candidate.tenantId);
+      if (!provider) throw new Error("No agent model provider is configured for Sentinel.");
+      const result = await provider.generate<SentinelOutput>({
         definition: sentinelPrompt,
         input,
         idempotencyKey: candidate.idempotencyKey,
@@ -116,6 +118,14 @@ export class SentinelProcessor {
       const output = validateSafety(result.output);
       await this.database.transaction(async (tx) => {
         await setTenantContext(tx, candidate.tenantId);
+        const access = await tx.query<{ active: boolean }>(
+          `SELECT (o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+                   AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP)) AS "active"
+           FROM "Organisation" o JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
+           WHERE o."id"=$1::uuid FOR SHARE OF o,pe`,
+          [candidate.tenantId],
+        );
+        if (!access.rows[0]?.active) throw new Error("Organisation access stopped while Sentinel was running.");
         await tx.query(
           `UPDATE "Interaction"
            SET "sentinelStatus"='CLASSIFIED',
@@ -171,7 +181,7 @@ export class SentinelProcessor {
            ) VALUES ($1::uuid,$2,'reply_classification','SENTINEL',$3,$4,$5,$6::jsonb)`,
           [
             candidate.tenantId,
-            this.provider!.name,
+            provider.name,
             result.usage.inputTokens,
             result.usage.outputTokens,
             result.usage.estimatedCostUsd,
@@ -191,14 +201,14 @@ export class SentinelProcessor {
                "errorCode"='SENTINEL_CLASSIFICATION_FAILED',"errorDetails"=$2,
                "completedAt"=CASE WHEN "retryCount"+1>=3 THEN CURRENT_TIMESTAMP ELSE NULL END,
                "updatedAt"=CURRENT_TIMESTAMP
-           WHERE "id"=$1::uuid RETURNING "retryCount"`,
+           WHERE "id"=$1::uuid AND "status" IN ('RUNNING','QUEUED') RETURNING "retryCount"`,
           [candidate.agentRunId, message.slice(0, 2_000)],
         );
         const retryCount = run.rows[0]?.retryCount ?? 3;
         await tx.query(
           `UPDATE "Interaction"
            SET "sentinelStatus"=$3::"SentinelStatus","sentinelError"=$4,"sentinelStartedAt"=NULL
-           WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+           WHERE "tenantId"=$1::uuid AND "id"=$2::uuid AND "sentinelStatus"='PROCESSING'`,
           [candidate.tenantId, candidate.id, retryCount >= 3 ? "FAILED" : "QUEUED", message.slice(0, 2_000)],
         );
         return retryCount;
@@ -212,15 +222,27 @@ export class SentinelProcessor {
     }
   }
 
+  private resolveProvider(tenantId: string): Promise<AgentModelProvider | null> {
+    if (!this.provider) return Promise.resolve(null);
+    if (isAgentProviderResolver(this.provider)) {
+      return this.provider.resolve({ tenantId, agentName: "SENTINEL", webSearchRequired: false });
+    }
+    return Promise.resolve(this.provider);
+  }
+
   private async claim(): Promise<SentinelCandidate | null> {
     return this.database.transaction(async (tx) => {
       const claimed = await tx.query<ClaimedSentinelCandidate>(
         `WITH candidate AS (
            SELECT i."id"
            FROM "Interaction" i
+           JOIN "Organisation" o ON o."id"=i."tenantId"
+           JOIN "ProductEntitlement" pe ON pe."tenantId"=i."tenantId"
            WHERE i."direction"='INBOUND'
              AND i."sentinelStatus"='QUEUED'
              AND NULLIF(BTRIM(i."outcome"),'') IS NOT NULL
+             AND o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+             AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP)
            ORDER BY i."occurredAt" ASC
            FOR UPDATE SKIP LOCKED
            LIMIT 1

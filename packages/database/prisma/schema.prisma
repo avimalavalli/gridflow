@@ -14,6 +14,55 @@ enum OrganisationType {
   COMMERCIAL_ORGANISATION
 }
 
+enum OrganisationAccessStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  REJECTED
+  REVOKED
+}
+
+enum ProductPlan {
+  CORE
+  ULTRA
+}
+
+enum EntitlementStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum AgentExecutionMode {
+  BYO_GEMINI
+  MANAGED
+}
+
+enum ActivationGrantStatus {
+  ISSUED
+  REDEEMED
+  REVOKED
+  EXPIRED
+}
+
+enum AgentCredentialProvider {
+  GEMINI
+}
+
+enum AgentCredentialStatus {
+  CONNECTED
+  INVALID
+  REVOKED
+}
+
+enum ResearchCreditReservationStatus {
+  RESERVED
+  CONSUMED
+  REFUNDED
+}
+
 enum MembershipRole {
   OWNER
   ADMIN
@@ -478,6 +527,10 @@ model User {
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
   startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
+  activationGrantsCreated ActivationGrant[] @relation("ActivationGrantCreatedBy")
+  activationGrantsRedeemed ActivationGrant[] @relation("ActivationGrantRedeemedBy")
+  entitlementsApproved ProductEntitlement[] @relation("ProductEntitlementApprovedBy")
+  platformAuditEvents PlatformAuditEvent[]
 }
 
 model Organisation {
@@ -485,6 +538,9 @@ model Organisation {
   name                String
   slug                String                   @unique
   type                OrganisationType         @default(DRIVER)
+  accessStatus        OrganisationAccessStatus @default(ACTIVE)
+  accessStatusReason  String?
+  accessReviewedAt    DateTime?                @db.Timestamptz(3)
   createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
   memberships         OrganisationMembership[]
@@ -521,6 +577,93 @@ model Organisation {
   releaseAcceptances  ReleaseAcceptance[]
   acceptanceChecks    ReleaseAcceptanceCheck[]
   pipelineRuns        PipelineRun[]
+  activationGrant     ActivationGrant?
+  productEntitlement  ProductEntitlement?
+  agentCredentials    AgentProviderCredential[]
+  researchCreditReservations ResearchCreditReservation[]
+}
+
+model ActivationGrant {
+  id                     String                @id @default(uuid()) @db.Uuid
+  email                  String
+  tokenHash              String                @unique
+  plan                   ProductPlan
+  status                 ActivationGrantStatus @default(ISSUED)
+  researchCreditsGranted Int                   @default(0)
+  seatLimit              Int                   @default(1)
+  expiresAt              DateTime              @db.Timestamptz(3)
+  redeemedAt             DateTime?             @db.Timestamptz(3)
+  activatedAt            DateTime?             @db.Timestamptz(3)
+  organisationId         String?               @unique @db.Uuid
+  createdByUserId        String                @db.Uuid
+  redeemedByUserId       String?               @db.Uuid
+  createdAt              DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
+  organisation           Organisation?         @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  createdBy              User                  @relation("ActivationGrantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  redeemedBy             User?                 @relation("ActivationGrantRedeemedBy", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([status, expiresAt])
+}
+
+model ProductEntitlement {
+  id                       String             @id @default(uuid()) @db.Uuid
+  tenantId                 String             @unique @db.Uuid
+  plan                     ProductPlan        @default(CORE)
+  status                   EntitlementStatus  @default(PENDING)
+  agentExecutionMode       AgentExecutionMode @default(BYO_GEMINI)
+  researchCreditsGranted   Int                @default(0)
+  researchCreditsUsed      Int                @default(0)
+  researchCreditsUnlimited Boolean            @default(false)
+  seatLimit                Int                @default(1)
+  startsAt                 DateTime?           @db.Timestamptz(3)
+  expiresAt                DateTime?           @db.Timestamptz(3)
+  approvedAt               DateTime?           @db.Timestamptz(3)
+  approvedByUserId         String?             @db.Uuid
+  suspensionReason         String?
+  createdAt                DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime            @updatedAt @db.Timestamptz(3)
+  tenant                   Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  approvedBy               User?               @relation("ProductEntitlementApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, plan])
+}
+
+model AgentProviderCredential {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  tenantId            String                  @db.Uuid
+  provider            AgentCredentialProvider
+  status              AgentCredentialStatus   @default(CONNECTED)
+  encryptedApiKey     String
+  keyFingerprint      String
+  model               String
+  capabilities        Json                    @default("[]")
+  lastValidatedAt     DateTime?                @db.Timestamptz(3)
+  lastUsedAt          DateTime?                @db.Timestamptz(3)
+  errorDetails        String?
+  createdAt           DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(3)
+  tenant              Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, status])
+}
+
+model PlatformAuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
 }
 
 model OrganisationMembership {
@@ -1312,11 +1455,27 @@ model AgentRun {
   humanReviewedBy  User?           @relation("AgentRunReviewedBy", fields: [humanReviewedByUserId], references: [id], onDelete: SetNull)
   evidence         EvidenceSource[]
   automationJobs   AutomationJob[]
+  researchCreditReservation ResearchCreditReservation?
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, agentName, status])
   @@index([tenantId, pipelineRunId, status])
   @@index([tenantId, humanReviewStatus, createdAt])
+}
+
+model ResearchCreditReservation {
+  id         String                          @id @default(uuid()) @db.Uuid
+  tenantId   String                          @db.Uuid
+  agentRunId String                          @unique @db.Uuid
+  amount     Int                             @default(1)
+  status     ResearchCreditReservationStatus @default(RESERVED)
+  reservedAt DateTime                        @default(now()) @db.Timestamptz(3)
+  consumedAt DateTime?                       @db.Timestamptz(3)
+  refundedAt DateTime?                       @db.Timestamptz(3)
+  tenant     Organisation                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agentRun   AgentRun                        @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, reservedAt])
 }
 
 model PipelineRun {

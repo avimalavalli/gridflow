@@ -1,4 +1,4 @@
-export type SignupMode = "OPEN" | "CODE" | "CLOSED";
+export type SignupMode = "OPEN" | "CODE" | "ACTIVATION" | "CLOSED";
 
 export interface ApiConfig {
   port: number;
@@ -11,6 +11,7 @@ export interface ApiConfig {
   devOrganisationSlug: string;
   signupMode: SignupMode;
   privateBetaCode: string;
+  platformAdminEmails: string[];
   sessionCookieName: string;
   sessionDays: number;
   invitationDays: number;
@@ -62,12 +63,22 @@ export function loadConfig(): ApiConfig {
 
   const defaultSignupMode: SignupMode = nodeEnv === "production" ? "CODE" : "OPEN";
   const signupMode = (process.env.AUTH_SIGNUP_MODE ?? defaultSignupMode) as SignupMode;
-  if (!["OPEN", "CODE", "CLOSED"].includes(signupMode)) {
-    throw new Error("AUTH_SIGNUP_MODE must be OPEN, CODE or CLOSED.");
+  if (!["OPEN", "CODE", "ACTIVATION", "CLOSED"].includes(signupMode)) {
+    throw new Error("AUTH_SIGNUP_MODE must be OPEN, CODE, ACTIVATION or CLOSED.");
   }
   const privateBetaCode = process.env.AUTH_PRIVATE_BETA_CODE ?? "";
   if (signupMode === "CODE" && privateBetaCode.length < 12) {
     throw new Error("AUTH_PRIVATE_BETA_CODE must contain at least 12 characters when signup mode is CODE.");
+  }
+  const platformAdminEmails = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (nodeEnv === "production" && signupMode === "ACTIVATION" && platformAdminEmails.length === 0) {
+    throw new Error("PLATFORM_ADMIN_EMAILS is required when production signup mode is ACTIVATION.");
+  }
+  if (nodeEnv === "production" && signupMode === "ACTIVATION" && !(process.env.INTEGRATION_ENCRYPTION_KEY ?? "").trim()) {
+    throw new Error("INTEGRATION_ENCRYPTION_KEY is required when production signup mode is ACTIVATION.");
   }
 
   const secureCookies = readBoolean(
@@ -105,6 +116,7 @@ export function loadConfig(): ApiConfig {
       process.env.GRIDFLOW_DEV_ORGANISATION_SLUG ?? "gridflow-test-athlete-local",
     signupMode,
     privateBetaCode,
+    platformAdminEmails,
     sessionCookieName: process.env.AUTH_SESSION_COOKIE_NAME ?? "gridflow_session",
     sessionDays: readPositiveInteger("AUTH_SESSION_DAYS", process.env.AUTH_SESSION_DAYS, 30),
     invitationDays: readPositiveInteger("AUTH_INVITATION_DAYS", process.env.AUTH_INVITATION_DAYS, 7),

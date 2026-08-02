@@ -35,6 +35,16 @@ AUTH_SIGNUP_MODE=CODE
 AUTH_PRIVATE_BETA_CODE=<at-least-12-random-characters>
 ```
 
+To test the paid customer flow, create an existing owner account first, then use:
+
+```bash
+AUTH_SIGNUP_MODE=ACTIVATION
+PLATFORM_ADMIN_EMAILS=owner@example.com
+INTEGRATION_ENCRYPTION_KEY=<strong-24+-character-development-secret>
+```
+
+Sign in as the allowlisted owner and create each one-use link from **Platform Admin**.
+
 ## 3. Start GridFlow
 
 ```bash

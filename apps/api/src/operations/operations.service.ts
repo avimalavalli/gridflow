@@ -151,6 +151,7 @@ export class OperationsService {
       const readiness = {
         database: true,
         productionSecurity: apiConfig.nodeEnv !== "production" || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
+        productAccess: apiConfig.nodeEnv !== "production" || (apiConfig.signupMode === "ACTIVATION" && apiConfig.platformAdminEmails.length > 0 && Boolean(process.env.INTEGRATION_ENCRYPTION_KEY)),
         passwordRecovery: apiConfig.nodeEnv !== "production" || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
         liveAgents: Boolean(process.env.OPENAI_API_KEY),
         gmailOAuth: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET && process.env.GOOGLE_OAUTH_REDIRECT_URI && process.env.INTEGRATION_ENCRYPTION_KEY),

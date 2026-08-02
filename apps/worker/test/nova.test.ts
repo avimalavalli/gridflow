@@ -30,6 +30,11 @@ async function seed(intent = "MEETING_REQUEST") {
      VALUES ('Nova Racing','nova-racing','DRIVER',CURRENT_TIMESTAMP) RETURNING "id"`,
   );
   const tenantId = organisation.rows[0]!.id;
+  await database!.query(
+    `INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt")
+     VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',true,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+    [tenantId],
+  );
   const company = await database!.query<{ id: string }>(
     `INSERT INTO "Company" (
        "tenantId","companyName","website","companyDomain","companyKey","researchNotes",

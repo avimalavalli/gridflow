@@ -34,6 +34,11 @@ export class RegisterDto {
   @IsString()
   @MaxLength(200)
   betaCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  activationToken?: string;
 }
 
 export class LoginDto {

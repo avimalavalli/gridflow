@@ -13,6 +13,10 @@ export interface SessionIdentity {
   userName: string;
   organisationName: string;
   organisationSlug: string;
+  organisationAccessStatus: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "REJECTED" | "REVOKED";
+  productPlan: "CORE" | "ULTRA";
+  entitlementStatus: "PENDING" | "ACTIVE" | "SUSPENDED" | "REVOKED" | "EXPIRED";
+  platformAdmin: boolean;
 }
 
 interface SessionRow extends Record<string, unknown> {
@@ -25,6 +29,9 @@ interface SessionRow extends Record<string, unknown> {
   userStatus: string;
   organisationName: string | null;
   organisationSlug: string | null;
+  organisationAccessStatus: SessionIdentity["organisationAccessStatus"] | null;
+  productPlan: SessionIdentity["productPlan"] | null;
+  entitlementStatus: SessionIdentity["entitlementStatus"] | null;
   role: SessionIdentity["role"] | null;
 }
 
@@ -53,12 +60,17 @@ export class SessionService {
            u."status" AS "userStatus",
            o."name" AS "organisationName",
            o."slug" AS "organisationSlug",
+           o."accessStatus" AS "organisationAccessStatus",
+           pe."plan" AS "productPlan",
+           CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
+             THEN 'EXPIRED'::"EntitlementStatus" ELSE pe."status" END AS "entitlementStatus",
            m."role"
          FROM "AuthSession" s
          JOIN "User" u ON u."id" = s."userId"
          LEFT JOIN "Organisation" o ON o."id" = s."activeOrganisationId"
          LEFT JOIN "OrganisationMembership" m
            ON m."organisationId" = s."activeOrganisationId" AND m."userId" = s."userId"
+         LEFT JOIN "ProductEntitlement" pe ON pe."tenantId" = s."activeOrganisationId"
          WHERE s."tokenHash" = $1
            AND s."revokedAt" IS NULL
            AND s."expiresAt" > CURRENT_TIMESTAMP`,
@@ -73,16 +85,26 @@ export class SessionService {
           organisationName: string;
           organisationSlug: string;
           role: SessionIdentity["role"];
+          organisationAccessStatus: SessionIdentity["organisationAccessStatus"];
+          productPlan: SessionIdentity["productPlan"] | null;
+          entitlementStatus: SessionIdentity["entitlementStatus"] | null;
         }>(
           `SELECT
              m."organisationId",
              o."name" AS "organisationName",
              o."slug" AS "organisationSlug",
+             o."accessStatus" AS "organisationAccessStatus",
+             pe."plan" AS "productPlan",
+             CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
+               THEN 'EXPIRED'::"EntitlementStatus" ELSE pe."status" END AS "entitlementStatus",
              m."role"
            FROM "OrganisationMembership" m
            JOIN "Organisation" o ON o."id" = m."organisationId"
+           LEFT JOIN "ProductEntitlement" pe ON pe."tenantId" = m."organisationId"
            WHERE m."userId" = $1::uuid
-           ORDER BY m."createdAt" ASC
+           ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
+                      AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP) THEN 0 ELSE 1 END,
+                    m."createdAt" ASC
            LIMIT 1`,
           [row.userId],
         );
@@ -103,6 +125,10 @@ export class SessionService {
           userName: row.userName,
           organisationName: membership.organisationName,
           organisationSlug: membership.organisationSlug,
+          organisationAccessStatus: membership.organisationAccessStatus,
+          productPlan: membership.productPlan ?? "CORE",
+          entitlementStatus: membership.entitlementStatus ?? "ACTIVE",
+          platformAdmin: apiConfig.platformAdminEmails.includes(row.userEmail.toLowerCase()),
         };
       }
 
@@ -123,6 +149,10 @@ export class SessionService {
         userName: row.userName,
         organisationName: row.organisationName,
         organisationSlug: row.organisationSlug,
+        organisationAccessStatus: row.organisationAccessStatus ?? "ACTIVE",
+        productPlan: row.productPlan ?? "CORE",
+        entitlementStatus: row.entitlementStatus ?? "ACTIVE",
+        platformAdmin: apiConfig.platformAdminEmails.includes(row.userEmail.toLowerCase()),
       };
     });
   }
@@ -191,7 +221,9 @@ export class SessionService {
       const membership = await tx.query(
         `SELECT 1
          FROM "OrganisationMembership"
-         WHERE "userId" = $1::uuid AND "organisationId" = $2::uuid`,
+         JOIN "Organisation" ON "Organisation"."id"="OrganisationMembership"."organisationId"
+         WHERE "userId" = $1::uuid AND "organisationId" = $2::uuid
+           AND "Organisation"."accessStatus"='ACTIVE'`,
         [userId, organisationId],
       );
       if (membership.rows.length !== 1) return false;

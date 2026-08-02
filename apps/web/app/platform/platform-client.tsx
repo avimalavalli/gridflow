@@ -26,7 +26,13 @@ async function jsonRequest(path: string, body?: unknown) {
   return payload;
 }
 
-function date(value: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function date(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
 
 export function PlatformClient({ data }: { data: PlatformData }) {
   const router = useRouter();

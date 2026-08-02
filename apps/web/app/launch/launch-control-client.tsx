@@ -71,7 +71,11 @@ function label(value: string): string {
 
 function dateTime(value: string | null): string {
   if (!value) return "Not yet";
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }
 
 function iconFor(status: CheckStatus) {

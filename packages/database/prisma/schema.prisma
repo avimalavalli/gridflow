@@ -386,6 +386,16 @@ enum NovaResponseChannel {
   NONE
 }
 
+enum OrbitStatus {
+  NOT_STARTED
+  QUEUED
+  PROCESSING
+  READY
+  REVIEWED
+  REJECTED
+  FAILED
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -524,6 +534,8 @@ model User {
   agentRunReviews AgentRun[] @relation("AgentRunReviewedBy")
   sentinelReviews Interaction[] @relation("SentinelReviewedBy")
   novaReviews     Interaction[] @relation("NovaReviewedBy")
+  orbitPrepReviews OrbitWorkspace[] @relation("OrbitPrepReviewedBy")
+  orbitDebriefReviews OrbitWorkspace[] @relation("OrbitDebriefReviewedBy")
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
   startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
@@ -561,6 +573,7 @@ model Organisation {
   interactions        Interaction[]
   tasks               Task[]
   meetings            Meeting[]
+  orbitWorkspaces     OrbitWorkspace[]
   proposals           Proposal[]
   agentRuns           AgentRun[]
   automationJobs      AutomationJob[]
@@ -1337,6 +1350,8 @@ model Task {
   companyId     String?      @db.Uuid
   contactId     String?      @db.Uuid
   opportunityId String?      @db.Uuid
+  meetingId     String?      @db.Uuid
+  automationKey String?
   ownerId       String?      @db.Uuid
   title         String
   description   String?
@@ -1351,8 +1366,11 @@ model Task {
   company       Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  meeting       Meeting?     @relation(fields: [meetingId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, dueAt])
+  @@index([tenantId, meetingId])
+  @@unique([tenantId, automationKey])
 }
 
 model Meeting {
@@ -1377,8 +1395,47 @@ model Meeting {
   company       Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  orbitWorkspace OrbitWorkspace?
+  tasks          Task[]
+  agentRuns      AgentRun[]
 
   @@index([tenantId, startsAt])
+}
+
+model OrbitWorkspace {
+  id                         String      @id @default(uuid()) @db.Uuid
+  tenantId                   String      @db.Uuid
+  meetingId                  String      @unique @db.Uuid
+  prepStatus                 OrbitStatus @default(NOT_STARTED)
+  prepDraft                  Json?
+  approvedPrep               Json?
+  prepAgentRunId             String?     @db.Uuid
+  prepError                  String?
+  prepStartedAt              DateTime?   @db.Timestamptz(3)
+  prepReviewedAt             DateTime?   @db.Timestamptz(3)
+  prepReviewedByUserId       String?     @db.Uuid
+  prepReviewNote             String?
+  debriefStatus              OrbitStatus @default(NOT_STARTED)
+  debriefDraft               Json?
+  approvedDebrief            Json?
+  debriefAgentRunId          String?     @db.Uuid
+  debriefError               String?
+  debriefStartedAt           DateTime?   @db.Timestamptz(3)
+  debriefReviewedAt          DateTime?   @db.Timestamptz(3)
+  debriefReviewedByUserId    String?     @db.Uuid
+  debriefReviewNote          String?
+  debriefAppliedAt           DateTime?   @db.Timestamptz(3)
+  createdAt                  DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime    @updatedAt @db.Timestamptz(3)
+  tenant                     Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  meeting                    Meeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  prepAgentRun               AgentRun?    @relation("OrbitPrepAgentRun", fields: [prepAgentRunId], references: [id], onDelete: SetNull)
+  debriefAgentRun            AgentRun?    @relation("OrbitDebriefAgentRun", fields: [debriefAgentRunId], references: [id], onDelete: SetNull)
+  prepReviewedBy             User?        @relation("OrbitPrepReviewedBy", fields: [prepReviewedByUserId], references: [id], onDelete: SetNull)
+  debriefReviewedBy          User?        @relation("OrbitDebriefReviewedBy", fields: [debriefReviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, prepStatus, updatedAt])
+  @@index([tenantId, debriefStatus, updatedAt])
 }
 
 model Proposal {
@@ -1444,6 +1501,7 @@ model AgentRun {
   contactId        String?        @db.Uuid
   outreachRecordId String?        @db.Uuid
   pipelineRunId    String?        @db.Uuid
+  meetingId        String?        @db.Uuid
   createdAt        DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
   tenant           Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1452,6 +1510,9 @@ model AgentRun {
   contact          Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   outreachRecord   OutreachRecord? @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
   pipelineRun      PipelineRun?    @relation(fields: [pipelineRunId], references: [id], onDelete: SetNull)
+  meeting          Meeting?        @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  orbitPrepFor     OrbitWorkspace[] @relation("OrbitPrepAgentRun")
+  orbitDebriefFor  OrbitWorkspace[] @relation("OrbitDebriefAgentRun")
   humanReviewedBy  User?           @relation("AgentRunReviewedBy", fields: [humanReviewedByUserId], references: [id], onDelete: SetNull)
   evidence         EvidenceSource[]
   automationJobs   AutomationJob[]
@@ -1461,6 +1522,7 @@ model AgentRun {
   @@index([tenantId, agentName, status])
   @@index([tenantId, pipelineRunId, status])
   @@index([tenantId, humanReviewStatus, createdAt])
+  @@index([tenantId, meetingId, status])
 }
 
 model ResearchCreditReservation {

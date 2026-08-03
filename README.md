@@ -2,13 +2,13 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 4A product-access codebase: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, connected commercial CRM, controlled outreach operations, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 4B meeting-intelligence codebase: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, connected commercial CRM, controlled outreach operations, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
 ## Working flow
 
-`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → automated quality gate → human acceptance → LinkedIn/Gmail operations → replies → opportunities → tasks and meetings`
+`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → human acceptance → LinkedIn/Gmail operations → Sentinel → Nova → Orbit meetings → approved tasks and opportunities`
 
 No athlete identity, nationality, championship, sponsor market or outreach strategy is hard-coded.
 
@@ -22,6 +22,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Personalised commercial profiles, markets, outreach policies and Discovery Briefs.
 - Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings.
 - Evidence-first agents with retries, recovery, versioning, tokens, cost and quality reports.
+- Orbit pre-meeting briefs and human-notes-only debriefs with idempotent task creation, explicit opportunity approval and follow-up drafts that cannot send themselves.
 - Human acceptance, tuning and rejection decisions with audit history.
 - Human-controlled LinkedIn workflow and policy-controlled Gmail architecture.
 - Airtable migration review/import and stable duplicate protection.

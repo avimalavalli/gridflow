@@ -3,6 +3,7 @@ import { Shell } from "../../components/shell";
 import { DataUnavailable } from "../../components/data-unavailable";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { MeetingsClient, type Meeting, type Company, type Contact, type Opportunity } from "./meetings-client";
+import Link from "next/link";
 export const dynamic = "force-dynamic";
 export default async function MeetingsPage() {
   let error = "";
@@ -20,5 +21,5 @@ export default async function MeetingsPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown meeting error.";
   }
-  return <Shell title="Meetings"><PageHead eyebrow="Conversation management" title="Prepare better sponsor meetings and preserve the outcome" description="Every agenda, preparation note, commercial outcome and next action stays attached to the right company, contact and opportunity." />{error ? <DataUnavailable message={error} /> : <MeetingsClient meetings={meetings} companies={companies} contacts={contacts} opportunities={opportunities} />}</Shell>;
+  return <Shell title="Meetings"><PageHead eyebrow="Conversation management" title="Prepare better sponsor meetings and preserve the outcome" description="Every agenda, preparation note, commercial outcome and next action stays attached to the right company, contact and opportunity." action={<Link className="button button-primary" href="/orbit">Open Orbit</Link>} />{error ? <DataUnavailable message={error} /> : <MeetingsClient meetings={meetings} companies={companies} contacts={contacts} opportunities={opportunities} />}</Shell>;
 }

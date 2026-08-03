@@ -9,6 +9,7 @@ import { AuthEmailProcessor } from "./auth-email.js";
 import { PulseProcessor } from "./pulse.js";
 import { SentinelProcessor } from "./sentinel.js";
 import { NovaProcessor } from "./nova.js";
+import { OrbitProcessor } from "./orbit.js";
 import { TenantAgentProviderResolver } from "./tenant-agent-provider.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
@@ -48,6 +49,9 @@ if (recoveredSentinel) logWorkerEvent({ event: "stale-sentinel-replies-recovered
 const nova = new NovaProcessor(database, provider);
 const recoveredNova = await nova.recoverStale(Number(process.env.NOVA_STALE_AFTER_MINUTES ?? 10));
 if (recoveredNova) logWorkerEvent({ event: "stale-nova-strategies-recovered", level: "warning", details: { count: recoveredNova } });
+const orbit = new OrbitProcessor(database, provider);
+const recoveredOrbit = await orbit.recoverStale(Number(process.env.ORBIT_STALE_AFTER_MINUTES ?? 10));
+if (recoveredOrbit) logWorkerEvent({ event: "stale-orbit-workspaces-recovered", level: "warning", details: { count: recoveredOrbit } });
 logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: "tenant-routed", managedResearchProvider: managedProvider?.name ?? null, agentProcessingEnabled: true, emailAutomationEnabled: true } });
 const healthServer = once ? null : await startWorkerHealthServer({
   port: Math.max(1, Number(process.env.PORT ?? 3_002)),
@@ -80,6 +84,15 @@ const runOnce = async (): Promise<boolean> => {
       event: "nova-strategy-processed",
       level: strategy.status === "FAILED" ? "error" : strategy.status === "RETRY_QUEUED" ? "warning" : "info",
       details: strategy as unknown as Record<string, unknown>,
+    });
+    return true;
+  }
+  const meeting = await orbit.processNext();
+  if (meeting.processed) {
+    logWorkerEvent({
+      event: "orbit-meeting-intelligence-processed",
+      level: meeting.status === "FAILED" ? "error" : meeting.status === "RETRY_QUEUED" ? "warning" : "info",
+      details: meeting as unknown as Record<string, unknown>,
     });
     return true;
   }
@@ -141,6 +154,11 @@ if (once) {
         return 0;
       });
       if (novaRecovered) logWorkerEvent({ event: "stale-nova-strategies-recovered", level: "warning", details: { count: novaRecovered } });
+      const orbitRecovered = await orbit.recoverStale(Number(process.env.ORBIT_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
+        reportWorkerError("stale-orbit-workspace-recovery-failed", error);
+        return 0;
+      });
+      if (orbitRecovered) logWorkerEvent({ event: "stale-orbit-workspaces-recovered", level: "warning", details: { count: orbitRecovered } });
       const pulseResult = await pulse.reconcile().catch((error) => {
         reportWorkerError("pulse-reconciliation-failed", error);
         return { stopped: 0, emailPlanned: 0, linkedinPlanned: 0, obsoleteClosed: 0 };

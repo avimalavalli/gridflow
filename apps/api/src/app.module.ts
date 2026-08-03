@@ -26,6 +26,7 @@ import { SentinelModule } from "./sentinel/sentinel.module.js";
 import { NovaModule } from "./nova/nova.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
 import { AiSettingsModule } from "./ai-settings/ai-settings.module.js";
+import { OrbitModule } from "./orbit/orbit.module.js";
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { AiSettingsModule } from "./ai-settings/ai-settings.module.js";
     NovaModule,
     PlatformModule,
     AiSettingsModule,
+    OrbitModule,
   ],
 })
 export class AppModule {}

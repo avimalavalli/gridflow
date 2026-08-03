@@ -198,6 +198,21 @@ try {
   assert(contactDetail.meetings.length === 1, "Contact workspace did not return its linked meeting.");
 
   await request(`/opportunities/${opportunity.id}`, { method: "PATCH", body: { stage: "PROPOSAL_REQUESTED", probability: 55 } });
+  const forge = await request("/forge", {
+    method: "POST",
+    body: {
+      opportunityId: opportunity.id,
+      requestKey: crypto.randomUUID(),
+      title: "2027 Technology Partnership proposal",
+      objective: "Prepare the proposal requested during the commercial conversation.",
+      currency: "GBP",
+      packageCount: 2,
+      termMonths: 12,
+    },
+  });
+  assert(forge.proposalId && forge.status === "QUEUED", "Forge did not queue a controlled proposal draft.");
+  const forgeOverview = await request("/forge");
+  assert(forgeOverview.proposals.some((item) => item.id === forge.proposalId), "Forge cockpit omitted the queued proposal.");
   await request(`/tasks/${task.id}`, { method: "PATCH", body: { status: "COMPLETED" } });
   await request(`/meetings/${meeting.id}`, { method: "PATCH", body: { preparation: "Review partnership angle and commercial score." } });
   await request(`/contacts/${contact.id}`, { method: "PATCH", body: { status: "ACTIVE_CONVERSATION" } });

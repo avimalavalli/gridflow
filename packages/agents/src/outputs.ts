@@ -177,4 +177,43 @@ export interface OrbitDebriefOutput {
   needs_human_review: true;
 }
 
-export type AgentOutput = CoreAgentOutput | SentinelOutput | NovaOutput | OrbitPrepOutput | OrbitDebriefOutput;
+export type ForgeInvestmentStatus = "BRIEFED" | "PROVISIONAL" | "NEEDS_INPUT";
+
+export interface ForgePackageOption {
+  name: string;
+  positioning: string;
+  investment_status: ForgeInvestmentStatus;
+  investment_minor: number;
+  currency: string;
+  term_months: number;
+  deliverables: string[];
+  activation_ideas: string[];
+  measurement_plan: string[];
+}
+
+export interface ForgeImplementationPhase {
+  phase: string;
+  timing: string;
+  actions: string[];
+}
+
+export interface ForgeOutput {
+  proposal_title: string;
+  executive_summary: string;
+  sponsor_context: string;
+  partnership_thesis: string;
+  sponsor_objectives: string[];
+  package_options: ForgePackageOption[];
+  rights_and_dependencies: string[];
+  assumptions: string[];
+  unknowns: string[];
+  exclusions: string[];
+  implementation_plan: ForgeImplementationPhase[];
+  next_steps: string[];
+  legal_notice: "Subject to contract, rights availability and final written approval.";
+  reasoning: string;
+  confidence: number;
+  needs_human_review: true;
+}
+
+export type AgentOutput = CoreAgentOutput | SentinelOutput | NovaOutput | OrbitPrepOutput | OrbitDebriefOutput | ForgeOutput;

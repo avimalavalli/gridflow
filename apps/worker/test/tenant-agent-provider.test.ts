@@ -46,6 +46,8 @@ describe("tenant-specific agent routing", () => {
     );
     await expect(resolver.resolve({ tenantId, agentName: "ECHO", webSearchRequired: false }))
       .resolves.toMatchObject({ name: "gemini" });
+    await expect(resolver.resolve({ tenantId, agentName: "FORGE", webSearchRequired: false }))
+      .resolves.toMatchObject({ name: "gemini" });
 
     await database.query(
       `UPDATE "Organisation" SET "accessStatus"='SUSPENDED',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,

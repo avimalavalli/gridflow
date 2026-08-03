@@ -14,6 +14,7 @@ import {
   ContactRound,
   DatabaseZap,
   Handshake,
+  Hammer,
   LayoutDashboard,
   ListTodo,
   Menu,
@@ -50,6 +51,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Nova", href: "/nova", icon: Sparkles, keywords: "reply draft strategy objection opportunity meeting recommendation" },
       { label: "Orbit", href: "/orbit", icon: OrbitIcon, keywords: "meeting preparation agenda briefing debrief notes follow up tasks" },
       { label: "Opportunities", href: "/opportunities", icon: Handshake, keywords: "pipeline deals sponsorship revenue" },
+      { label: "Forge", href: "/forge", icon: Hammer, keywords: "proposal packages pricing activation commercial approval pdf" },
     ],
   },
   {

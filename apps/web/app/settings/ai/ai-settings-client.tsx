@@ -104,7 +104,7 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
       </section>
 
       <div className="grid-2 balanced">
-        <section className="card soft"><div className="section-header"><div><div className="eyebrow">Your key</div><h2>Gemini agents</h2></div><Bot size={19}/></div><p className="rich-copy">Echo drafts outreach, Sentinel classifies replies, Nova recommends responses and Orbit prepares and debriefs meetings. These tasks use information already inside GridFlow and do not perform open-web sponsor research.</p></section>
+        <section className="card soft"><div className="section-header"><div><div className="eyebrow">Your key</div><h2>Gemini agents</h2></div><Bot size={19}/></div><p className="rich-copy">Echo drafts outreach, Sentinel classifies replies, Nova recommends responses, Orbit prepares and debriefs meetings, and Forge builds internal proposals. These tasks use information already inside GridFlow and do not perform open-web sponsor research.</p></section>
         <section className="card soft"><div className="section-header"><div><div className="eyebrow">Included intelligence</div><h2>Managed research</h2></div><Search size={19}/></div><p className="rich-copy">Atlas, Sage and Relay require live evidence and verified sources. They use GridFlow-managed research credits, so racers never need to purchase or configure an OpenAI account. One credit is reserved per agent execution and returned if the job reaches a final failure without a usable result.</p></section>
       </div>
     </div>

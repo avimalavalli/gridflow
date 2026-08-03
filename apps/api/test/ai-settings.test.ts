@@ -50,6 +50,7 @@ describe("organisation AI credential custody", () => {
     const service = new AiSettingsService(new TestDatabaseService(database) as never);
     const status = await service.status(seed.tenantId);
     expect(status.gemini).toMatchObject({ connected: true, keyFingerprint: "abcdef123456", model: "gemini-test-model" });
+    expect(status.routing.geminiAgents).toContain("FORGE");
     expect(JSON.stringify(status)).not.toContain("encrypted-payload-must-never-be-returned");
     expect(JSON.stringify(status)).not.toContain("encryptedApiKey");
 

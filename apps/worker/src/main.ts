@@ -10,6 +10,7 @@ import { PulseProcessor } from "./pulse.js";
 import { SentinelProcessor } from "./sentinel.js";
 import { NovaProcessor } from "./nova.js";
 import { OrbitProcessor } from "./orbit.js";
+import { ForgeProcessor } from "./forge.js";
 import { TenantAgentProviderResolver } from "./tenant-agent-provider.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
@@ -52,6 +53,9 @@ if (recoveredNova) logWorkerEvent({ event: "stale-nova-strategies-recovered", le
 const orbit = new OrbitProcessor(database, provider);
 const recoveredOrbit = await orbit.recoverStale(Number(process.env.ORBIT_STALE_AFTER_MINUTES ?? 10));
 if (recoveredOrbit) logWorkerEvent({ event: "stale-orbit-workspaces-recovered", level: "warning", details: { count: recoveredOrbit } });
+const forge = new ForgeProcessor(database, provider);
+const recoveredForge = await forge.recoverStale(Number(process.env.FORGE_STALE_AFTER_MINUTES ?? 10));
+if (recoveredForge) logWorkerEvent({ event: "stale-forge-proposals-recovered", level: "warning", details: { count: recoveredForge } });
 logWorkerEvent({ event: "worker-started", level: "info", details: { agentProvider: "tenant-routed", managedResearchProvider: managedProvider?.name ?? null, agentProcessingEnabled: true, emailAutomationEnabled: true } });
 const healthServer = once ? null : await startWorkerHealthServer({
   port: Math.max(1, Number(process.env.PORT ?? 3_002)),
@@ -93,6 +97,15 @@ const runOnce = async (): Promise<boolean> => {
       event: "orbit-meeting-intelligence-processed",
       level: meeting.status === "FAILED" ? "error" : meeting.status === "RETRY_QUEUED" ? "warning" : "info",
       details: meeting as unknown as Record<string, unknown>,
+    });
+    return true;
+  }
+  const proposal = await forge.processNext();
+  if (proposal.processed) {
+    logWorkerEvent({
+      event: "forge-proposal-processed",
+      level: proposal.status === "FAILED" ? "error" : proposal.status === "RETRY_QUEUED" ? "warning" : "info",
+      details: proposal as unknown as Record<string, unknown>,
     });
     return true;
   }
@@ -159,6 +172,11 @@ if (once) {
         return 0;
       });
       if (orbitRecovered) logWorkerEvent({ event: "stale-orbit-workspaces-recovered", level: "warning", details: { count: orbitRecovered } });
+      const forgeRecovered = await forge.recoverStale(Number(process.env.FORGE_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
+        reportWorkerError("stale-forge-proposal-recovery-failed", error);
+        return 0;
+      });
+      if (forgeRecovered) logWorkerEvent({ event: "stale-forge-proposals-recovered", level: "warning", details: { count: forgeRecovered } });
       const pulseResult = await pulse.reconcile().catch((error) => {
         reportWorkerError("pulse-reconciliation-failed", error);
         return { stopped: 0, emailPlanned: 0, linkedinPlanned: 0, obsoleteClosed: 0 };

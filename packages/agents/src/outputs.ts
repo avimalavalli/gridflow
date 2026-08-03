@@ -128,4 +128,53 @@ export interface NovaOutput {
   needs_human_review: true;
 }
 
-export type AgentOutput = CoreAgentOutput | SentinelOutput | NovaOutput;
+export interface OrbitObjectionPreparation {
+  objection: string;
+  response_approach: string;
+}
+
+export interface OrbitPrepOutput {
+  meeting_objective: string;
+  executive_brief: string;
+  relationship_summary: string;
+  sponsor_context: string;
+  key_facts: string[];
+  unknowns: string[];
+  questions: string[];
+  objection_preparation: OrbitObjectionPreparation[];
+  success_outcomes: string[];
+  risks: string[];
+  agenda: string;
+  reasoning: string;
+  confidence: number;
+  needs_human_review: true;
+}
+
+export interface OrbitActionItemRecommendation {
+  title: string;
+  description: string;
+  type: "MANUAL_ACTION" | "FOLLOW_UP" | "PROPOSAL" | "DATA_REVIEW";
+  due_offset_days: number;
+}
+
+export interface OrbitDebriefOutput {
+  meeting_summary: string;
+  decisions: string[];
+  commitments: string[];
+  open_questions: string[];
+  recommended_next_action: string;
+  action_items: OrbitActionItemRecommendation[];
+  should_update_opportunity: boolean;
+  opportunity_stage: "INTERESTED" | "DISCOVERY_CALL" | "NEEDS_ANALYSIS" | "PROPOSAL_REQUESTED" | "ON_HOLD" | "LOST";
+  opportunity_probability: number;
+  opportunity_rationale: string;
+  follow_up_required: boolean;
+  follow_up_channel: "EMAIL" | "LINKEDIN" | "NONE";
+  follow_up_subject: string;
+  follow_up_body: string;
+  reasoning: string;
+  confidence: number;
+  needs_human_review: true;
+}
+
+export type AgentOutput = CoreAgentOutput | SentinelOutput | NovaOutput | OrbitPrepOutput | OrbitDebriefOutput;

@@ -242,3 +242,85 @@ export const novaOutputSchema = {
     needs_human_review: { type: "boolean", const: true },
   },
 } as const;
+
+export const orbitPrepOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "meeting_objective", "executive_brief", "relationship_summary", "sponsor_context",
+    "key_facts", "unknowns", "questions", "objection_preparation", "success_outcomes",
+    "risks", "agenda", "reasoning", "confidence", "needs_human_review",
+  ],
+  properties: {
+    meeting_objective: { type: "string", minLength: 1, maxLength: 1_200 },
+    executive_brief: { type: "string", minLength: 1, maxLength: 3_000 },
+    relationship_summary: { type: "string", minLength: 1, maxLength: 2_000 },
+    sponsor_context: { type: "string", minLength: 1, maxLength: 3_000 },
+    key_facts: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 500 } },
+    unknowns: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 500 } },
+    questions: { type: "array", minItems: 3, maxItems: 15, items: { type: "string", minLength: 1, maxLength: 500 } },
+    objection_preparation: {
+      type: "array",
+      maxItems: 12,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["objection", "response_approach"],
+        properties: {
+          objection: { type: "string", minLength: 1, maxLength: 500 },
+          response_approach: { type: "string", minLength: 1, maxLength: 1_000 },
+        },
+      },
+    },
+    success_outcomes: { type: "array", minItems: 1, maxItems: 10, items: { type: "string", minLength: 1, maxLength: 500 } },
+    risks: { type: "array", maxItems: 12, items: { type: "string", minLength: 1, maxLength: 500 } },
+    agenda: { type: "string", minLength: 1, maxLength: 4_000 },
+    reasoning: { type: "string", minLength: 1, maxLength: 2_000 },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    needs_human_review: { type: "boolean", const: true },
+  },
+} as const;
+
+export const orbitDebriefOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "meeting_summary", "decisions", "commitments", "open_questions", "recommended_next_action",
+    "action_items", "should_update_opportunity", "opportunity_stage", "opportunity_probability",
+    "opportunity_rationale", "follow_up_required", "follow_up_channel", "follow_up_subject",
+    "follow_up_body", "reasoning", "confidence", "needs_human_review",
+  ],
+  properties: {
+    meeting_summary: { type: "string", minLength: 1, maxLength: 4_000 },
+    decisions: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 600 } },
+    commitments: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 600 } },
+    open_questions: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 600 } },
+    recommended_next_action: { type: "string", minLength: 1, maxLength: 1_200 },
+    action_items: {
+      type: "array",
+      maxItems: 15,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "description", "type", "due_offset_days"],
+        properties: {
+          title: { type: "string", minLength: 1, maxLength: 300 },
+          description: { type: "string", maxLength: 1_500 },
+          type: { type: "string", enum: ["MANUAL_ACTION", "FOLLOW_UP", "PROPOSAL", "DATA_REVIEW"] },
+          due_offset_days: { type: "integer", minimum: 0, maximum: 90 },
+        },
+      },
+    },
+    should_update_opportunity: { type: "boolean" },
+    opportunity_stage: { type: "string", enum: ["INTERESTED", "DISCOVERY_CALL", "NEEDS_ANALYSIS", "PROPOSAL_REQUESTED", "ON_HOLD", "LOST"] },
+    opportunity_probability: { type: "integer", minimum: 0, maximum: 100 },
+    opportunity_rationale: { type: "string", maxLength: 1_500 },
+    follow_up_required: { type: "boolean" },
+    follow_up_channel: { type: "string", enum: ["EMAIL", "LINKEDIN", "NONE"] },
+    follow_up_subject: { type: "string", maxLength: 300 },
+    follow_up_body: { type: "string", maxLength: 8_000 },
+    reasoning: { type: "string", minLength: 1, maxLength: 2_000 },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    needs_human_review: { type: "boolean", const: true },
+  },
+} as const;

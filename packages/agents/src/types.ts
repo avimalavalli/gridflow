@@ -1,5 +1,5 @@
 export type CoreAgentName = "ATLAS" | "SAGE" | "RELAY" | "ECHO";
-export type AgentPromptName = CoreAgentName | "SENTINEL" | "NOVA";
+export type AgentPromptName = CoreAgentName | "SENTINEL" | "NOVA" | "ORBIT";
 
 export interface AgentPromptDefinition {
   name: AgentPromptName;

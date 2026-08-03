@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, sentinel, outreach, pulse, nova, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -183,6 +183,39 @@ export class DashboardService {
           [tenantId],
         ),
         tx.query<ActionRow>(
+          `SELECT m."id",'ORBIT' AS "kind",
+                  CASE
+                    WHEN m."startsAt">CURRENT_TIMESTAMP AND COALESCE(ow."prepStatus",'NOT_STARTED')='FAILED' THEN 'Orbit preparation failed for ' || m."title"
+                    WHEN m."startsAt">CURRENT_TIMESTAMP AND COALESCE(ow."prepStatus",'NOT_STARTED')='READY' THEN 'Review Orbit preparation for ' || m."title"
+                    WHEN m."startsAt">CURRENT_TIMESTAMP THEN 'Prepare ' || m."title" || ' with Orbit'
+                    WHEN COALESCE(ow."debriefStatus",'NOT_STARTED')='FAILED' THEN 'Orbit debrief failed for ' || m."title"
+                    WHEN COALESCE(ow."debriefStatus",'NOT_STARTED')='READY' THEN 'Review Orbit debrief for ' || m."title"
+                    ELSE 'Add meeting notes for ' || m."title"
+                  END AS "title",
+                  COALESCE(co."companyName",c."contactName",'Commercial meeting') AS "detail",
+                  m."startsAt" AS "dueAt",'/orbit' AS "href",
+                  CASE
+                    WHEN ow."prepStatus"='FAILED' OR ow."debriefStatus"='FAILED' THEN 'FAILED'
+                    WHEN ow."prepStatus"='READY' OR ow."debriefStatus"='READY' THEN 'REVIEW'
+                    WHEN m."startsAt"<=CURRENT_TIMESTAMP THEN 'OVERDUE'
+                    ELSE 'UPCOMING'
+                  END AS "urgency"
+           FROM "Meeting" m
+           LEFT JOIN "OrbitWorkspace" ow ON ow."meetingId"=m."id" AND ow."tenantId"=m."tenantId"
+           LEFT JOIN "Company" co ON co."id"=m."companyId"
+           LEFT JOIN "Contact" c ON c."id"=m."contactId"
+           WHERE m."tenantId"=$1::uuid AND (
+             (m."startsAt">CURRENT_TIMESTAMP AND m."startsAt"<CURRENT_TIMESTAMP+INTERVAL '7 days'
+               AND COALESCE(ow."prepStatus",'NOT_STARTED') IN ('NOT_STARTED','READY','FAILED'))
+             OR (m."startsAt"<=CURRENT_TIMESTAMP
+               AND COALESCE(ow."debriefStatus",'NOT_STARTED') IN ('NOT_STARTED','READY','FAILED'))
+           )
+           ORDER BY CASE WHEN ow."prepStatus"='FAILED' OR ow."debriefStatus"='FAILED' THEN 0
+                         WHEN ow."prepStatus"='READY' OR ow."debriefStatus"='READY' THEN 1 ELSE 2 END,
+                    m."startsAt" DESC LIMIT 8`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
           `SELECT a."id", 'AGENT_FAILURE' AS "kind", a."agentName"::text || ' needs attention' AS "title",
                   COALESCE(a."errorCode", a."errorDetails", 'Agent run failed') AS "detail", a."updatedAt" AS "dueAt",
                   '/agent-runs' AS "href", 'FAILED' AS "urgency"
@@ -212,7 +245,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

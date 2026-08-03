@@ -556,3 +556,33 @@ tbody tr:last-child td { border-bottom: 0; }
 .nova-recommendation p { margin:0; color:var(--muted); font-size:11px; }
 .nova-recommendation textarea { min-height:76px; }
 @media(max-width:850px){.nova-context-grid,.nova-recommendations{grid-template-columns:1fr}.nova-card .section-header{display:grid}}
+
+/* Phase 4B: Orbit meeting intelligence */
+.orbit-safe { margin-left:auto; color:#d7e8ff; }
+.orbit-list { display:grid; gap:15px; }
+.orbit-card { display:grid; gap:16px; }
+.orbit-card .section-header p { margin:6px 0 0; color:var(--muted); font-size:10px; }
+.orbit-start { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:14px; border:1px solid #bad9ff; border-radius:13px; background:linear-gradient(135deg,#eff7ff,#fff); }
+.orbit-start strong,.orbit-notes strong { font-size:11px; }
+.orbit-start p,.orbit-notes p { margin:4px 0 0; color:var(--muted); font-size:9px; line-height:1.55; }
+.orbit-editor { border-top:1px solid var(--line); padding-top:16px; }
+.orbit-editor textarea { min-height:92px; }
+.orbit-approved { border:1px solid #c7ead5; border-radius:12px; background:#f8fffb; overflow:hidden; }
+.orbit-approved summary { display:flex; align-items:center; gap:8px; padding:12px 14px; color:#246342; font-size:10px; font-weight:800; cursor:pointer; }
+.orbit-approved-body { display:grid; gap:7px; padding:0 14px 14px; }
+.orbit-approved-body strong { color:var(--muted); font-size:8px; text-transform:uppercase; letter-spacing:.05em; }
+.orbit-approved-body p { margin:0 0 7px; color:#42526a; font-size:10px; line-height:1.6; white-space:pre-wrap; }
+.orbit-notes { display:grid; grid-template-columns:minmax(210px,.65fr) minmax(320px,1.35fr) auto; align-items:end; gap:12px; padding:14px; border:1px solid var(--line); border-radius:13px; background:var(--panel-subtle); }
+.orbit-notes textarea { min-height:100px; resize:vertical; }
+.orbit-notes .button { min-height:38px; }
+.orbit-recommendations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.orbit-recommendations > section { display:grid; align-content:start; gap:10px; padding:14px; border:1px solid var(--line); border-radius:13px; background:var(--panel-subtle); }
+.orbit-recommendations strong { font-size:10px; }
+.orbit-recommendations p { margin:0; color:var(--muted); font-size:9px; line-height:1.55; }
+.orbit-recommendations ul { display:grid; gap:7px; margin:0; padding:0; list-style:none; }
+.orbit-recommendations li { display:flex; justify-content:space-between; gap:12px; padding-bottom:7px; border-bottom:1px solid var(--line); font-size:9px; }
+.orbit-recommendations li span { font-weight:750; }
+.orbit-recommendations li small { color:var(--muted); text-align:right; }
+.orbit-draft { padding:14px; border:1px solid #cfe2fb; border-radius:13px; background:#f8fbff; }
+.orbit-draft .notice { margin:0; }
+@media(max-width:900px){.orbit-notes{grid-template-columns:1fr}.orbit-recommendations{grid-template-columns:1fr}.orbit-card .section-header{display:grid}.orbit-start{align-items:flex-start;flex-direction:column}}

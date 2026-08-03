@@ -3,6 +3,8 @@ import {
   atlasOutputSchema,
   echoOutputSchema,
   novaOutputSchema,
+  orbitDebriefOutputSchema,
+  orbitPrepOutputSchema,
   relayOutputSchema,
   sageOutputSchema,
   sentinelOutputSchema,
@@ -50,6 +52,8 @@ describe("agent response schemas", () => {
       echoOutputSchema,
       sentinelOutputSchema,
       novaOutputSchema,
+      orbitPrepOutputSchema,
+      orbitDebriefOutputSchema,
     ]) {
       expect(collectFormats(schema).every((format) => structuredOutputFormats.has(format))).toBe(true);
     }

@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 4A
+# GridFlow implementation status — Phase 4B
 
 ## Built and verified
 
@@ -17,12 +17,13 @@
 - Paid, email-bound one-time activations with platform-owner approval and immediate access suspension/revocation.
 - Core one-time entitlements, renewable Ultra terms, seat limits and atomic managed-research credits.
 - Encrypted tenant Gemini keys, onboarding guidance and per-capability Gemini/managed-provider routing.
+- **Orbit meeting intelligence** with factual preparation, human-notes-only debriefs, editable review, idempotent approved tasks, explicit opportunity updates and unsent follow-up drafts.
 
 ## Validation result
 
-- 81 automated tests passed across 33 files.
+- 85 automated tests passed across 36 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 54 models and 11 registered migrations.
+- Database schema check passed: 55 models and 12 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 

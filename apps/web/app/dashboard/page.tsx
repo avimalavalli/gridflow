@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         <div className="split-layout">
           <div className="stack">
             <section className="card">
-              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines Pulse follow-ups, Sentinel replies, Nova plans, due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/nova">Open Nova <ArrowUpRight size={14}/></Link></div>
+              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines Pulse follow-ups, Sentinel replies, Nova plans, Orbit meetings, due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/orbit">Open Orbit <ArrowUpRight size={14}/></Link></div>
               {snapshot.actions.length === 0 ? <EmptyState title="Your queue is clear" copy="New follow-ups, approvals and system issues will appear here." /> : <div className="queue">{snapshot.actions.map((action) => <Link href={action.href} className="queue-item" key={`${action.kind}-${action.id}`}><div className="queue-main"><div className="queue-title">{action.title}</div><div className="queue-copy">{action.detail || "Open the record for the full context."}{action.dueAt ? ` · ${dateTime(action.dueAt)}` : ""}</div></div><div className="queue-meta"><StatusBadge value={action.urgency}/><ArrowUpRight size={13}/></div></Link>)}</div>}
             </section>
 
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
           <div className="stack">
             <section className="card">
               <div className="section-header"><div><div className="eyebrow">Calendar</div><h2>Upcoming meetings</h2></div><Link className="button button-ghost" href="/meetings">View all</Link></div>
-              {snapshot.upcomingMeetings.length === 0 ? <EmptyState title="No meetings scheduled" copy="Book a discovery call or sponsor meeting and it will appear here." /> : <div className="queue">{snapshot.upcomingMeetings.map((meeting) => <Link href="/meetings" className="queue-item" key={meeting.id}><span className="metric-icon"><CalendarDays size={15}/></span><div className="queue-main"><div className="queue-title">{meeting.title}</div><div className="queue-copy">{dateTime(meeting.startsAt)} · {meeting.companyName || meeting.contactName || "Commercial meeting"}</div></div></Link>)}</div>}
+              {snapshot.upcomingMeetings.length === 0 ? <EmptyState title="No meetings scheduled" copy="Book a discovery call or sponsor meeting and it will appear here." /> : <div className="queue">{snapshot.upcomingMeetings.map((meeting) => <Link href="/orbit" className="queue-item" key={meeting.id}><span className="metric-icon"><CalendarDays size={15}/></span><div className="queue-main"><div className="queue-title">{meeting.title}</div><div className="queue-copy">{dateTime(meeting.startsAt)} · {meeting.companyName || meeting.contactName || "Commercial meeting"}</div></div></Link>)}</div>}
             </section>
 
             <section className="card">

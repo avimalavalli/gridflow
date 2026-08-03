@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconstructedCoreAgents } from "../src/index.js";
+import { forgePrompt, reconstructedCoreAgents } from "../src/index.js";
 
 describe("reconstructed GridFlow agent contracts", () => {
   it("keeps one responsibility per core agent", () => {
@@ -25,5 +25,14 @@ describe("reconstructed GridFlow agent contracts", () => {
       expect(agent.systemPrompt.toLowerCase()).toContain("invent");
     }
     expect(reconstructedCoreAgents.find((agent) => agent.name === "ECHO")?.systemPrompt).toContain("250 characters");
+  });
+
+  it("keeps Forge internal, price-bound and human-controlled", () => {
+    expect(forgePrompt.name).toBe("FORGE");
+    expect(forgePrompt.webSearchAllowed).toBe(false);
+    expect(forgePrompt.systemPrompt).toContain("invent audience numbers, results, sponsor objectives, budgets, rights");
+    expect(forgePrompt.systemPrompt).toContain("Never send, publish, sign, accept, book, invoice or update the opportunity");
+    expect(forgePrompt.systemPrompt).toContain("Subject to contract, rights availability and final written approval.");
+    expect(forgePrompt.outputSchema.properties.needs_human_review).toMatchObject({ const: true });
   });
 });

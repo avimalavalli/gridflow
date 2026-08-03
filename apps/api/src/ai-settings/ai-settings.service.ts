@@ -43,7 +43,7 @@ export class AiSettingsService {
           requiresGemini: product.agentExecutionMode === "BYO_GEMINI",
         },
         routing: {
-          geminiAgents: ["ECHO", "SENTINEL", "NOVA", "ORBIT"],
+          geminiAgents: ["ECHO", "SENTINEL", "NOVA", "ORBIT", "FORGE"],
           managedResearchAgents: ["ATLAS", "SAGE", "RELAY"],
           evidenceSearchNeverUsesGeminiFreeKey: true,
         },

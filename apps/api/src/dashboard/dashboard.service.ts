@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, forge, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -216,6 +216,24 @@ export class DashboardService {
           [tenantId],
         ),
         tx.query<ActionRow>(
+          `SELECT p."id",'FORGE' AS "kind",
+                  CASE
+                    WHEN p."status"='READY' THEN 'Review Forge proposal for ' || co."companyName"
+                    WHEN p."status"='APPROVED' THEN 'Share approved proposal with ' || co."companyName"
+                    ELSE 'Forge needs attention for ' || co."companyName"
+                  END AS "title",
+                  COALESCE(op."opportunityName",p."title") AS "detail",p."updatedAt" AS "dueAt",
+                  '/forge/' || p."id" AS "href",
+                  CASE WHEN p."status"='FAILED' THEN 'FAILED' WHEN p."status"='READY' THEN 'REVIEW' ELSE 'READY' END AS "urgency"
+           FROM "Proposal" p
+           JOIN "Company" co ON co."id"=p."companyId" AND co."tenantId"=p."tenantId"
+           LEFT JOIN "Opportunity" op ON op."id"=p."opportunityId" AND op."tenantId"=p."tenantId"
+           WHERE p."tenantId"=$1::uuid AND p."status" IN ('READY','APPROVED','FAILED')
+           ORDER BY CASE p."status" WHEN 'FAILED' THEN 0 WHEN 'READY' THEN 1 ELSE 2 END,p."updatedAt" DESC
+           LIMIT 8`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
           `SELECT a."id", 'AGENT_FAILURE' AS "kind", a."agentName"::text || ' needs attention' AS "title",
                   COALESCE(a."errorCode", a."errorDetails", 'Agent run failed') AS "detail", a."updatedAt" AS "dueAt",
                   '/agent-runs' AS "href", 'FAILED' AS "urgency"
@@ -245,7 +263,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

@@ -396,6 +396,18 @@ enum OrbitStatus {
   FAILED
 }
 
+enum ForgeStatus {
+  DRAFT
+  QUEUED
+  PROCESSING
+  READY
+  APPROVED
+  REJECTED
+  SENT
+  FAILED
+  ARCHIVED
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -536,6 +548,11 @@ model User {
   novaReviews     Interaction[] @relation("NovaReviewedBy")
   orbitPrepReviews OrbitWorkspace[] @relation("OrbitPrepReviewedBy")
   orbitDebriefReviews OrbitWorkspace[] @relation("OrbitDebriefReviewedBy")
+  forgeProposalsCreated Proposal[] @relation("ProposalCreatedBy")
+  forgeProposalsReviewed Proposal[] @relation("ProposalReviewedBy")
+  forgeProposalsSent Proposal[] @relation("ProposalSentBy")
+  forgeVersionsCreated ProposalVersion[] @relation("ProposalVersionCreatedBy")
+  forgeVersionsApproved ProposalVersion[] @relation("ProposalVersionApprovedBy")
   releaseApprovals ReleaseAcceptance[] @relation("ReleaseAcceptanceApprovedBy")
   acceptanceChecks ReleaseAcceptanceCheck[] @relation("AcceptanceCheckTestedBy")
   startedPipelineRuns PipelineRun[] @relation("PipelineRunStartedBy")
@@ -575,6 +592,7 @@ model Organisation {
   meetings            Meeting[]
   orbitWorkspaces     OrbitWorkspace[]
   proposals           Proposal[]
+  proposalVersions    ProposalVersion[]
   agentRuns           AgentRun[]
   automationJobs      AutomationJob[]
   jobOutbox            JobOutbox[]
@@ -1439,34 +1457,67 @@ model OrbitWorkspace {
 }
 
 model Proposal {
-  id               String           @id @default(uuid()) @db.Uuid
-  tenantId         String           @db.Uuid
-  companyId        String           @db.Uuid
-  opportunityId    String?          @db.Uuid
-  title            String
-  status           String           @default("DRAFT")
-  currentVersionId String?          @unique @db.Uuid
-  sentAt           DateTime?        @db.Timestamptz(3)
-  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
-  tenant           Organisation     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  opportunity      Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  versions         ProposalVersion[] @relation("ProposalVersions")
-  currentVersion   ProposalVersion?  @relation("CurrentProposalVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @db.Uuid
+  companyId          String            @db.Uuid
+  opportunityId      String?           @db.Uuid
+  title              String
+  status             ForgeStatus       @default(DRAFT)
+  requestKey         String?
+  brief              Json?
+  currentVersionId   String?           @unique @db.Uuid
+  currentAgentRunId  String?           @unique @db.Uuid
+  errorDetails       String?
+  generationStartedAt DateTime?         @db.Timestamptz(3)
+  createdByUserId    String?            @db.Uuid
+  reviewedAt         DateTime?          @db.Timestamptz(3)
+  reviewedByUserId   String?            @db.Uuid
+  reviewNote         String?
+  sentAt             DateTime?          @db.Timestamptz(3)
+  sentByUserId       String?            @db.Uuid
+  sentChannel        String?
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  tenant             Organisation       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity        Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  createdBy          User?               @relation("ProposalCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reviewedBy         User?               @relation("ProposalReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  sentBy             User?               @relation("ProposalSentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  versions           ProposalVersion[]   @relation("ProposalVersions")
+  currentVersion     ProposalVersion?    @relation("CurrentProposalVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  currentAgentRun    AgentRun?           @relation("ProposalCurrentAgentRun", fields: [currentAgentRunId], references: [id], onDelete: SetNull)
+  agentRuns          AgentRun[]           @relation("ProposalAgentRuns")
+
+  @@unique([tenantId, requestKey])
+  @@index([tenantId, status, updatedAt])
+  @@index([tenantId, opportunityId, updatedAt])
 }
 
 model ProposalVersion {
-  id             String      @id @default(uuid()) @db.Uuid
-  proposalId     String      @db.Uuid
-  versionNumber  Int
-  content        Json
-  fileObjectKey  String?
-  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
-  proposal       Proposal    @relation("ProposalVersions", fields: [proposalId], references: [id], onDelete: Cascade)
-  currentFor     Proposal?   @relation("CurrentProposalVersion")
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @db.Uuid
+  proposalId       String        @db.Uuid
+  versionNumber    Int
+  content          Json
+  fileObjectKey    String?
+  promptVersion    String?
+  modelUsed        String?
+  agentRunId       String?       @unique @db.Uuid
+  createdByUserId  String?       @db.Uuid
+  humanEdited      Boolean       @default(false)
+  approvedAt       DateTime?     @db.Timestamptz(3)
+  approvedByUserId String?       @db.Uuid
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  tenant           Organisation  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proposal         Proposal      @relation("ProposalVersions", fields: [proposalId], references: [id], onDelete: Cascade)
+  currentFor       Proposal?     @relation("CurrentProposalVersion")
+  agentRun         AgentRun?     @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  createdBy        User?         @relation("ProposalVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  approvedBy       User?         @relation("ProposalVersionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([proposalId, versionNumber])
+  @@index([tenantId, proposalId, versionNumber])
 }
 
 model AgentRun {
@@ -1502,6 +1553,7 @@ model AgentRun {
   outreachRecordId String?        @db.Uuid
   pipelineRunId    String?        @db.Uuid
   meetingId        String?        @db.Uuid
+  proposalId       String?        @db.Uuid
   createdAt        DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
   tenant           Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1511,6 +1563,9 @@ model AgentRun {
   outreachRecord   OutreachRecord? @relation(fields: [outreachRecordId], references: [id], onDelete: SetNull)
   pipelineRun      PipelineRun?    @relation(fields: [pipelineRunId], references: [id], onDelete: SetNull)
   meeting          Meeting?        @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  proposal         Proposal?       @relation("ProposalAgentRuns", fields: [proposalId], references: [id], onDelete: SetNull)
+  forgeCurrentFor  Proposal?       @relation("ProposalCurrentAgentRun")
+  proposalVersion  ProposalVersion?
   orbitPrepFor     OrbitWorkspace[] @relation("OrbitPrepAgentRun")
   orbitDebriefFor  OrbitWorkspace[] @relation("OrbitDebriefAgentRun")
   humanReviewedBy  User?           @relation("AgentRunReviewedBy", fields: [humanReviewedByUserId], references: [id], onDelete: SetNull)
@@ -1523,6 +1578,7 @@ model AgentRun {
   @@index([tenantId, pipelineRunId, status])
   @@index([tenantId, humanReviewStatus, createdAt])
   @@index([tenantId, meetingId, status])
+  @@index([tenantId, proposalId, status])
 }
 
 model ResearchCreditReservation {

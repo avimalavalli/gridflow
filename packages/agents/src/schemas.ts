@@ -324,3 +324,69 @@ export const orbitDebriefOutputSchema = {
     needs_human_review: { type: "boolean", const: true },
   },
 } as const;
+
+export const forgeOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "proposal_title", "executive_summary", "sponsor_context", "partnership_thesis",
+    "sponsor_objectives", "package_options", "rights_and_dependencies", "assumptions",
+    "unknowns", "exclusions", "implementation_plan", "next_steps", "legal_notice",
+    "reasoning", "confidence", "needs_human_review",
+  ],
+  properties: {
+    proposal_title: { type: "string", minLength: 1, maxLength: 300 },
+    executive_summary: { type: "string", minLength: 1, maxLength: 4_000 },
+    sponsor_context: { type: "string", minLength: 1, maxLength: 3_000 },
+    partnership_thesis: { type: "string", minLength: 1, maxLength: 3_000 },
+    sponsor_objectives: { type: "array", minItems: 1, maxItems: 12, items: { type: "string", minLength: 1, maxLength: 600 } },
+    package_options: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "name", "positioning", "investment_status", "investment_minor", "currency",
+          "term_months", "deliverables", "activation_ideas", "measurement_plan",
+        ],
+        properties: {
+          name: { type: "string", minLength: 1, maxLength: 160 },
+          positioning: { type: "string", minLength: 1, maxLength: 1_500 },
+          investment_status: { type: "string", enum: ["BRIEFED", "PROVISIONAL", "NEEDS_INPUT"] },
+          investment_minor: { type: "integer", minimum: 0, maximum: 2_147_483_647 },
+          currency: { type: "string", pattern: "^[A-Z]{3}$" },
+          term_months: { type: "integer", minimum: 0, maximum: 60 },
+          deliverables: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", minLength: 1, maxLength: 600 } },
+          activation_ideas: { type: "array", maxItems: 15, items: { type: "string", minLength: 1, maxLength: 800 } },
+          measurement_plan: { type: "array", maxItems: 15, items: { type: "string", minLength: 1, maxLength: 600 } },
+        },
+      },
+    },
+    rights_and_dependencies: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 700 } },
+    assumptions: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 700 } },
+    unknowns: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 700 } },
+    exclusions: { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 700 } },
+    implementation_plan: {
+      type: "array",
+      minItems: 1,
+      maxItems: 12,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["phase", "timing", "actions"],
+        properties: {
+          phase: { type: "string", minLength: 1, maxLength: 160 },
+          timing: { type: "string", minLength: 1, maxLength: 300 },
+          actions: { type: "array", minItems: 1, maxItems: 12, items: { type: "string", minLength: 1, maxLength: 600 } },
+        },
+      },
+    },
+    next_steps: { type: "array", minItems: 1, maxItems: 12, items: { type: "string", minLength: 1, maxLength: 600 } },
+    legal_notice: { type: "string", const: "Subject to contract, rights availability and final written approval." },
+    reasoning: { type: "string", minLength: 1, maxLength: 2_500 },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    needs_human_review: { type: "boolean", const: true },
+  },
+} as const;

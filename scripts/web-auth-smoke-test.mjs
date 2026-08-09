@@ -61,9 +61,13 @@ async function webRequest(path, { cookie, method = "GET", body } = {}) {
 }
 
 function sessionCookie(response) {
-  const header = response.headers.get("set-cookie");
-  if (!header) throw new Error("The web proxy did not forward the API session cookie.");
-  return header.split(";", 1)[0];
+  const headers = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+  const values = headers.length ? headers : [response.headers.get("set-cookie")].filter(Boolean);
+  const cookies = values.map((value) => value.split(";", 1)[0]).filter((value) => /^gridflow_(session|device)=/.test(value));
+  if (!cookies.some((value) => value.startsWith("gridflow_session=")) || !cookies.some((value) => value.startsWith("gridflow_device="))) {
+    throw new Error("The web proxy did not forward both session and trusted-device cookies.");
+  }
+  return cookies.join("; ");
 }
 
 const api = start("api", process.execPath, ["apps/api/dist/main.js"], {
@@ -85,6 +89,7 @@ const web = start(
     GRIDFLOW_API_URL: unavailableApiBase,
     GRIDFLOW_API_FALLBACK_URL: apiBase,
     AUTH_SESSION_COOKIE_NAME: "gridflow_session",
+    AUTH_DEVICE_COOKIE_NAME: "gridflow_device",
   },
 );
 

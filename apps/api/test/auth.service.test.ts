@@ -17,23 +17,33 @@ class TestDatabaseService {
   }
 }
 
-function request(cookie?: string): Request {
+function request(cookie?: string, userAgent = "gridflow-auth-test", ip = "127.0.0.1"): Request {
   return {
     headers: cookie ? { cookie } : {},
-    ip: "127.0.0.1",
-    header(name: string) { return name.toLowerCase() === "user-agent" ? "gridflow-auth-test" : undefined; },
+    ip,
+    header(name: string) { return name.toLowerCase() === "user-agent" ? userAgent : undefined; },
   } as unknown as Request;
 }
 
 function response() {
-  let cookieValue = "";
+  const cookies = new Map<string, string>();
   return {
     response: {
-      cookie(name: string, value: string) { cookieValue = `${name}=${encodeURIComponent(value)}`; return this; },
-      clearCookie() { cookieValue = ""; return this; },
+      cookie(name: string, value: string) { cookies.set(name, `${name}=${encodeURIComponent(value)}`); return this; },
+      clearCookie(name: string) { cookies.delete(name); return this; },
     } as unknown as Response,
-    cookie: () => cookieValue,
+    cookie: () => [...cookies.values()].join("; "),
   };
+}
+
+function mergeCookies(...values: string[]): string {
+  const cookies = new Map<string, string>();
+  for (const value of values) for (const part of value.split(";")) {
+    const clean = part.trim();
+    if (!clean) continue;
+    cookies.set(clean.split("=", 1)[0]!, clean);
+  }
+  return [...cookies.values()].join("; ");
 }
 
 const originalAuthEncryptionKey = apiConfig.authEncryptionKey;
@@ -84,10 +94,11 @@ describe("GridFlow account recovery and MFA", () => {
 
     await expect(auth.login({ email: "athlete@example.test", password: "old-private-password-123" }, request(), response().response)).rejects.toThrow();
     const loginResponse = response();
-    const loggedIn = await auth.login({ email: "athlete@example.test", password: "new-private-password-123" }, request(), loginResponse.response);
+    const loggedIn = await auth.login({ email: "athlete@example.test", password: "new-private-password-123" }, request(registrationResponse.cookie()), loginResponse.response);
     expect("mfaRequired" in loggedIn).toBe(false);
 
-    const identity = await sessions.resolve(request(loginResponse.cookie()));
+    const activeBrowserCookies = mergeCookies(registrationResponse.cookie(), loginResponse.cookie());
+    const identity = await sessions.resolve(request(activeBrowserCookies));
     expect(identity).toBeTruthy();
     const setup = await auth.setupMfa(identity!);
     const enabled = await auth.enableMfa(identity!, { code: currentTotp(setup.secret) });
@@ -95,13 +106,73 @@ describe("GridFlow account recovery and MFA", () => {
     expect(enabled.recoveryCodes).toHaveLength(10);
 
     const mfaLoginResponse = response();
-    const challenge = await auth.login({ email: "athlete@example.test", password: "new-private-password-123" }, request(), mfaLoginResponse.response) as { mfaRequired: true; challengeToken: string };
+    const challenge = await auth.login({ email: "athlete@example.test", password: "new-private-password-123" }, request(activeBrowserCookies), mfaLoginResponse.response) as { mfaRequired: true; challengeToken: string };
     expect(challenge.mfaRequired).toBe(true);
     expect(mfaLoginResponse.cookie()).toBe("");
 
     const verifiedResponse = response();
-    const verified = await auth.verifyMfaLogin({ challengeToken: challenge.challengeToken, code: currentTotp(setup.secret) }, request(), verifiedResponse.response);
+    const verified = await auth.verifyMfaLogin({ challengeToken: challenge.challengeToken, code: currentTotp(setup.secret) }, request(activeBrowserCookies), verifiedResponse.response);
     expect(verified.security.mfaEnabled).toBe(true);
     expect(verifiedResponse.cookie()).toContain("gridflow_session=");
+  });
+
+  it("allows two trusted devices and requires verified replacement for a third", async () => {
+    directory = await mkdtemp(join(tmpdir(), "gridflow-trusted-devices-"));
+    database = await createDatabase("pglite://memory");
+    await migrateDatabase(database);
+    const db = new TestDatabaseService(database);
+    const sessions = new SessionService(db as never);
+    const auth = new AuthService(db as never, sessions);
+
+    const firstResponse = response();
+    await auth.register({
+      email: "devices@example.test",
+      password: "private-password-123",
+      name: "Device Test",
+      organisationName: "Device Test Racing",
+      organisationType: "DRIVER",
+    }, request(undefined, "Mozilla/5.0 (Windows NT 10.0) Chrome/149.0"), firstResponse.response);
+
+    const secondResponse = response();
+    await auth.login(
+      { email: "devices@example.test", password: "private-password-123" },
+      request(undefined, "Mozilla/5.0 (iPhone) Version/18.0 Mobile Safari/605.1", "127.0.0.2"),
+      secondResponse.response,
+    );
+
+    let limitPayload: Record<string, unknown> | undefined;
+    try {
+      await auth.login(
+        { email: "devices@example.test", password: "private-password-123" },
+        request(undefined, "Mozilla/5.0 (Macintosh) Firefox/141.0", "127.0.0.3"),
+        response().response,
+      );
+    } catch (error) {
+      limitPayload = (error as { getResponse(): Record<string, unknown> }).getResponse();
+    }
+    expect(limitPayload).toMatchObject({ code: "TRUSTED_DEVICE_LIMIT" });
+    const listed = limitPayload?.devices as Array<{ id: string; name: string }>;
+    expect(listed).toHaveLength(2);
+    expect(typeof limitPayload?.replacementToken).toBe("string");
+    const windowsDevice = listed.find((device) => device.name.includes("Windows"));
+    expect(windowsDevice).toBeTruthy();
+
+    const replacementResponse = response();
+    await auth.replaceDevice({
+      replacementToken: String(limitPayload?.replacementToken),
+      deviceId: windowsDevice!.id,
+    }, request(undefined, "Mozilla/5.0 (Macintosh) Firefox/141.0", "127.0.0.3"), replacementResponse.response);
+
+    const active = await database.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "AuthDevice" WHERE "revokedAt" IS NULL`);
+    expect(active.rows[0]?.count).toBe(2);
+    const revoked = await database.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "AuthDevice" WHERE "revokedAt" IS NOT NULL`);
+    expect(revoked.rows[0]?.count).toBe(1);
+    expect(await sessions.resolve(request(firstResponse.cookie(), "Mozilla/5.0 (Windows NT 10.0) Chrome/149.0"))).toBeNull();
+    expect(await sessions.resolve(request(replacementResponse.cookie(), "Mozilla/5.0 (Macintosh) Firefox/141.0"))).toBeTruthy();
+    const replacementDevices = await sessions.listDevices(
+      String((await database.query<{ id: string }>(`SELECT "id" FROM "User" WHERE "email"='devices@example.test'`)).rows[0]?.id),
+      request(replacementResponse.cookie()),
+    );
+    expect(replacementDevices.devices.filter((device) => device.current)).toHaveLength(1);
   });
 });

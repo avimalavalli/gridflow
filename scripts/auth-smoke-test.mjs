@@ -45,9 +45,13 @@ function assert(condition, message) {
 }
 
 function sessionCookie(response) {
-  const header = response.headers.get("set-cookie");
-  if (!header) throw new Error("Authentication response did not set a session cookie.");
-  return header.split(";", 1)[0];
+  const headers = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+  const values = headers.length ? headers : [response.headers.get("set-cookie")].filter(Boolean);
+  const cookies = values.map((value) => value.split(";", 1)[0]).filter((value) => /^gridflow_(session|device)=/.test(value));
+  if (!cookies.some((value) => value.startsWith("gridflow_session=")) || !cookies.some((value) => value.startsWith("gridflow_device="))) {
+    throw new Error("Authentication response did not set both session and trusted-device cookies.");
+  }
+  return cookies.join("; ");
 }
 
 async function request(path, { cookie, method = "GET", body } = {}) {

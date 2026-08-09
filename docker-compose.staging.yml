@@ -68,6 +68,7 @@ services:
       NODE_ENV: production
       GRIDFLOW_DEV_BOOTSTRAP: "false"
       AUTH_SESSION_COOKIE_NAME: gridflow_session
+      AUTH_DEVICE_COOKIE_NAME: gridflow_device
     ports:
       - "3000:3000"
 

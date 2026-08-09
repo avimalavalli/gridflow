@@ -27,13 +27,13 @@ function request(cookie?: string): Request {
 }
 
 function response() {
-  let cookieValue = "";
+  const cookies = new Map<string, string>();
   return {
     response: {
-      cookie(name: string, value: string) { cookieValue = `${name}=${encodeURIComponent(value)}`; return this; },
-      clearCookie() { cookieValue = ""; return this; },
+      cookie(name: string, value: string) { cookies.set(name, `${name}=${encodeURIComponent(value)}`); return this; },
+      clearCookie(name: string) { cookies.delete(name); return this; },
     } as unknown as Response,
-    cookie: () => cookieValue,
+    cookie: () => [...cookies.values()].join("; "),
   };
 }
 
@@ -85,6 +85,7 @@ describe("GridFlow paid activation and owner approval", () => {
     });
     const identity: RequestIdentity = {
       sessionId: "platform-admin-test",
+      deviceId: "platform-admin-device-test",
       userId: admin.userId,
       tenantId: admin.tenantId,
       role: "OWNER",

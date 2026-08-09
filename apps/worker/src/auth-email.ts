@@ -32,6 +32,16 @@ function passwordResetContent(payload: Record<string, unknown>) {
   return { subject, text, html };
 }
 
+function newDeviceContent(payload: Record<string, unknown>) {
+  const deviceName = typeof payload.deviceName === "string" ? payload.deviceName : "a new device";
+  const ipAddress = typeof payload.ipAddress === "string" && payload.ipAddress ? payload.ipAddress : "unavailable";
+  const signedInAt = typeof payload.signedInAt === "string" ? payload.signedInAt : new Date().toISOString();
+  const subject = "New device signed in to GridFlow";
+  const text = `A new trusted device signed in to your GridFlow account.\n\nDevice: ${deviceName}\nIP address: ${ipAddress}\nTime: ${signedInAt}\n\nIf this was not you, open GridFlow Settings immediately, revoke the device and reset your password.`;
+  const html = `<p>A new trusted device signed in to your GridFlow account.</p><p><strong>Device:</strong> ${escapeHtml(deviceName)}<br><strong>IP address:</strong> ${escapeHtml(ipAddress)}<br><strong>Time:</strong> ${escapeHtml(signedInAt)}</p><p>If this was not you, open GridFlow Settings immediately, revoke the device and reset your password.</p>`;
+  return { subject, text, html };
+}
+
 export class AuthEmailProcessor {
   constructor(private readonly database: GridFlowDatabase) {}
 
@@ -50,7 +60,9 @@ export class AuthEmailProcessor {
     try {
       const content = row.template === "PASSWORD_RESET"
         ? passwordResetContent(row.payload)
-        : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
+        : row.template === "NEW_DEVICE"
+          ? newDeviceContent(row.payload)
+          : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
       await this.deliver(row.id, row.recipient, content);
       await this.database.query(
         `UPDATE "AuthEmailOutbox" SET "status"='SENT',"sentAt"=CURRENT_TIMESTAMP,"errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,

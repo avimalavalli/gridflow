@@ -118,6 +118,7 @@ export class TenantContextService {
 
       return {
         sessionId: "development-bootstrap",
+        deviceId: "development-bootstrap",
         tenantId,
         userId,
         role: "OWNER",

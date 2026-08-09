@@ -541,6 +541,8 @@ model User {
   updatedAt      DateTime                 @updatedAt @db.Timestamptz(3)
   memberships    OrganisationMembership[]
   authSessions   AuthSession[]
+  authDevices    AuthDevice[]
+  authDeviceChallenges AuthDeviceChallenge[]
   createdCompanies Company[]              @relation("CompanyCreatedBy")
   createdContacts Contact[]                @relation("ContactCreatedBy")
   auditLogs      AuditLog[]
@@ -610,6 +612,7 @@ model Organisation {
   integrationAccounts IntegrationAccount[]
   leadSources         LeadSource[]
   authSessions        AuthSession[]
+  authDeviceChallenges AuthDeviceChallenge[]
   invitations         OrganisationInvitation[]
   loginChallenges     AuthLoginChallenge[]
   releaseAcceptances  ReleaseAcceptance[]
@@ -721,6 +724,7 @@ model AuthSession {
   id                   String        @id @default(uuid()) @db.Uuid
   userId               String        @db.Uuid
   activeOrganisationId String?       @db.Uuid
+  deviceId             String?       @db.Uuid
   tokenHash            String        @unique
   expiresAt            DateTime      @db.Timestamptz(3)
   revokedAt            DateTime?     @db.Timestamptz(3)
@@ -730,9 +734,47 @@ model AuthSession {
   updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeOrganisation   Organisation? @relation(fields: [activeOrganisationId], references: [id], onDelete: SetNull)
+  device               AuthDevice?   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([activeOrganisationId])
+  @@index([deviceId])
+}
+
+model AuthDevice {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @db.Uuid
+  tokenHash    String        @unique
+  name         String
+  userAgent    String?
+  ipAddress    String?
+  firstSeenAt  DateTime      @default(now()) @db.Timestamptz(3)
+  lastSeenAt   DateTime      @default(now()) @db.Timestamptz(3)
+  revokedAt    DateTime?     @db.Timestamptz(3)
+  revokeReason String?
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions     AuthSession[]
+
+  @@index([userId, revokedAt])
+  @@index([userId, lastSeenAt])
+}
+
+model AuthDeviceChallenge {
+  id                   String        @id @default(uuid()) @db.Uuid
+  userId               String        @db.Uuid
+  organisationId       String        @db.Uuid
+  tokenHash            String        @unique
+  expiresAt            DateTime      @db.Timestamptz(3)
+  completedAt          DateTime?     @db.Timestamptz(3)
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime      @default(now()) @db.Timestamptz(3)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation         Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model OrganisationInvitation {

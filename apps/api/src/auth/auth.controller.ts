@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
   Post,
   Query,
   Req,
@@ -17,6 +18,7 @@ import {
   LoginDto,
   RegisterDto,
   ResetPasswordDto,
+  ReplaceTrustedDeviceDto,
   SwitchOrganisationDto,
   VerifyMfaLoginDto,
   VerifyMfaSetupDto,
@@ -109,6 +111,43 @@ export class AuthController {
   async disableMfa(@Req() request: Request, @Body() input: DisableMfaDto) {
     const identity = await this.context.resolve(request);
     return this.auth.disableMfa(identity, input);
+  }
+
+  @Get("devices")
+  async devices(@Req() request: Request) {
+    const identity = await this.context.resolveAnyAccess(request);
+    return this.auth.devices(identity, request);
+  }
+
+  @HttpCode(200)
+  @Post("devices/replace")
+  replaceDevice(
+    @Body() input: ReplaceTrustedDeviceDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.auth.replaceDevice(input, request, response);
+  }
+
+  @HttpCode(200)
+  @Post("devices/:deviceId/revoke")
+  async revokeDevice(
+    @Param("deviceId") deviceId: string,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const identity = await this.context.resolveAnyAccess(request);
+    return this.auth.revokeDevice(identity, deviceId, request, response);
+  }
+
+  @HttpCode(200)
+  @Post("devices/revoke-all")
+  async revokeAllDevices(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const identity = await this.context.resolveAnyAccess(request);
+    return this.auth.revokeAllDevices(identity, request, response);
   }
 
   @Get("me")

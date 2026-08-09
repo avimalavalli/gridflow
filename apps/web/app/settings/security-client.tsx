@@ -3,10 +3,12 @@
 import Image from "next/image";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import { apiPost } from "../../lib/api";
+import { apiGet, apiPost } from "../../lib/api";
 
 interface SetupResponse { secret: string; otpauthUri: string; expiresAt: string; }
 interface EnableResponse { enabled: boolean; recoveryCodes: string[]; }
+interface TrustedDevice { id: string; name: string; firstSeenAt: string; lastSeenAt: string; ipAddress: string | null; current: boolean; activeSessions: number; }
+interface TrustedDevicesResponse { maximum: number; devices: TrustedDevice[]; }
 
 export function SecurityClient({ mfaEnabled }: { mfaEnabled: boolean }) {
   const [enabled, setEnabled] = useState(mfaEnabled);
@@ -17,6 +19,15 @@ export function SecurityClient({ mfaEnabled }: { mfaEnabled: boolean }) {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [devices, setDevices] = useState<TrustedDevicesResponse | null>(null);
+  const [deviceMessage, setDeviceMessage] = useState("");
+
+  async function loadDevices() {
+    try { setDevices(await apiGet<TrustedDevicesResponse>("/auth/devices")); }
+    catch (error) { setDeviceMessage(error instanceof Error ? error.message : "Could not load trusted devices."); }
+  }
+
+  useEffect(() => { void loadDevices(); }, []);
 
   useEffect(() => {
     if (!setup) return;
@@ -62,7 +73,26 @@ export function SecurityClient({ mfaEnabled }: { mfaEnabled: boolean }) {
     finally { setBusy(false); }
   }
 
-  return (
+  async function revokeDevice(device: TrustedDevice) {
+    if (!window.confirm(`Sign out and remove ${device.name}?`)) return;
+    setBusy(true); setDeviceMessage("");
+    try {
+      const result = await apiPost<{ currentDeviceRevoked: boolean }>(`/auth/devices/${device.id}/revoke`);
+      if (result.currentDeviceRevoked) { window.location.assign("/login"); return; }
+      await loadDevices();
+      setDeviceMessage(`${device.name} has been removed and all of its sessions were revoked.`);
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "Could not remove the trusted device."); }
+    finally { setBusy(false); }
+  }
+
+  async function revokeAll() {
+    if (!window.confirm("Sign out every trusted device, including this one? You will need to sign in again.")) return;
+    setBusy(true); setDeviceMessage("");
+    try { await apiPost("/auth/devices/revoke-all"); window.location.assign("/login"); }
+    catch (error) { setDeviceMessage(error instanceof Error ? error.message : "Could not sign out all devices."); setBusy(false); }
+  }
+
+  return (<>
     <section className="card" aria-labelledby="security-heading">
       <div className="card-head"><div><h2 id="security-heading">Account security</h2><p className="card-subtitle">Protect this account with an authenticator app and recovery codes.</p></div><span className={`badge ${enabled ? "green" : "amber"}`}>{enabled ? "MFA enabled" : "MFA off"}</span></div>
       {!enabled && !setup ? <button className="button button-primary" onClick={beginSetup} disabled={busy}>{busy ? "Preparing…" : "Set up MFA"}</button> : null}
@@ -74,5 +104,14 @@ export function SecurityClient({ mfaEnabled }: { mfaEnabled: boolean }) {
       {recoveryCodes.length ? <div className="recovery-panel" role="status"><strong>Recovery codes — shown once</strong><p>Each code works one time. Store them outside GridFlow.</p><div className="recovery-grid">{recoveryCodes.map((item)=><code key={item}>{item}</code>)}</div></div> : null}
       {message ? <div className={`notice ${/could not|incorrect|failed/i.test(message) ? "notice-error" : "notice-success"}`} role="status">{message}</div> : null}
     </section>
-  );
+    <section className="card" aria-labelledby="trusted-devices-heading">
+      <div className="card-head"><div><h2 id="trusted-devices-heading">Trusted devices</h2><p className="card-subtitle">Each person can use GridFlow on two trusted devices. Extra browser tabs do not consume another slot.</p></div><span className="badge blue">{devices ? `${devices.devices.length} of ${devices.maximum}` : "Loading…"}</span></div>
+      {devices ? <div className="trusted-device-list">{devices.devices.map((device) => <div className="trusted-device-row" key={device.id}>
+        <div className="trusted-device-copy"><div className="trusted-device-heading"><strong>{device.name}</strong>{device.current ? <span className="badge green">This device</span> : null}</div><small>Last active {new Date(device.lastSeenAt).toLocaleString()} · Trusted since {new Date(device.firstSeenAt).toLocaleDateString()} · {device.activeSessions} active {device.activeSessions === 1 ? "session" : "sessions"}</small></div>
+        <div className="trusted-device-actions"><button className="button button-secondary" type="button" disabled={busy} onClick={() => revokeDevice(device)}>{device.current ? "Remove and sign out" : "Remove device"}</button></div>
+      </div>)}</div> : null}
+      <div className="section-gap"><button className="button button-danger" type="button" disabled={busy || !devices?.devices.length} onClick={revokeAll}>Sign out all devices</button></div>
+      {deviceMessage ? <div className={`notice ${/could not|failed/i.test(deviceMessage) ? "notice-error" : "notice-success"}`} role="status">{deviceMessage}</div> : null}
+    </section>
+  </>);
 }

@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: gridflow-restore-only
@@ -43,8 +43,16 @@ jobs:
 
       - name: Install PostgreSQL client
         run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error --location \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+          sudo apt-get install --yes postgresql-client-18
+          test "$(pg_dump --version | awk '{print $3}' | cut -d. -f1)" = "18"
 
       - name: Validate protected backup configuration
         run: |
@@ -60,6 +68,8 @@ jobs:
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
           dump="/tmp/gridflow-${stamp}.dump"
           encrypted="backup-evidence/gridflow-${stamp}.dump.enc"
+          source_migration_count="$(psql "$GRIDFLOW_DATABASE_PUBLIC_URL" --tuples-only --no-align --command 'SELECT COUNT(*) FROM "_GridFlowMigration"')"
+          test "$source_migration_count" -ge 14
           pg_dump "$GRIDFLOW_DATABASE_PUBLIC_URL" --format=custom --no-owner --no-privileges --file="$dump"
           checksum="$(sha256sum "$dump" | awk '{print $1}')"
           bytes="$(wc -c < "$dump" | tr -d ' ')"
@@ -82,6 +92,7 @@ jobs:
           echo "file=$encrypted" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
           echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+          echo "migration_count=$source_migration_count" >> "$GITHUB_OUTPUT"
           shred --remove "$dump"
 
       - name: Decrypt and restore into clean PostgreSQL
@@ -93,7 +104,8 @@ jobs:
           test "$(sha256sum "$restored" | awk '{print $1}')" = "${{ steps.backup.outputs.checksum }}"
           pg_restore --clean --if-exists --no-owner --no-privileges --dbname="$RESTORE_DATABASE_URL" "$restored"
           migration_count="$(psql "$RESTORE_DATABASE_URL" --tuples-only --no-align --command 'SELECT COUNT(*) FROM "_GridFlowMigration"')"
-          test "$migration_count" -ge 13
+          test "$migration_count" -ge 14
+          test "$migration_count" -eq "${{ steps.backup.outputs.migration_count }}"
           psql "$RESTORE_DATABASE_URL" --set=ON_ERROR_STOP=1 <<'SQL'
           DO $$
           DECLARE missing text;

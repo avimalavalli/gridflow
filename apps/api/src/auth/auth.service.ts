@@ -31,6 +31,7 @@ import type {
   LoginDto,
   RegisterDto,
   ResetPasswordDto,
+  ReplaceTrustedDeviceDto,
   SwitchOrganisationDto,
   VerifyMfaLoginDto,
   VerifyMfaSetupDto,
@@ -299,6 +300,32 @@ export class AuthService {
     return { signedOut: true };
   }
 
+  async devices(identity: SessionIdentity, request: Request) {
+    return this.sessions.listDevices(identity.userId, request);
+  }
+
+  async replaceDevice(input: ReplaceTrustedDeviceDto, request: Request, response: Response) {
+    const replaced = await this.sessions.replaceDevice(input.replacementToken, input.deviceId, request, response);
+    await this.audit(replaced.organisationId, replaced.userId, "STATUS_CHANGE", "AuthDevice", input.deviceId, request, { replaced: true });
+    return this.meFromIds(replaced.userId, replaced.organisationId);
+  }
+
+  async revokeDevice(identity: SessionIdentity, deviceId: string, request: Request, response: Response) {
+    const revoked = await this.sessions.revokeDevice(identity.userId, deviceId);
+    if (!revoked) throw new NotFoundException("That trusted device is no longer active.");
+    const currentDeviceRevoked = deviceId === identity.deviceId;
+    if (currentDeviceRevoked) this.sessions.clearAuthenticationCookies(response);
+    await this.audit(identity.tenantId, identity.userId, "STATUS_CHANGE", "AuthDevice", deviceId, request, { revoked: true, currentDeviceRevoked });
+    return { revoked: true, currentDeviceRevoked };
+  }
+
+  async revokeAllDevices(identity: SessionIdentity, request: Request, response: Response) {
+    const revokedDevices = await this.sessions.revokeAllDevices(identity.userId);
+    this.sessions.clearAuthenticationCookies(response);
+    await this.audit(identity.tenantId, identity.userId, "STATUS_CHANGE", "AuthDevice", null, request, { revokedAll: true, revokedDevices });
+    return { revoked: true, revokedDevices };
+  }
+
   async me(identity: SessionIdentity) {
     return this.meFromIds(identity.userId, identity.tenantId);
   }
@@ -391,7 +418,7 @@ export class AuthService {
         throw new BadRequestException("This GridFlow organisation has reached its licensed team seat limit.");
       }
       const userResult = await tx.query<UserRow>(
-        `SELECT "id", "email", "name", "passwordHash", "status"
+        `SELECT "id", "email", "name", "passwordHash", "status", "mfaEnabled"
          FROM "User" WHERE "email" = $1`,
         [email],
       );
@@ -429,11 +456,26 @@ export class AuthService {
          WHERE "id" = $2::uuid`,
         [userId, invitation.id],
       );
-      return { userId, organisationId: invitation.organisationId };
+      let mfaChallengeToken: string | null = null;
+      let mfaChallengeExpiresAt: Date | null = null;
+      if (existing?.mfaEnabled) {
+        mfaChallengeToken = createOpaqueToken();
+        mfaChallengeExpiresAt = new Date(Date.now() + apiConfig.mfaChallengeMinutes * 60_000);
+        await tx.query(`DELETE FROM "AuthLoginChallenge" WHERE "userId"=$1::uuid AND ("completedAt" IS NULL OR "expiresAt"<CURRENT_TIMESTAMP)`, [userId]);
+        await tx.query(
+          `INSERT INTO "AuthLoginChallenge" ("userId","organisationId","tokenHash","expiresAt","ipAddress","userAgent")
+           VALUES ($1::uuid,$2::uuid,$3,$4::timestamptz,$5,$6)`,
+          [userId, invitation.organisationId, hashOpaqueToken(mfaChallengeToken), mfaChallengeExpiresAt.toISOString(), request.ip ?? null, request.header("user-agent") ?? null],
+        );
+      }
+      return { userId, organisationId: invitation.organisationId, mfaChallengeToken, mfaChallengeExpiresAt };
     });
 
-    await this.sessions.create(result.userId, result.organisationId, request, response);
     await this.audit(result.organisationId, result.userId, "CREATE", "OrganisationMembership", result.userId, request);
+    if (result.mfaChallengeToken && result.mfaChallengeExpiresAt) {
+      return { mfaRequired: true, challengeToken: result.mfaChallengeToken, expiresAt: result.mfaChallengeExpiresAt };
+    }
+    await this.sessions.create(result.userId, result.organisationId, request, response);
     return this.meFromIds(result.userId, result.organisationId);
   }
 
@@ -485,6 +527,7 @@ export class AuthService {
       await tx.query(`UPDATE "PasswordResetToken" SET "usedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [token.id]);
       await tx.query(`UPDATE "PasswordResetToken" SET "usedAt"=CURRENT_TIMESTAMP WHERE "userId"=$1::uuid AND "usedAt" IS NULL`, [token.userId]);
       await tx.query(`UPDATE "AuthSession" SET "revokedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "userId"=$1::uuid AND "revokedAt" IS NULL`, [token.userId]);
+      await tx.query(`UPDATE "AuthDevice" SET "revokedAt"=CURRENT_TIMESTAMP,"revokeReason"='PASSWORD_RESET',"updatedAt"=CURRENT_TIMESTAMP WHERE "userId"=$1::uuid AND "revokedAt" IS NULL`, [token.userId]);
       await tx.query(`DELETE FROM "AuthLoginChallenge" WHERE "userId"=$1::uuid`, [token.userId]);
       const membership = await tx.query<{ organisationId: string }>(
         `SELECT "organisationId" FROM "OrganisationMembership" WHERE "userId"=$1::uuid ORDER BY "createdAt" ASC LIMIT 1`,

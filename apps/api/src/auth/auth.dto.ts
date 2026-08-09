@@ -117,3 +117,15 @@ export class DisableMfaDto {
   @MaxLength(32)
   code!: string;
 }
+
+export class ReplaceTrustedDeviceDto {
+  @IsString()
+  @MinLength(20)
+  @MaxLength(256)
+  replacementToken!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  deviceId!: string;
+}

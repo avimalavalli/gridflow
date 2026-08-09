@@ -14,6 +14,8 @@ export interface ApiConfig {
   platformAdminEmails: string[];
   sessionCookieName: string;
   sessionDays: number;
+  deviceCookieName: string;
+  deviceDays: number;
   invitationDays: number;
   secureCookies: boolean;
   trustProxy: boolean;
@@ -103,6 +105,17 @@ export function loadConfig(): ApiConfig {
     throw new Error("AUTH_SECURE_COOKIES must be true in production.");
   }
 
+  const sessionCookieName = process.env.AUTH_SESSION_COOKIE_NAME ?? "gridflow_session";
+  const deviceCookieName = process.env.AUTH_DEVICE_COOKIE_NAME ?? "gridflow_device";
+  if (!sessionCookieName || !deviceCookieName || sessionCookieName === deviceCookieName) {
+    throw new Error("Session and trusted-device cookie names must be non-empty and different.");
+  }
+  const sessionDays = readPositiveInteger("AUTH_SESSION_DAYS", process.env.AUTH_SESSION_DAYS, 30);
+  const deviceDays = readPositiveInteger("AUTH_DEVICE_DAYS", process.env.AUTH_DEVICE_DAYS, 365);
+  if (deviceDays < sessionDays) {
+    throw new Error("AUTH_DEVICE_DAYS cannot be shorter than AUTH_SESSION_DAYS.");
+  }
+
   return {
     port,
     webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
@@ -117,8 +130,10 @@ export function loadConfig(): ApiConfig {
     signupMode,
     privateBetaCode,
     platformAdminEmails,
-    sessionCookieName: process.env.AUTH_SESSION_COOKIE_NAME ?? "gridflow_session",
-    sessionDays: readPositiveInteger("AUTH_SESSION_DAYS", process.env.AUTH_SESSION_DAYS, 30),
+    sessionCookieName,
+    sessionDays,
+    deviceCookieName,
+    deviceDays,
     invitationDays: readPositiveInteger("AUTH_INVITATION_DAYS", process.env.AUTH_INVITATION_DAYS, 7),
     secureCookies,
     trustProxy: readBoolean(process.env.TRUST_PROXY, nodeEnv === "production"),

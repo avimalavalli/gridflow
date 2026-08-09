@@ -26,6 +26,7 @@ NODE_ENV=production
 GRIDFLOW_API_URL=http://gridflow-api.railway.internal:3001/api/v1
 GRIDFLOW_API_FALLBACK_URL=https://<api-public-domain>/api/v1
 AUTH_SESSION_COOKIE_NAME=gridflow_session
+AUTH_DEVICE_COOKIE_NAME=gridflow_device
 ```
 
 `GRIDFLOW_API_URL` is read at runtime. It is not a public browser variable and must point to the API service's Railway private DNS name. If the API service has a different name, replace `gridflow-api` with that exact service name.
@@ -44,6 +45,8 @@ GRIDFLOW_DEV_BOOTSTRAP=false
 AUTH_SIGNUP_MODE=ACTIVATION
 PLATFORM_ADMIN_EMAILS=<comma-separated-owner-account-emails>
 AUTH_SESSION_COOKIE_NAME=gridflow_session
+AUTH_DEVICE_COOKIE_NAME=gridflow_device
+AUTH_DEVICE_DAYS=365
 AUTH_SECURE_COOKIES=true
 TRUST_PROXY=true
 AUTH_ENCRYPTION_KEY=<32+-character-secret>

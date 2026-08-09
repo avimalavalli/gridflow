@@ -35,6 +35,10 @@ class FakeDatabase {
   }
 
   snapshot() { return { ...this.row }; }
+  setNewDevice() {
+    this.row.template = "NEW_DEVICE";
+    this.row.payload = { deviceName: "Chrome on Windows", ipAddress: "203.0.113.4", signedInAt: "2026-08-09T10:00:00.000Z" } as typeof this.row.payload;
+  }
 }
 
 afterEach(() => {
@@ -69,5 +73,16 @@ describe("GridFlow auth email outbox", () => {
     expect(request.mock.calls[0]?.[1]).toMatchObject({
       headers: expect.objectContaining({ "Idempotency-Key": "gridflow-auth-11111111-1111-4111-8111-111111111111" }),
     });
+  });
+
+  it("delivers a security alert for a newly trusted device", async () => {
+    process.env.AUTH_MAIL_PROVIDER = "CONSOLE";
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const database = new FakeDatabase();
+    database.setNewDevice();
+    const processor = new AuthEmailProcessor(database as never);
+
+    expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("New device signed in to GridFlow"));
   });
 });

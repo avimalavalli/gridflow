@@ -14,6 +14,8 @@ interface OperationalEvent {
   errorType?: string;
 }
 
+export class PublicOperationalException extends HttpException {}
+
 export function logOperationalEvent(event: OperationalEvent): void {
   const line = JSON.stringify({ timestamp: new Date().toISOString(), ...event });
   if (event.level === "error") console.error(line);
@@ -46,6 +48,7 @@ async function sendOperationalAlert(event: OperationalEvent): Promise<void> {
 }
 
 function exceptionMessage(exception: unknown, statusCode: number): string | string[] {
+  if (statusCode >= 500 && process.env.NODE_ENV === "production") return "GridFlow encountered an internal error.";
   if (exception instanceof HttpException) {
     const response = exception.getResponse();
     if (typeof response === "string") return response;
@@ -54,8 +57,14 @@ function exceptionMessage(exception: unknown, statusCode: number): string | stri
       if (typeof message === "string" || (Array.isArray(message) && message.every((item) => typeof item === "string"))) return message as string | string[];
     }
   }
-  if (statusCode >= 500 && process.env.NODE_ENV === "production") return "GridFlow encountered an internal error.";
   return exception instanceof Error ? exception.message : "GridFlow encountered an unexpected error.";
+}
+
+function publicExceptionPayload(exception: unknown): Record<string, unknown> | null {
+  if (!(exception instanceof PublicOperationalException)) return null;
+  const response = exception.getResponse();
+  if (!response || typeof response !== "object" || Array.isArray(response)) return null;
+  return response as Record<string, unknown>;
 }
 
 @Catch()
@@ -80,11 +89,14 @@ export class OperationalExceptionFilter implements ExceptionFilter {
     if (statusCode >= 500) void sendOperationalAlert(event);
 
     if (response.headersSent) return;
-    response.status(statusCode).json({
-      statusCode,
-      message: exceptionMessage(exception, statusCode),
-      requestId,
-      timestamp: new Date().toISOString(),
-    });
+    const publicPayload = publicExceptionPayload(exception);
+    response.status(statusCode).json(publicPayload
+      ? { ...publicPayload, statusCode, requestId, timestamp: new Date().toISOString() }
+      : {
+          statusCode,
+          message: exceptionMessage(exception, statusCode),
+          requestId,
+          timestamp: new Date().toISOString(),
+        });
   }
 }

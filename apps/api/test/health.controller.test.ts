@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ServiceUnavailableException } from "@nestjs/common";
 import { apiConfig } from "../src/config.js";
 import { HealthController } from "../src/health/health.controller.js";
+import { PublicOperationalException } from "../src/observability.js";
 
 const originalConfig = { ...apiConfig };
 const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY"] as const;
@@ -32,8 +32,8 @@ describe("HealthController readiness", () => {
       await controller.ready();
       throw new Error("Expected readiness to fail.");
     } catch (error) {
-      expect(error).toBeInstanceOf(ServiceUnavailableException);
-      const response = (error as ServiceUnavailableException).getResponse() as { failedChecks: string[]; checks: Record<string, boolean> };
+      expect(error).toBeInstanceOf(PublicOperationalException);
+      const response = (error as PublicOperationalException).getResponse() as { failedChecks: string[]; checks: Record<string, boolean> };
       expect(response.failedChecks).toContain("productionMonitoring");
       expect(response.checks.backupRestore).toBe(true);
     }

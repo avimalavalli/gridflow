@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 6 opportunity-and-meeting operating system: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, a controlled opportunity/task/calendar workflow, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 6.1 production-completion release candidate: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, a controlled opportunity/task/calendar workflow, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 

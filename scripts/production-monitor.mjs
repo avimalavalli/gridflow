@@ -34,7 +34,14 @@ try {
   const livePayload = await liveness.json();
   if (livePayload.status !== "ok" || livePayload.service !== "gridflow-api") throw new Error("API liveness payload is invalid.");
   deployedCommit = typeof livePayload.commit === "string" ? livePayload.commit : null;
-  await request("API production readiness", "/backend/health/ready", {}, expectReady ? [200] : [200, 503]);
+  const readiness = await request("API production readiness", "/backend/health/ready", {}, expectReady ? [200] : [200, 503]);
+  const readinessPayload = await readiness.json();
+  if (readiness.status === 200 && (readinessPayload.status !== "ready" || !Array.isArray(readinessPayload.failedChecks) || readinessPayload.failedChecks.length !== 0)) {
+    throw new Error("API readiness returned HTTP 200 without a valid ready payload.");
+  }
+  if (readiness.status === 503 && (readinessPayload.status !== "not-ready" || !readinessPayload.checks || !Array.isArray(readinessPayload.failedChecks) || readinessPayload.failedChecks.length === 0)) {
+    throw new Error("API readiness returned HTTP 503 without safe structured diagnostics.");
+  }
   await request("Authentication rejection", "/backend/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },

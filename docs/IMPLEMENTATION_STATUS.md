@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 6
+# GridFlow implementation status — Phase 6.1
 
 ## Built and verified
 
@@ -32,15 +32,15 @@
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 
-The dependency audit endpoint returned HTTP 502. No dependency was added; a fresh successful audit remains required before public release.
+The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
 ## Still required before public V1
 
-1. Release-owned production infrastructure and domain.
+1. A release-owned GridFlow domain and production DNS.
 2. Live OpenAI acceptance and prompt tuning using real current evidence.
 3. Real Gmail, Resend and authenticator-device acceptance.
-4. Browser, mobile, accessibility and performance QA on real devices.
-5. Production-format backup restore, permission review and security sign-off.
+4. Browser, mobile, accessibility and performance QA on physical devices.
+5. Permission review and final security sign-off.
 6. Completion of every required Launch Control check.
 7. Owner approval, deployment and selected-athlete acceptance.
 

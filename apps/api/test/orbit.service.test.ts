@@ -62,6 +62,9 @@ describe("OrbitService", () => {
     expect((await database!.query(`SELECT 1 FROM "Task" WHERE "tenantId"=$1::uuid`, [data.tenantId])).rows).toHaveLength(1);
     const opportunity = await database!.query<{ stage: string; probability: number }>(`SELECT "stage"::text AS "stage","probability" FROM "Opportunity" WHERE "id"=$1::uuid`, [data.opportunityId]);
     expect(opportunity.rows[0]).toMatchObject({ stage: "PROPOSAL_REQUESTED", probability: 55 });
+    expect((await database!.query<{ status:string }>(`SELECT "status"::text AS "status" FROM "Meeting" WHERE "id"=$1::uuid`, [data.meetingId])).rows[0]?.status).toBe("COMPLETED");
+    expect((await database!.query(`SELECT 1 FROM "StatusHistory" WHERE "entityType"='Opportunity' AND "entityId"=$1::uuid AND "newValue"='PROPOSAL_REQUESTED'`, [data.opportunityId])).rows).toHaveLength(1);
+    expect((await database!.query(`SELECT 1 FROM "StatusHistory" WHERE "entityType"='Meeting' AND "entityId"=$1::uuid AND "newValue"='COMPLETED'`, [data.meetingId])).rows).toHaveLength(1);
     expect((await database!.query(`SELECT 1 FROM "EmailMessage" WHERE "tenantId"=$1::uuid`, [data.tenantId])).rows).toHaveLength(0);
     expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [data.tenantId])).rows).toHaveLength(0);
     expect((await database!.query(`SELECT 1 FROM "Meeting" WHERE "tenantId"=$1::uuid`, [data.tenantId])).rows).toHaveLength(1);

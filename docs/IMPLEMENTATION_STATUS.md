@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 5
+# GridFlow implementation status — Phase 6
 
 ## Built and verified
 
@@ -19,12 +19,16 @@
 - Encrypted tenant Gemini keys, onboarding guidance and per-capability Gemini/managed-provider routing.
 - **Orbit meeting intelligence** with factual preparation, human-notes-only debriefs, editable review, idempotent approved tasks, explicit opportunity updates and unsent follow-up drafts.
 - **Forge proposal intelligence** with human-set commercial boundaries, evidence-bound packages, protected prices and terms, immutable versions, editable approval, print/PDF presentation and human-confirmed delivery recording.
+- **Opportunity OS** with ten controlled stages, mandatory stage-change reasons, explicit closed-deal reopening, closure records, immutable history and automatic stage-appropriate next actions.
+- **Meeting OS** with scheduled/completed/cancelled/no-show lifecycle, reasoned transitions, automatic Orbit preparation, visible debrief backlog and approved post-meeting updates.
+- **Unified calendar** combining meetings, open task deadlines and active expected-close dates in desktop month and mobile agenda views.
+- Tenant-safe relationship validation and mutation audits across opportunities, tasks and meetings.
 
 ## Validation result
 
-- 90 automated tests passed across 38 files.
+- 99 automated tests passed across 42 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 55 models and 13 registered migrations.
+- Database schema check passed: 55 models and 14 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 

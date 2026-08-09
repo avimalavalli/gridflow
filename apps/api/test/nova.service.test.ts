@@ -72,13 +72,14 @@ describe("NovaService", () => {
       [tenantId, company.rows[0]!.id, contact.rows[0]!.id],
     );
     const service = new NovaService(new TestDatabaseService(database!) as never);
-    const input = { decision: "APPROVE" as const };
+    const input = { decision: "APPROVE" as const, createMeetingTask: true };
 
     const first = await service.review(tenantId, user.rows[0]!.id, interaction.rows[0]!.id, input);
     const second = await service.review(tenantId, user.rows[0]!.id, interaction.rows[0]!.id, input);
-    expect(first).toMatchObject({ status: "REVIEWED", reused: false });
+    expect(first).toMatchObject({ status: "REVIEWED", reused: false, meetingTaskCreated: true });
     expect(second).toMatchObject({ status: "REVIEWED", reused: true, opportunityId: first.opportunityId });
     expect((await database!.query(`SELECT 1 FROM "Opportunity" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(1);
+    expect((await database!.query(`SELECT 1 FROM "Task" WHERE "tenantId"=$1::uuid AND "type"='MEETING_PREP'`, [tenantId])).rows).toHaveLength(1);
     expect((await database!.query(`SELECT 1 FROM "Meeting" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
     expect((await database!.query(`SELECT 1 FROM "EmailMessage" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
     expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);

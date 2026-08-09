@@ -312,7 +312,7 @@ export const orbitDebriefOutputSchema = {
       },
     },
     should_update_opportunity: { type: "boolean" },
-    opportunity_stage: { type: "string", enum: ["INTERESTED", "DISCOVERY_CALL", "NEEDS_ANALYSIS", "PROPOSAL_REQUESTED", "ON_HOLD", "LOST"] },
+    opportunity_stage: { type: "string", enum: ["INTERESTED", "DISCOVERY_CALL", "NEEDS_ANALYSIS", "PROPOSAL_REQUESTED", "PROPOSAL_SENT", "NEGOTIATION", "VERBAL_AGREEMENT", "WON", "LOST", "ON_HOLD"] },
     opportunity_probability: { type: "integer", minimum: 0, maximum: 100 },
     opportunity_rationale: { type: "string", maxLength: 1_500 },
     follow_up_required: { type: "boolean" },

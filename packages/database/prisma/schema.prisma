@@ -439,6 +439,13 @@ enum TaskType {
   AUTOMATION_RETRY
 }
 
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 enum IntegrationProvider {
   GMAIL
   GOOGLE_CALENDAR
@@ -1278,8 +1285,11 @@ model Opportunity {
   valueMinor        Int?
   currency          String           @default("GBP")
   stage             OpportunityStage @default(INTERESTED)
+  stageEnteredAt    DateTime         @default(now()) @db.Timestamptz(3)
   probability       Int              @default(10)
   expectedCloseDate DateTime?        @db.Date
+  closedAt          DateTime?        @db.Timestamptz(3)
+  closeReason       String?
   notes             String?
   source             SourceType       @default(MANUAL)
   createdAt         DateTime         @default(now()) @db.Timestamptz(3)
@@ -1398,8 +1408,12 @@ model Meeting {
   contactId     String?      @db.Uuid
   opportunityId String?      @db.Uuid
   title         String
+  status        MeetingStatus @default(SCHEDULED)
+  statusUpdatedAt DateTime     @default(now()) @db.Timestamptz(3)
   startsAt      DateTime     @db.Timestamptz(3)
   endsAt        DateTime?    @db.Timestamptz(3)
+  completedAt   DateTime?    @db.Timestamptz(3)
+  cancelledAt   DateTime?    @db.Timestamptz(3)
   attendees     Json?
   agenda        String?
   preparation   String?
@@ -1418,6 +1432,7 @@ model Meeting {
   agentRuns      AgentRun[]
 
   @@index([tenantId, startsAt])
+  @@index([tenantId, status, startsAt])
 }
 
 model OrbitWorkspace {

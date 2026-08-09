@@ -3,6 +3,7 @@ import { Shell } from "../../components/shell";
 import { DataUnavailable } from "../../components/data-unavailable";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { TasksClient, type Task, type Company, type Contact, type Opportunity } from "./tasks-client";
+import { Suspense } from "react";
 export const dynamic = "force-dynamic";
 export default async function TasksPage() {
   let error = "";
@@ -20,5 +21,5 @@ export default async function TasksPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown task error.";
   }
-  return <Shell title="Tasks"><PageHead eyebrow="Daily execution" title="Know the next action for every sponsor relationship" description="Follow-ups, approvals, LinkedIn actions, meeting preparation and manual work stay attached to the correct commercial record." />{error ? <DataUnavailable message={error} /> : <TasksClient tasks={tasks} companies={companies} contacts={contacts} opportunities={opportunities} />}</Shell>;
+  return <Shell title="Tasks"><PageHead eyebrow="Daily execution" title="Know the next action for every sponsor relationship" description="Follow-ups, approvals, LinkedIn actions, meeting preparation and manual work stay attached to the correct commercial record." />{error ? <DataUnavailable message={error} /> : <Suspense><TasksClient tasks={tasks} companies={companies} contacts={contacts} opportunities={opportunities} /></Suspense>}</Shell>;
 }

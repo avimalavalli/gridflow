@@ -2,13 +2,13 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 5 proposal-intelligence codebase: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, connected commercial CRM, controlled outreach operations, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 6 opportunity-and-meeting operating system: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, a controlled opportunity/task/calendar workflow, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
 ## Working flow
 
-`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → human acceptance → LinkedIn/Gmail operations → Sentinel → Nova → Orbit meetings → approved tasks and opportunities → Forge proposals → human-approved delivery record`
+`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → human acceptance → LinkedIn/Gmail operations → Sentinel → Nova approval → opportunity and next action → Orbit meeting prep/debrief → approved stage and tasks → Forge proposal → human-approved delivery record`
 
 No athlete identity, nationality, championship, sponsor market or outreach strategy is hard-coded.
 
@@ -21,6 +21,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Separate athlete/team organisations, roles, invitations and organisation switching.
 - Personalised commercial profiles, markets, outreach policies and Discovery Briefs.
 - Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings.
+- Opportunity stage reasons, explicit closed-deal reopening, automatic next-action safeguards, immutable history and a unified meeting/task/close-date calendar.
 - Evidence-first agents with retries, recovery, versioning, tokens, cost and quality reports.
 - Orbit pre-meeting briefs and human-notes-only debriefs with idempotent task creation, explicit opportunity approval and follow-up drafts that cannot send themselves.
 - Forge proposal intelligence with human commercial briefs, grounded packages and pricing, immutable versions, editable approval, print/PDF views and explicit human-confirmed delivery records.
@@ -70,6 +71,6 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
 
 Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

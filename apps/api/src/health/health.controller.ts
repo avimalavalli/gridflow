@@ -1,8 +1,9 @@
-import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
+import { Controller, Get, HttpStatus } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
 import { currentReleaseCommit, currentReleaseVersion } from "../release-metadata.js";
 import { OperationsProofsService } from "../operations-proofs/operations-proofs.service.js";
+import { PublicOperationalException } from "../observability.js";
 
 @Controller("health")
 export class HealthController {
@@ -60,7 +61,12 @@ export class HealthController {
       commit: currentReleaseCommit(),
       timestamp: new Date().toISOString(),
     };
-    if (failedChecks.length > 0) throw new ServiceUnavailableException(payload);
+    if (failedChecks.length > 0) {
+      throw new PublicOperationalException({
+        ...payload,
+        message: "GridFlow is running but has incomplete production dependencies.",
+      }, HttpStatus.SERVICE_UNAVAILABLE);
+    }
     return payload;
   }
 

@@ -108,7 +108,7 @@ kbd { border: 1px solid var(--line-strong); background: white; border-radius: 5p
 .metric-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--blue-soft); color: var(--blue); margin-bottom: 12px; }
 
 /* Buttons, badges, inputs */
-.button { min-height: 37px; border: 1px solid transparent; border-radius: 10px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: white; color: var(--text); font-size: 11px; font-weight: 800; cursor: pointer; transition: .15s ease; white-space: nowrap; }
+.button { min-height: 37px; border: 1px solid transparent; border-radius: 10px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: white; color: var(--text); font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; white-space: nowrap; }
 .button:hover { transform: translateY(-1px); }
 .button-primary { background: var(--blue); color: white; box-shadow: 0 7px 18px rgba(22,119,255,.18); }
 .button-primary:hover { background: var(--blue-hover); }

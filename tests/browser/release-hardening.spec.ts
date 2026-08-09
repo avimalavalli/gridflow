@@ -51,7 +51,26 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   await page.getByLabel("Organisation name").fill(`GridFlow ${suffix} ${testInfo.retry}`);
   await page.getByLabel("Password").fill("GridFlow-browser-test-2026!");
   await page.getByRole("button", { name: "Create GridFlow account" }).click();
-  await page.waitForURL(/\/(onboarding|pending-approval)/);
+  await page.waitForURL(/\/(welcome|onboarding|pending-approval)/);
   await expect(page.locator("main")).toBeVisible();
-  if (page.url().endsWith("/onboarding")) await expectNoWcagViolations(page);
+  if (page.url().endsWith("/welcome")) {
+    await expect(page.getByRole("heading", { name: new RegExp(`Welcome to GridFlow, Release`, "i") })).toBeVisible();
+    await expect(page.getByText("Atlas", { exact: true })).toBeVisible();
+    await expectNoWcagViolations(page);
+    await page.getByRole("button", { name: /Set up my GridFlow/i }).click();
+    await page.waitForURL(/\/onboarding/);
+  }
+  if (page.url().endsWith("/onboarding")) {
+    await expect(page.getByRole("heading", { name: "Build the operating system around your programme" })).toBeVisible();
+    await expect(page.getByText(/saves each step automatically/i)).toBeVisible();
+    await expectNoWcagViolations(page);
+    await page.goto("/guide");
+    await expect(page.getByRole("heading", { name: "Learn GridFlow by following the real workflow" })).toBeVisible();
+    await expectNoWcagViolations(page);
+    await page.goto("/help");
+    await expect(page.getByRole("heading", { name: "Everything you need to run GridFlow safely" })).toBeVisible();
+    await page.getByLabel("Search the GridFlow manual").fill("API keys");
+    await expect(page.getByRole("button", { name: /AI Setup and keys/i })).toBeVisible();
+    await expectNoWcagViolations(page);
+  }
 });

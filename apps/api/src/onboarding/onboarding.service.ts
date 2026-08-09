@@ -22,7 +22,13 @@ interface DriverProfileView extends Record<string, unknown> {
   currentProgramme: string | null;
   futureGoals: string | null;
   achievements: string | null;
+  personalStory: string | null;
+  differentiators: string | null;
+  minimumDealMinor: number | null;
+  maximumDealMinor: number | null;
+  currency: string;
   audienceSummary: string | null;
+  audienceGeography: string[] | null;
   tone: string | null;
   onboardingStatus: string;
   profileVersion: number;
@@ -54,6 +60,11 @@ interface MarketView extends Record<string, unknown> {
   type: string;
   priority: number;
   rationale: string | null;
+}
+
+interface PreferenceView extends Record<string, unknown> {
+  preferredIndustries: string[];
+  excludedIndustries: string[];
 }
 
 const unique = (values: readonly string[] | undefined): string[] =>
@@ -273,6 +284,19 @@ export class OnboardingService {
       );
 
       await tx.query(
+        `INSERT INTO "ProductExperienceProgress" (
+           "tenantId","userId","experienceVersion","welcomeCompletedAt","onboardingStep","updatedAt"
+         ) VALUES ($1::uuid,$2::uuid,1,CURRENT_TIMESTAMP,4,CURRENT_TIMESTAMP)
+         ON CONFLICT ("tenantId","userId") DO UPDATE SET
+           "welcomeCompletedAt"=COALESCE("ProductExperienceProgress"."welcomeCompletedAt",CURRENT_TIMESTAMP),
+           "onboardingStep"=4,
+           "onboardingDraft"=NULL,
+           "onboardingSavedAt"=NULL,
+           "updatedAt"=CURRENT_TIMESTAMP`,
+        [identity.tenantId, identity.userId],
+      );
+
+      await tx.query(
         `INSERT INTO "AuditLog" (
            "tenantId", "userId", "action", "entityType", "entityId", "newValues", "metadata"
          ) VALUES ($1::uuid, $2::uuid, 'UPDATE', 'DriverProfile', $3, $4::jsonb, $5::jsonb)`,
@@ -292,21 +316,28 @@ export class OnboardingService {
   async get(identity: RequestIdentity): Promise<{
     profile: DriverProfileView | null;
     policy: PolicyView | null;
+    discoveryPreference: PreferenceView | null;
     targetMarkets: MarketView[];
     discoveryBriefs: BriefView[];
   }> {
     return this.database.tenantTransaction(identity.tenantId, async (tx) => {
-      const [profile, policy, markets, briefs] = await Promise.all([
+      const [profile, policy, preference, markets, briefs] = await Promise.all([
         tx.query<DriverProfileView>(
           `SELECT "athleteName", "sport", "nationality", "countryOfResidence",
                   "currentSeries", "currentTeam", "currentProgramme", "futureGoals",
-                  "achievements", "audienceSummary", "tone", "onboardingStatus", "profileVersion"
+                  "achievements", "personalStory", "differentiators", "minimumDealMinor", "maximumDealMinor",
+                  "currency", "audienceSummary", "audienceGeography", "tone", "onboardingStatus", "profileVersion"
            FROM "DriverProfile" WHERE "tenantId" = $1::uuid`,
           [identity.tenantId],
         ),
         tx.query<PolicyView>(
           `SELECT "strategy", "emailAutomationMode", "approvalMode", "dailyEmailLimit", "timezone"
            FROM "OutreachPolicy" WHERE "tenantId" = $1::uuid`,
+          [identity.tenantId],
+        ),
+        tx.query<PreferenceView>(
+          `SELECT "preferredIndustries", "excludedIndustries"
+           FROM "DiscoveryPreference" WHERE "tenantId" = $1::uuid`,
           [identity.tenantId],
         ),
         tx.query<MarketView>(
@@ -328,6 +359,7 @@ export class OnboardingService {
       return {
         profile: profile.rows[0] ?? null,
         policy: policy.rows[0] ?? null,
+        discoveryPreference: preference.rows[0] ?? null,
         targetMarkets: markets.rows,
         discoveryBriefs: briefs.rows,
       };

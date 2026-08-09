@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Bot,
+  BookOpen,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   DatabaseZap,
   Handshake,
   Hammer,
+  LifeBuoy,
   LayoutDashboard,
   ListTodo,
   Menu,
@@ -68,6 +70,13 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
     items: [
       { label: "Discovery Briefs", href: "/discovery-briefs", icon: Radar, keywords: "atlas target market search strategy" },
       { label: "Agent Runs", href: "/agent-runs", icon: Bot, keywords: "atlas sage relay echo jobs errors cost" },
+    ],
+  },
+  {
+    label: "Learn",
+    items: [
+      { label: "Guided start", href: "/guide", icon: BookOpen, keywords: "tutorial walkthrough setup checklist learn getting started" },
+      { label: "Help centre", href: "/help", icon: LifeBuoy, keywords: "manual help documentation guide glossary support how to" },
     ],
   },
   {
@@ -214,6 +223,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
             <div><div className="topbar-kicker">GridFlow</div><div className="topbar-title">{title}</div></div>
           </div>
           <div className="topbar-actions">
+            <Link className="icon-button topbar-help" href="/help" aria-label="Open Help Centre" title="Help Centre"><LifeBuoy size={17} /></Link>
             <button className="search-trigger" type="button" aria-label="Search GridFlow" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search GridFlow</span><kbd>⌘ K</kbd></button>
             <Link className="avatar" href="/team" title={auth?.user.name ?? "Current account"}>{accountInitials}</Link>
           </div>

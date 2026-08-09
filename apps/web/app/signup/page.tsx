@@ -60,7 +60,7 @@ export default function SignupPage() {
         throw new Error(Array.isArray(body.message) ? body.message.join(" ") : body.message ?? "Registration failed.");
       }
       const access = (body as { activeOrganisation?: { organisationAccessStatus?: string } }).activeOrganisation?.organisationAccessStatus;
-      router.push(access === "PENDING_APPROVAL" ? "/pending-approval" : "/onboarding");
+      router.push(access === "PENDING_APPROVAL" ? "/pending-approval" : "/");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "GridFlow could not create the account.");

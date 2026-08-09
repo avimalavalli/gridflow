@@ -18,7 +18,7 @@ export default async function PendingApprovalPage() {
   const data = await apiGet<AccessData>("/auth/me");
   const status = data.activeOrganisation.organisationAccessStatus;
   return (
-    <main className="auth-shell" id="main-content">
+    <main className="auth-shell" id="main-content" tabIndex={-1}>
       <section className="auth-card auth-card-wide">
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Controlled customer access</div>

@@ -54,6 +54,8 @@ RESEND_API_KEY=<secret>
 
 Add the OpenAI, Google OAuth, integration encryption, release, alerting and backup variables from `.env.example` before enabling those modules. `INTEGRATION_ENCRYPTION_KEY` is mandatory for customer Gemini keys and must be identical on the API and worker. Use the private PostgreSQL reference from the PostgreSQL service in the same Railway environment. Railway private database traffic does not require application-level SSL, so `DATABASE_SSL=false` avoids a TLS mismatch on the internal address.
 
+Phase 5.1 also requires `OPERATIONS_PROBE_TOKEN` on the API. Use the same 32+-character value for the GitHub Actions secret of that name. Production monitoring and backup acceptance gates are proof-backed: a URL or checkbox alone cannot mark them ready.
+
 ## Required worker variables
 
 Use the same values as the API for:
@@ -90,5 +92,7 @@ GOOGLE_OAUTH_REDIRECT_URI=https://<api-public-domain>/api/v1/integrations/gmail/
 8. Sign in with the allowlisted owner account and confirm **Platform Admin** appears.
 9. Create an activation for a controlled test email, register once, confirm it stays locked, then approve it in Platform Admin.
 10. Confirm Core onboarding requires and verifies the customer's own Gemini key, while Atlas/Sage/Relay use managed research credits.
+11. Run the **Production smoke and incident management** workflow for the deployed commit and confirm the signed heartbeat is accepted.
+12. Run the **Production database backup and restore proof** workflow once, then verify both proof-backed controls and their evidence links in Launch Control.
 
 The web service is the only service that needs to be public for normal app use. Give the API a temporary Railway domain only when configuring or accepting Google OAuth; normal web-to-API traffic stays on Railway's private network.

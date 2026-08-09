@@ -75,6 +75,23 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack --experimental-build-mode generate
 
+      - name: Install release browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Cross-browser, responsive and accessibility acceptance
+        run: npm run test:browser
+
+      - name: Upload browser acceptance evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gridflow-browser-acceptance-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Dependency security audit
         shell: bash
         run: |

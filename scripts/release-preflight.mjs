@@ -13,6 +13,9 @@ const required = [
   "RELEASE_BUILD_VALIDATED",
   "RELEASE_CI_PASSED",
   "RELEASE_DEPENDENCY_AUDIT_PASSED",
+  "OPERATIONS_PROBE_TOKEN",
+  "PRODUCTION_MONITOR_URL",
+  "BACKUP_STORAGE_URL",
 ];
 
 const failures = [];
@@ -25,18 +28,16 @@ if (process.env.AUTH_SECURE_COOKIES !== "true") failures.push("AUTH_SECURE_COOKI
 if ((process.env.AUTH_MAIL_PROVIDER ?? "").toUpperCase() !== "RESEND") failures.push("AUTH_MAIL_PROVIDER must be RESEND.");
 if ((process.env.AUTH_ENCRYPTION_KEY ?? "").length < 32) failures.push("AUTH_ENCRYPTION_KEY must contain at least 32 characters.");
 if ((process.env.INTEGRATION_ENCRYPTION_KEY ?? "").length < 32) failures.push("INTEGRATION_ENCRYPTION_KEY must contain at least 32 characters.");
+if ((process.env.OPERATIONS_PROBE_TOKEN ?? "").length < 32) failures.push("OPERATIONS_PROBE_TOKEN must contain at least 32 characters.");
 if (!/^https:\/\//.test(process.env.WEB_ORIGIN ?? "")) failures.push("WEB_ORIGIN must use HTTPS.");
 if (!/^https:\/\//.test(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "")) failures.push("GOOGLE_OAUTH_REDIRECT_URI must use HTTPS.");
+if (!/^https:\/\//.test(process.env.BACKUP_STORAGE_URL ?? "")) failures.push("BACKUP_STORAGE_URL must use HTTPS.");
+if (!/^https:\/\//.test(process.env.PRODUCTION_MONITOR_URL ?? "")) failures.push("PRODUCTION_MONITOR_URL must use HTTPS.");
 const releaseCommit = process.env.RAILWAY_GIT_COMMIT_SHA?.trim() || process.env.GRIDFLOW_COMMIT_SHA?.trim() || "";
 if (releaseCommit.length < 7) failures.push("RAILWAY_GIT_COMMIT_SHA or GRIDFLOW_COMMIT_SHA must contain a real commit identifier.");
 for (const gate of ["RELEASE_BUILD_VALIDATED", "RELEASE_CI_PASSED", "RELEASE_DEPENDENCY_AUDIT_PASSED"]) {
   if (process.env[gate] !== "true") failures.push(`${gate} must be true for the exact release commit.`);
 }
-
-const backupsReady = process.env.DATABASE_PROVIDER_BACKUPS === "true" || Boolean(process.env.BACKUP_STORAGE_URL?.trim());
-if (!backupsReady) failures.push("Configure BACKUP_STORAGE_URL or confirm DATABASE_PROVIDER_BACKUPS=true.");
-const alertsReady = process.env.LOG_DRAIN_CONFIGURED === "true" || Boolean(process.env.OPERATIONS_ALERT_WEBHOOK_URL?.trim());
-if (!alertsReady) failures.push("Configure OPERATIONS_ALERT_WEBHOOK_URL or confirm LOG_DRAIN_CONFIGURED=true.");
 
 if (failures.length) {
   console.error("GridFlow release preflight failed:\n- " + failures.join("\n- "));

@@ -12,6 +12,8 @@ interface GmailStatus {
   lastSyncedAt: string | null;
   errorDetails: string | null;
   historyId: string | null;
+  redirectUri: string | null;
+  missingVariables: string[];
 }
 
 function dateTime(value: string | null): string {
@@ -81,6 +83,16 @@ export function IntegrationsClient({ gmail }: { gmail: GmailStatus }) {
           </>
         )}
       </div>
+
+      {!gmail.configured ? (
+        <div className="integration-setup section-gap" role="status">
+          <strong>Google Cloud setup required</strong>
+          <p>Create one Web OAuth client, add the production callback, then place the client ID and secret in both Railway API and worker services.</p>
+          {gmail.redirectUri ? <div><span>Authorised redirect URI</span><code>{gmail.redirectUri}</code></div> : null}
+          {gmail.missingVariables.length ? <div><span>Missing server variables</span><code>{gmail.missingVariables.join(" · ")}</code></div> : null}
+          <small>GridFlow will keep the Connect Gmail button locked until every required value is present.</small>
+        </div>
+      ) : null}
 
       <div className="safety-strip section-gap">
         <span><ShieldCheck size={14} /> Encrypted refresh tokens</span>

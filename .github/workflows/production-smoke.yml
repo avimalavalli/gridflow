@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: gridflow-production-smoke
@@ -17,30 +18,72 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify web, API proxy, and authentication
-        shell: bash
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.16.0
+          package-manager-cache: false
+
+      - name: Verify web, API proxy, recovery surface and authentication
         env:
           GRIDFLOW_WEB_URL: https://web-production-24fce.up.railway.app
+          GRIDFLOW_EXPECT_READY: ${{ vars.GRIDFLOW_EXPECT_READY || 'false' }}
+        run: node scripts/production-monitor.mjs
+
+      - name: Record signed monitoring heartbeat
+        if: success()
+        env:
+          GRIDFLOW_WEB_URL: https://web-production-24fce.up.railway.app
+          OPERATIONS_PROBE_TOKEN: ${{ secrets.OPERATIONS_PROBE_TOKEN }}
+          PROOF_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROOF_RUN_ID: monitor-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const report = JSON.parse(await readFile("reports/production-monitor.json", "utf8"));
+          if (!/^[a-f0-9]{7,64}$/i.test(report.deployedCommit ?? "")) throw new Error("Production liveness did not expose a valid deployed commit.");
+          const response = await fetch(`${process.env.GRIDFLOW_WEB_URL}/backend/operations/proofs`, {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPERATIONS_PROBE_TOKEN}` },
+            body: JSON.stringify({ kind: "MONITOR_HEARTBEAT", runId: process.env.PROOF_RUN_ID, sourceUrl: process.env.PROOF_SOURCE_URL, observedAt: new Date().toISOString(), commitSha: report.deployedCommit }),
+          });
+          if (response.status !== 202) throw new Error(`Operations proof endpoint returned HTTP ${response.status}.`);
+          NODE
 
-          curl --fail-with-body --silent --show-error \
-            --retry 3 --retry-delay 5 --retry-all-errors \
-            "$GRIDFLOW_WEB_URL/login" >/dev/null
+      - name: Upload monitor evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gridflow-production-monitor-${{ github.run_id }}
+          path: reports/production-monitor.json
+          if-no-files-found: warn
+          retention-days: 30
 
-          health="$(curl --fail-with-body --silent --show-error \
-            --retry 3 --retry-delay 5 --retry-all-errors \
-            "$GRIDFLOW_WEB_URL/backend/health/live")"
-          node -e '
-            const payload = JSON.parse(process.argv[1]);
-            if (payload.status !== "ok" || payload.service !== "gridflow-api") process.exit(1);
-          ' "$health"
+      - name: Open or update production incident
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = "[GridFlow monitor] Production unavailable";
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner: context.repo.owner, repo: context.repo.repo, state: "all", per_page: 100 });
+            const existing = issues.find((issue) => !issue.pull_request && issue.title === title);
+            const body = `The scheduled production monitor failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\nDetected: ${new Date().toISOString()}\n\nNo credentials or response bodies are included.`;
+            if (!existing) await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+            else {
+              if (existing.state === "closed") await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: "open" });
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body });
+            }
 
-          auth_status="$(curl --silent --show-error --output /tmp/gridflow-auth.json \
-            --write-out "%{http_code}" \
-            --header "content-type: application/json" \
-            --data "{\"email\":\"production-monitor@example.invalid\",\"password\":\"intentionally-invalid\"}" \
-            "$GRIDFLOW_WEB_URL/backend/auth/login")"
-          test "$auth_status" = "401"
-
-          echo "GridFlow production web, API proxy, and authentication are healthy."
+      - name: Close recovered production incident
+        if: success()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = "[GridFlow monitor] Production unavailable";
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100 });
+            const existing = issues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body: `Production recovered. Verified by ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}.` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: "closed", state_reason: "completed" });
+            }

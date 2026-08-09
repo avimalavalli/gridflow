@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabase, migrateDatabase, setTenantContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
 import { ReleaseAcceptanceService } from "../src/release-acceptance/release-acceptance.service.js";
 import { apiConfig } from "../src/config.js";
+import { OperationsProofsService } from "../src/operations-proofs/operations-proofs.service.js";
 
 class TestDatabaseService {
   constructor(private readonly database: GridFlowDatabase) {}
   async ping() { await this.database.query("SELECT 1"); return { database: "ok" as const, kind: this.database.kind }; }
+  async raw() { return this.database; }
   tenantTransaction<T>(tenantId: string, callback: (tx: SqlExecutor) => Promise<T>) {
     return this.database.transaction(async (tx) => { await setTenantContext(tx, tenantId); return callback(tx); });
   }
@@ -64,7 +66,8 @@ describe("ReleaseAcceptanceService", () => {
     const tenantId = organisation.rows[0]!.id;
     await database.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
 
-    const service = new ReleaseAcceptanceService(new TestDatabaseService(database) as never);
+    const databaseService = new TestDatabaseService(database);
+    const service = new ReleaseAcceptanceService(databaseService as never, new OperationsProofsService(databaseService as never));
     const first = await service.overview(tenantId);
     expect(first.release.releaseVersion).toBe("v1.0.0-rc.1");
     expect(first.summary.required).toBeGreaterThan(20);
@@ -134,7 +137,8 @@ describe("ReleaseAcceptanceService", () => {
     const tenantId = organisation.rows[0]!.id;
     await database.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'ADMIN')`, [tenantId, userId]);
 
-    const service = new ReleaseAcceptanceService(new TestDatabaseService(database) as never);
+    const databaseService = new TestDatabaseService(database);
+    const service = new ReleaseAcceptanceService(databaseService as never, new OperationsProofsService(databaseService as never));
     const first = await service.overview(tenantId);
     const manual = first.groups.flatMap((group) => group.checks).find((check) => !check.automated)!;
     await expect(service.updateCheck(tenantId, userId, manual.id, { status: "BLOCKED" })).rejects.toThrow(/add notes/i);

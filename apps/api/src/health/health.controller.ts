@@ -2,10 +2,11 @@ import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
 import { currentReleaseCommit, currentReleaseVersion } from "../release-metadata.js";
+import { OperationsProofsService } from "../operations-proofs/operations-proofs.service.js";
 
 @Controller("health")
 export class HealthController {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly proofs: OperationsProofsService) {}
 
   @Get("live")
   live(): Record<string, unknown> {
@@ -21,19 +22,46 @@ export class HealthController {
 
   @Get("ready")
   async ready(): Promise<Record<string, unknown>> {
+    const production = apiConfig.nodeEnv === "production";
+    let databaseReady = false;
+    let databaseKind: string | null = null;
     try {
       const database = await this.database.ping();
-      const checks = {
-        database: true,
-        productionAuth: apiConfig.nodeEnv !== "production" || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
-        passwordRecovery: apiConfig.nodeEnv !== "production" || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
-      };
-      const failedChecks = Object.entries(checks).filter(([, ready]) => !ready).map(([name]) => name);
-      if (failedChecks.length > 0) throw new Error(`Production readiness checks failed: ${failedChecks.join(", ")}.`);
-      return { status: "ready", service: "gridflow-api", check: "readiness", checks, ...database, timestamp: new Date().toISOString() };
-    } catch (error) {
-      throw new ServiceUnavailableException({ status: "not-ready", service: "gridflow-api", message: error instanceof Error ? error.message : String(error), timestamp: new Date().toISOString() });
+      databaseReady = database.database === "ok";
+      databaseKind = database.kind;
+    } catch {
+      databaseReady = false;
     }
+    let proofStatus: Awaited<ReturnType<OperationsProofsService["status"]>> | null = null;
+    try { proofStatus = await this.proofs.status(); } catch { proofStatus = null; }
+    const checks = {
+      database: databaseReady,
+      productionAuth: !production || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
+      agentProvider: !production || Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_AGENT_MODEL?.trim()),
+      gmailOAuth: !production || Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID?.trim() && process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim() && process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() && process.env.INTEGRATION_ENCRYPTION_KEY?.trim()),
+      passwordRecovery: !production || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
+      productionMonitoring: !production || proofStatus?.monitor.fresh === true,
+      backupRestore: !production || proofStatus?.backup.fresh === true,
+    };
+    const failedChecks = Object.entries(checks).filter(([, ready]) => !ready).map(([name]) => name);
+    const payload = {
+      status: failedChecks.length ? "not-ready" : "ready",
+      service: "gridflow-api",
+      check: "readiness",
+      checks,
+      failedChecks,
+      database: databaseReady ? "ok" : "unavailable",
+      kind: databaseKind,
+      proofs: {
+        monitoring: { fresh: proofStatus?.monitor.fresh ?? false, recordedAt: proofStatus?.monitor.recordedAt ?? null, ageMinutes: proofStatus?.monitor.ageMinutes ?? null },
+        backupRestore: { fresh: proofStatus?.backup.fresh ?? false, recordedAt: proofStatus?.backup.recordedAt ?? null, ageMinutes: proofStatus?.backup.ageMinutes ?? null },
+      },
+      version: currentReleaseVersion(),
+      commit: currentReleaseCommit(),
+      timestamp: new Date().toISOString(),
+    };
+    if (failedChecks.length > 0) throw new ServiceUnavailableException(payload);
+    return payload;
   }
 
   @Get()

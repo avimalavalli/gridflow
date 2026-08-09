@@ -675,3 +675,5 @@ tbody tr:last-child td { border-bottom: 0; }
   .forge-document > section { break-inside:auto; }
   .forge-document-package-grid > article,.forge-document-timeline article { break-inside:avoid; }
 }
+
+.integration-setup{display:grid;gap:9px;padding:15px;border:1px solid #f0d08a;border-radius:14px;background:#fffaf0;color:#5f4a1a}.integration-setup>p,.integration-setup>small{margin:0;color:#78643a;line-height:1.55}.integration-setup>div{display:grid;gap:4px;min-width:0}.integration-setup span{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.integration-setup code{display:block;max-width:100%;overflow-wrap:anywhere;padding:8px 10px;border:1px solid #ead7aa;border-radius:9px;background:#fff;font-size:10px;color:#4d3a11}

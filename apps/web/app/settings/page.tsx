@@ -24,13 +24,15 @@ interface IntegrationData {
     lastSyncedAt: string | null;
     errorDetails: string | null;
     historyId: string | null;
+    redirectUri: string | null;
+    missingVariables: string[];
   };
 }
 
 export default async function SettingsPage() {
   let data: OnboardingData | null = null;
   let auth: AuthData = { security: { mfaEnabled: false } };
-  let integrations: IntegrationData = { gmail: { configured: false, connected: false, status: "DISCONNECTED", email: null, lastSyncedAt: null, errorDetails: null, historyId: null } };
+  let integrations: IntegrationData = { gmail: { configured: false, connected: false, status: "DISCONNECTED", email: null, lastSyncedAt: null, errorDetails: null, historyId: null, redirectUri: null, missingVariables: [] } };
   let error = "";
   try {
     [data, integrations, auth] = await Promise.all([

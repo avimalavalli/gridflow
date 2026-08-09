@@ -27,7 +27,7 @@ async function verifyChecksum(backupPath) {
 async function assertGridFlowDatabase(database) {
   const migrationResult = await database.query(`SELECT COUNT(*)::int AS "count" FROM "_GridFlowMigration"`);
   const migrations = Number(migrationResult.rows[0]?.count ?? 0);
-  if (migrations < 5) throw new Error(`Restored database has only ${migrations} GridFlow migrations.`);
+  if (migrations < 14) throw new Error(`Restored database has only ${migrations} GridFlow migrations; Phase 6 requires all 14.`);
 
   const requiredTables = ["Organisation", "User", "Company", "Contact", "OutreachRecord", "Opportunity", "AgentRun"];
   const tableResult = await database.query(

@@ -1,7 +1,7 @@
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
 import { closeDatabase, getDatabase, migrateDatabase } from "@gridflow/database";
-import { AgentEngine } from "@gridflow/engine";
+import { AgentEngine, AutomationControlEngine } from "@gridflow/engine";
 import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
 import { GmailSyncProcessor } from "./gmail-sync.js";
@@ -23,9 +23,17 @@ const database = await getDatabase();
 await migrateDatabase(database);
 
 const recoveryEngine = new AgentEngine(database);
+const automationControl = new AutomationControlEngine(database);
 const initialRecovery = await recoveryEngine.recoverStaleJobs(Number(process.env.AGENT_STALE_AFTER_MINUTES ?? 10));
 if (initialRecovery.requeued || initialRecovery.deadLettered) {
   logWorkerEvent({ event: "stale-agent-jobs-recovered", level: "warning", details: initialRecovery });
+}
+const initialAutomation = await automationControl.reconcileAll().catch((error) => {
+  reportWorkerError("automation-cockpit-initial-reconciliation-failed", error);
+  return null;
+});
+if (initialAutomation && (initialAutomation.tasksCreated || initialAutomation.decisionsCreated || initialAutomation.retriesQueued || initialAutomation.pipelinesStarted || initialAutomation.briefsGenerated)) {
+  logWorkerEvent({ event: "automation-cockpit-reconciled", level: "info", details: initialAutomation });
 }
 
 const emailProcessor = new EmailAutomationProcessor(database);
@@ -177,6 +185,13 @@ if (once) {
         return 0;
       });
       if (forgeRecovered) logWorkerEvent({ event: "stale-forge-proposals-recovered", level: "warning", details: { count: forgeRecovered } });
+      const automationResult = await automationControl.reconcileAll().catch((error) => {
+        reportWorkerError("automation-cockpit-reconciliation-failed", error);
+        return null;
+      });
+      if (automationResult && (automationResult.tasksCreated || automationResult.decisionsCreated || automationResult.retriesQueued || automationResult.pipelinesStarted || automationResult.briefsGenerated || automationResult.failures)) {
+        logWorkerEvent({ event: "automation-cockpit-reconciled", level: automationResult.failures ? "warning" : "info", details: automationResult });
+      }
       const pulseResult = await pulse.reconcile().catch((error) => {
         reportWorkerError("pulse-reconciliation-failed", error);
         return { stopped: 0, emailPlanned: 0, linkedinPlanned: 0, obsoleteClosed: 0 };

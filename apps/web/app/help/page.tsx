@@ -72,6 +72,13 @@ const chapters = [
     ["Agent Runs", "Use Agent Runs to inspect queued, running, succeeded and failed work. Retry the failed stage only after correcting its cause."],
     ["Production health", "Owners and admins can inspect readiness and release evidence. Deferred optional services should be labelled; core database, API, worker and web failures are launch blockers."],
   ]},
+  { id: "automation", title: "Automation Cockpit", summary: "Let GridFlow handle routine internal work while keeping consequential decisions human.", route: "/automation", sections: [
+    ["Three operating modes", "Guided explains and asks. Assisted creates safe internal tasks and briefs. Controlled may also schedule the Atlas → Sage → Relay → Echo chain and retry eligible failed runs inside configured budgets."],
+    ["Approval Inbox", "All meaningful decisions appear in one inbox with a plain-English reason. Only low-risk internal task creation can be batched; relationship, sending, booking, money, legal and deal decisions open individually."],
+    ["Policies and quiet hours", "Owners and admins set the timezone, working days, quiet hours, agent-run limit, research-credit limit, cost ceiling, concurrency, stale-deal threshold and discovery schedule."],
+    ["What remains manual", "GridFlow never performs the LinkedIn action, sends an external message without the existing approval policy, books a meeting, changes a deal stage, or approves proposal terms by itself."],
+    ["Exceptions and briefs", "The Today view prioritises due work, broken integrations, failed queues and at-risk opportunities. The weekly brief is calculated from live companies, contacts, replies, meetings, opportunities and failures."],
+  ]},
   { id: "glossary", title: "Glossary", summary: "Plain-English definitions for the words used across GridFlow.", route: "/dashboard", sections: [
     ["Tenant / organisation", "The isolated GridFlow workspace that owns its members, athlete profile, companies, conversations and settings."],
     ["Pipeline run", "One coordinated execution of the core research-and-drafting agent chain for a Discovery Brief."],

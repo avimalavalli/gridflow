@@ -12,7 +12,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://localhost:3000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -26,7 +26,7 @@ export default defineConfig({
       env: {
         NODE_ENV: "development",
         PORT: "3001",
-        WEB_ORIGIN: "http://127.0.0.1:3000",
+        WEB_ORIGIN: "http://localhost:3000",
         DATABASE_URL: `pglite:///tmp/gridflow-browser-${e2eRun}`,
         GRIDFLOW_DEV_BOOTSTRAP: "true",
         AUTH_SIGNUP_MODE: "OPEN",
@@ -39,7 +39,7 @@ export default defineConfig({
     },
     {
       command: "npm run dev --workspace @gridflow/web",
-      url: "http://127.0.0.1:3000/login",
+      url: "http://localhost:3000/login",
       timeout: 120_000,
       reuseExistingServer: false,
       env: {

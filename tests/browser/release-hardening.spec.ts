@@ -42,7 +42,7 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     const style = getComputedStyle(element);
     return { transitionDuration: style.transitionDuration, animationDuration: style.animationDuration };
   });
-  expect(motion.transitionDuration).toMatch(/0\.00001s|0\.01ms|0s/);
+  expect(Number.parseFloat(motion.transitionDuration)).toBeLessThanOrEqual(0.00001);
   await expectNoWcagViolations(page);
 
   const suffix = testInfo.project.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();

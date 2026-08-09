@@ -3,12 +3,12 @@
   --panel: #ffffff;
   --panel-subtle: #f9fbff;
   --text: #10213d;
-  --muted: #66758d;
-  --muted-2: #98a4b7;
+  --muted: #5c6b82;
+  --muted-2: #5f6d82;
   --line: #e5eaf2;
   --line-strong: #d7dfeb;
-  --blue: #075fdb;
-  --blue-hover: #044aa8;
+  --blue: #064ebc;
+  --blue-hover: #043f99;
   --blue-soft: #eaf3ff;
   --blue-pale: #f4f8ff;
   --green: #087a55;
@@ -44,13 +44,13 @@ h3 { font-size: 14px; margin-bottom: 0; }
 .brand-word { font-size: 19px; letter-spacing: -.7px; font-weight: 500; }
 .brand-word strong { font-weight: 900; }
 .workspace-pill { margin: 14px 14px 6px; padding: 11px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.045); border-radius: 12px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; color: #dbe5f4; }
-.workspace-avatar { width: 29px; height: 29px; border-radius: 9px; display: grid; place-items: center; background: #1f7cff; color: white; font-size: 11px; font-weight: 850; }
+.workspace-avatar { width: 29px; height: 29px; border-radius: 9px; display: grid; place-items: center; background: var(--blue); color: white; font-size: 11px; font-weight: 850; }
 .workspace-pill strong, .workspace-pill small { display: block; }
 .workspace-pill strong { font-size: 11px; }
 .workspace-pill small { color: var(--nav-muted); font-size: 9px; margin-top: 2px; }
 .nav { padding: 8px 12px 20px; flex: 1; }
 .nav-section { margin-top: 15px; }
-.nav-section-label { color: #62758f; text-transform: uppercase; font-size: 9px; letter-spacing: .13em; font-weight: 850; padding: 0 10px 7px; }
+.nav-section-label { color: #9fb1c8; text-transform: uppercase; font-size: 9px; letter-spacing: .13em; font-weight: 850; padding: 0 10px 7px; }
 .nav-link { height: 39px; padding: 0 10px; margin: 2px 0; border-radius: 9px; display: flex; align-items: center; gap: 10px; color: #aebbd0; font-size: 12px; font-weight: 650; transition: .15s ease; }
 .nav-link:hover { color: white; background: rgba(255,255,255,.055); }
 .nav-link.active { color: white; background: rgba(22,119,255,.18); box-shadow: inset 3px 0 0 #4d9cff; }

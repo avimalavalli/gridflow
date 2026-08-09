@@ -38,7 +38,7 @@ export default defineConfig({
       },
     },
     {
-      command: "npm run dev --workspace @gridflow/web",
+      command: "npm run dev --workspace @gridflow/web -- --hostname 127.0.0.1",
       url: "http://localhost:3000/login",
       timeout: 120_000,
       reuseExistingServer: false,

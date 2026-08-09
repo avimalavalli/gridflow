@@ -6,6 +6,7 @@ import { DataUnavailable } from "../../components/data-unavailable";
 import { EmptyState } from "../../components/empty-state";
 import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
+import { SetupChecklist } from "../../components/setup-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function DashboardPage() {
   return (
     <Shell title="Command Centre">
       <PageHead eyebrow="Commercial OS" title="Turn sponsor work into a daily system" description="Prioritise the next commercial action, keep every conversation moving and see where the pipeline is creating value." action={<Link className="button button-primary" href="/discovery-briefs"><Building2 size={15}/>Discover companies</Link>} />
+      <SetupChecklist />
       {!snapshot ? <DataUnavailable message={error} /> : <>
         <section className="metrics metrics-six">
           <div className="metric"><span className="metric-icon"><Building2 size={17}/></span><div className="metric-label">Companies</div><div className="metric-value">{snapshot.metrics.companiesDiscovered}</div><div className="metric-foot">{snapshot.metrics.companiesResearched} fully researched</div></div>

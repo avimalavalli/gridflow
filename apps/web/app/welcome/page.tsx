@@ -69,6 +69,7 @@ export default function WelcomePage() {
             <li><CheckCircle2 size={15}/>LinkedIn-first is the safe default.</li>
             <li><CheckCircle2 size={15}/>Messages wait for your approval.</li>
             <li><CheckCircle2 size={15}/>Replies stop follow-ups automatically.</li>
+            <li><CheckCircle2 size={15}/>The cockpit handles safe work within your budgets.</li>
           </ul>
         </div>
       </section>
@@ -81,7 +82,7 @@ export default function WelcomePage() {
       </section>
 
       <section className="welcome-grid">
-        <article className="card welcome-detail"><span className="welcome-detail-icon auto"><Bot size={19}/></span><h3>GridFlow handles</h3><p>Research orchestration, scoring, contact discovery, first drafts, follow-up timing, reply classification, meeting preparation and proposal preparation.</p></article>
+        <article className="card welcome-detail"><span className="welcome-detail-icon auto"><Bot size={19}/></span><h3>GridFlow handles</h3><p>Research orchestration, scoring, contact discovery, first drafts, follow-up timing, reply classification, meeting preparation, proposal preparation and safe internal automation.</p></article>
         <article className="card welcome-detail"><span className="welcome-detail-icon human"><Hand size={19}/></span><h3>You decide</h3><p>Which markets to pursue, which companies are worth contacting, whether a message is right, when a deal becomes real and what proposal leaves the business.</p></article>
       </section>
     </Shell>

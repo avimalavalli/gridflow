@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 6.2 guided-product release candidate: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, two trusted devices per user, a first-run welcome, resumable onboarding, a revisitable tutorial, a permanent searchable manual, customer-specific Gemini routing, managed evidence-research credits, a durable Atlas → Sage → Relay → Echo engine, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, a controlled opportunity/task/calendar workflow, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 6.3 automation-cockpit release candidate: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, stale-opportunity and missing-data detection, weekly outcome briefs, customer-specific Gemini routing, managed evidence-research credits, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -29,6 +29,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Human-controlled LinkedIn workflow and policy-controlled Gmail architecture.
 - Airtable migration review/import and stable duplicate protection.
 - Operations console for failures, queues, integrations, quality reviews and release readiness.
+- Automation Cockpit with Guided, Assisted and Controlled modes, budgets, quiet hours, discovery schedules, safe internal task creation, centralized approvals, exceptions, integration monitoring and weekly outcome briefs.
 - Launch Control with automated and manual acceptance checks, owner approval and immutable audit history.
 - Structured logging, optional external alerts, backups, verification and restore rehearsals.
 - CI, release preflight, schema validation and deterministic agent-quality regression fixtures.
@@ -71,6 +72,6 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/PHASE_6_2_GUIDED_EXPERIENCE.md`, `docs/PHASE_6_1_1_TRUSTED_DEVICES.md`, `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/PHASE_6_3_AUTOMATION_COCKPIT.md`, `docs/PHASE_6_2_GUIDED_EXPERIENCE.md`, `docs/PHASE_6_1_1_TRUSTED_DEVICES.md`, `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
 
 Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

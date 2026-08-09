@@ -1,0 +1,87 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createDatabase, migrateDatabase, type GridFlowDatabase } from "@gridflow/database";
+import { AutomationControlEngine } from "../src/automation.js";
+
+interface Seed { tenantId: string; userId: string }
+let database: GridFlowDatabase | undefined;
+
+async function seed(mode: "GUIDED" | "ASSISTED" | "CONTROLLED"): Promise<Seed> {
+  const user = await database!.query<{ id: string }>(`INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ($1,'x','Automation Owner',CURRENT_TIMESTAMP) RETURNING "id"`, [`${mode.toLowerCase()}@example.test`]);
+  const organisation = await database!.query<{ id: string }>(`INSERT INTO "Organisation" ("name","slug","updatedAt") VALUES ($1,$2,CURRENT_TIMESTAMP) RETURNING "id"`, [`${mode} Racing`, `${mode.toLowerCase()}-racing`]);
+  const userId = user.rows[0]!.id;
+  const tenantId = organisation.rows[0]!.id;
+  await database!.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
+  await database!.query(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',true,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, [tenantId]);
+  await database!.query(`INSERT INTO "AutomationControlPolicy" ("tenantId","mode","enabled","staleOpportunityDays","weeklyBriefEnabled","updatedAt") VALUES ($1::uuid,$2::"AutomationOperatingMode",true,3,true,CURRENT_TIMESTAMP)`, [tenantId, mode]);
+  const company = await database!.query<{ id: string }>(
+    `INSERT INTO "Company" ("tenantId","companyName","website","companyDomain","companyKey","researchStatus","priority","updatedAt") VALUES ($1::uuid,'Apex Sponsor','https://apex.test','apex.test',$2,'RESEARCHED','HIGH',CURRENT_TIMESTAMP-interval '10 days') RETURNING "id"`,
+    [tenantId, `cmp-${mode.toLowerCase()}`],
+  );
+  await database!.query(
+    `INSERT INTO "Opportunity" ("tenantId","companyId","opportunityName","stage","stageEnteredAt","updatedAt") VALUES ($1::uuid,$2::uuid,'Apex partnership','INTERESTED',CURRENT_TIMESTAMP-interval '10 days',CURRENT_TIMESTAMP-interval '10 days')`,
+    [tenantId, company.rows[0]!.id],
+  );
+  return { tenantId, userId };
+}
+
+beforeEach(async () => { database = await createDatabase("pglite://memory"); await migrateDatabase(database); });
+afterEach(async () => { await database?.close(); database = undefined; });
+
+describe("AutomationControlEngine", () => {
+  it("keeps Guided mode advisory, idempotent and fully internal", async () => {
+    const { tenantId } = await seed("GUIDED");
+    const engine = new AutomationControlEngine(database!);
+    const first = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    const second = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:05:00Z") });
+    expect(first).toMatchObject({ decisionsCreated: 2, tasksCreated: 0, briefsGenerated: 1 });
+    expect(second).toMatchObject({ decisionsCreated: 0, tasksCreated: 0, briefsGenerated: 0 });
+    const decisions = await database!.query<{ kind: string; risk: string }>(`SELECT "kind","risk"::text AS "risk" FROM "AutomationDecision" WHERE "tenantId"=$1::uuid ORDER BY "kind"`, [tenantId]);
+    expect(decisions.rows.map((row) => row.kind)).toEqual(["CREATE_MISSING_DATA_TASK", "CREATE_STALE_OPPORTUNITY_TASK"]);
+    expect((await database!.query(`SELECT 1 FROM "Task" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+    expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+  });
+
+  it("lets Assisted mode create safe tasks without sending, booking or changing the deal", async () => {
+    const { tenantId } = await seed("ASSISTED");
+    const engine = new AutomationControlEngine(database!);
+    const result = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    expect(result).toMatchObject({ tasksCreated: 2, decisionsCreated: 0 });
+    const tasks = await database!.query<{ title: string; source: string }>(`SELECT "title","source"::text AS "source" FROM "Task" WHERE "tenantId"=$1::uuid ORDER BY "title"`, [tenantId]);
+    expect(tasks.rows).toHaveLength(2);
+    expect(tasks.rows.every((row) => row.source === "SYSTEM_GENERATED")).toBe(true);
+    const opportunity = await database!.query<{ stage: string }>(`SELECT "stage"::text AS "stage" FROM "Opportunity" WHERE "tenantId"=$1::uuid`, [tenantId]);
+    expect(opportunity.rows[0]?.stage).toBe("INTERESTED");
+    expect((await database!.query(`SELECT 1 FROM "Meeting" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+    expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+  });
+
+  it("self-heals an eligible Controlled-mode failure inside every configured budget", async () => {
+    const { tenantId } = await seed("CONTROLLED");
+    const run = await database!.query<{ id: string }>(
+      `INSERT INTO "AgentRun" ("tenantId","agentName","status","idempotencyKey","input","errorDetails","updatedAt") VALUES ($1::uuid,'ECHO','FAILED','controlled-retry','{}'::jsonb,'Temporary provider failure',CURRENT_TIMESTAMP) RETURNING "id"`,
+      [tenantId],
+    );
+    await database!.query(`INSERT INTO "AutomationJob" ("tenantId","agentRunId","queueName","jobName","idempotencyKey","payload","status","updatedAt") VALUES ($1::uuid,$2::uuid,'core-agents','ECHO','controlled-retry','{}'::jsonb,'FAILED',CURRENT_TIMESTAMP)`, [tenantId, run.rows[0]!.id]);
+    await database!.query(`INSERT INTO "JobOutbox" ("tenantId","queueName","jobName","idempotencyKey","payload","status","updatedAt") VALUES ($1::uuid,'core-agents','ECHO','controlled-retry','{}'::jsonb,'FAILED',CURRENT_TIMESTAMP)`, [tenantId]);
+    const result = await new AutomationControlEngine(database!).reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    expect(result).toMatchObject({ retriesQueued: 1, failures: 0 });
+    const state = await database!.query<{ status: string; retryCount: number }>(`SELECT "status"::text AS "status","retryCount" FROM "AgentRun" WHERE "id"=$1::uuid`, [run.rows[0]!.id]);
+    expect(state.rows[0]).toEqual({ status: "QUEUED", retryCount: 1 });
+    expect((await database!.query(`SELECT 1 FROM "AutomationDecision" WHERE "tenantId"=$1::uuid AND "kind"='RETRY_AGENT_RUN'`, [tenantId])).rows).toHaveLength(0);
+  });
+
+  it("holds a Controlled-mode retry when the daily run ceiling is reached", async () => {
+    const { tenantId } = await seed("CONTROLLED");
+    await database!.query(`UPDATE "AutomationControlPolicy" SET "dailyAgentRunLimit"=1 WHERE "tenantId"=$1::uuid`, [tenantId]);
+    const run = await database!.query<{ id: string }>(
+      `INSERT INTO "AgentRun" ("tenantId","agentName","status","idempotencyKey","input","errorDetails","updatedAt") VALUES ($1::uuid,'ECHO','FAILED','budget-held-retry','{}'::jsonb,'Temporary provider failure',CURRENT_TIMESTAMP) RETURNING "id"`,
+      [tenantId],
+    );
+    const result = await new AutomationControlEngine(database!).reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    expect(result).toMatchObject({ retriesQueued: 0, decisionsCreated: 1 });
+    const decision = await database!.query<{ risk: string; explanation: string }>(`SELECT "risk"::text AS "risk","explanation" FROM "AutomationDecision" WHERE "tenantId"=$1::uuid AND "sourceId"=$2`, [tenantId, run.rows[0]!.id]);
+    expect(decision.rows[0]).toMatchObject({ risk: "MEDIUM" });
+    expect(decision.rows[0]?.explanation).toMatch(/budget has been reached/i);
+    expect((await database!.query<{ status: string }>(`SELECT "status"::text AS "status" FROM "AgentRun" WHERE "id"=$1::uuid`, [run.rows[0]!.id])).rows[0]?.status).toBe("FAILED");
+  });
+});

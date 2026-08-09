@@ -72,5 +72,12 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await page.getByLabel("Search the GridFlow manual").fill("API keys");
     await expect(page.getByRole("button", { name: /AI Setup and keys/i })).toBeVisible();
     await expectNoWcagViolations(page);
+    await page.goto("/automation");
+    await expect(page.getByRole("heading", { name: "Run the commercial system by exception" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Approval Inbox/i })).toBeVisible();
+    await expect(page.getByText("LinkedIn sending is always manual")).toBeVisible();
+    const cockpitViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(cockpitViewport.scrollWidth, `${testInfo.project.name} automation cockpit has horizontal overflow`).toBeLessThanOrEqual(cockpitViewport.width + 1);
+    await expectNoWcagViolations(page);
   }
 });

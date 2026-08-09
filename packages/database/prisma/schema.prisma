@@ -278,6 +278,42 @@ enum AutomationJobStatus {
   DEAD_LETTER
 }
 
+enum AutomationOperatingMode {
+  GUIDED
+  ASSISTED
+  CONTROLLED
+}
+
+enum AutomationCadence {
+  MANUAL
+  DAILY
+  WEEKLY
+}
+
+enum AutomationDecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+  EXPIRED
+  FAILED
+}
+
+enum AutomationRisk {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AutomationEventOutcome {
+  DETECTED
+  ACTIONED
+  APPROVAL_REQUIRED
+  BLOCKED
+  FAILED
+}
+
 enum PipelineRunStatus {
   QUEUED
   RUNNING
@@ -570,6 +606,8 @@ model User {
   entitlementsApproved ProductEntitlement[] @relation("ProductEntitlementApprovedBy")
   platformAuditEvents PlatformAuditEvent[]
   productExperienceProgress ProductExperienceProgress[]
+  automationPoliciesUpdated AutomationControlPolicy[] @relation("AutomationPolicyUpdatedBy")
+  automationDecisionsMade AutomationDecision[] @relation("AutomationDecisionDecidedBy")
 }
 
 model Organisation {
@@ -624,6 +662,10 @@ model Organisation {
   agentCredentials    AgentProviderCredential[]
   researchCreditReservations ResearchCreditReservation[]
   productExperienceProgress ProductExperienceProgress[]
+  automationControlPolicy AutomationControlPolicy?
+  automationDecisions AutomationDecision[]
+  automationEvents AutomationEvent[]
+  automationBriefs AutomationBrief[]
 }
 
 model ActivationGrant {
@@ -923,6 +965,106 @@ model ProductExperienceProgress {
   @@unique([tenantId, userId])
   @@index([userId])
   @@index([tenantId, tutorialCompletedAt])
+}
+
+model AutomationControlPolicy {
+  id                           String                  @id @default(uuid()) @db.Uuid
+  tenantId                     String                  @unique @db.Uuid
+  mode                         AutomationOperatingMode @default(GUIDED)
+  enabled                      Boolean                 @default(true)
+  timezone                     String                  @default("UTC")
+  quietHoursStart              String                  @default("20:00")
+  quietHoursEnd                String                  @default("08:00")
+  workingDays                  Json                    @default("[1,2,3,4,5]")
+  dailyAgentRunLimit           Int                     @default(40)
+  dailyResearchCreditLimit     Int                     @default(10)
+  dailyEstimatedCostLimitUsd   Decimal                 @default(10) @db.Decimal(12, 2)
+  maxConcurrentRuns            Int                     @default(4)
+  approvalBatchSize            Int                     @default(10)
+  staleOpportunityDays         Int                     @default(14)
+  missingDataChecksEnabled     Boolean                 @default(true)
+  automaticTaskCreationEnabled Boolean                 @default(true)
+  automaticRetryEnabled        Boolean                 @default(true)
+  integrationMonitoringEnabled Boolean                 @default(true)
+  weeklyBriefEnabled           Boolean                 @default(true)
+  weeklyBriefDay               Int                     @default(1)
+  weeklyBriefHour              Int                     @default(8)
+  discoveryScheduleEnabled     Boolean                 @default(false)
+  discoveryCadence             AutomationCadence       @default(MANUAL)
+  discoveryDay                 Int                     @default(1)
+  discoveryHour                Int                     @default(9)
+  pausedAt                     DateTime?               @db.Timestamptz(3)
+  pauseReason                  String?
+  lastEvaluatedAt              DateTime?               @db.Timestamptz(3)
+  updatedByUserId              String?                 @db.Uuid
+  createdAt                    DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime                @updatedAt @db.Timestamptz(3)
+  tenant                       Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedBy                    User?                   @relation("AutomationPolicyUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([enabled, mode])
+}
+
+model AutomationDecision {
+  id                String                   @id @default(uuid()) @db.Uuid
+  tenantId          String                   @db.Uuid
+  kind              String
+  sourceType        String
+  sourceId          String?
+  title             String
+  summary           String
+  explanation       String
+  risk              AutomationRisk           @default(LOW)
+  status            AutomationDecisionStatus @default(PENDING)
+  payload           Json
+  idempotencyKey    String
+  batchKey          String?
+  expiresAt         DateTime?                @db.Timestamptz(3)
+  decidedAt         DateTime?                @db.Timestamptz(3)
+  decidedByUserId   String?                  @db.Uuid
+  decisionNotes     String?
+  executedAt        DateTime?                @db.Timestamptz(3)
+  errorDetails      String?
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(3)
+  tenant            Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  decidedBy         User?                    @relation("AutomationDecisionDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, batchKey, status])
+}
+
+model AutomationEvent {
+  id             String                   @id @default(uuid()) @db.Uuid
+  tenantId       String                   @db.Uuid
+  triggerKey     String
+  outcome        AutomationEventOutcome
+  mode           AutomationOperatingMode
+  sourceType     String
+  sourceId       String?
+  explanation    String
+  metadata       Json?
+  idempotencyKey String
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+  tenant         Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, outcome, createdAt])
+}
+
+model AutomationBrief {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @db.Uuid
+  periodStart DateTime     @db.Date
+  periodEnd   DateTime     @db.Date
+  summary     Json
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  tenant      Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, periodStart, periodEnd])
+  @@index([tenantId, createdAt])
 }
 
 model OutreachPolicy {

@@ -34,6 +34,7 @@ import {
   Orbit as OrbitIcon,
   TimerReset,
   UsersRound,
+  Workflow,
   X,
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
@@ -45,6 +46,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
     label: "Workspace",
     items: [
       { label: "Command Centre", href: "/dashboard", icon: LayoutDashboard, keywords: "home actions overview dashboard" },
+      { label: "Automation", href: "/automation", icon: Workflow, keywords: "cockpit approvals autopilot policies triggers schedule exceptions weekly brief" },
       { label: "Companies", href: "/companies", icon: Building2, keywords: "brands prospects sponsors organisations" },
       { label: "Contacts", href: "/contacts", icon: ContactRound, keywords: "people decision makers leads" },
       { label: "Outreach", href: "/outreach", icon: Send, keywords: "linkedin email drafts messages approval" },

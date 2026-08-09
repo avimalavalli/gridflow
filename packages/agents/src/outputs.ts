@@ -165,7 +165,7 @@ export interface OrbitDebriefOutput {
   recommended_next_action: string;
   action_items: OrbitActionItemRecommendation[];
   should_update_opportunity: boolean;
-  opportunity_stage: "INTERESTED" | "DISCOVERY_CALL" | "NEEDS_ANALYSIS" | "PROPOSAL_REQUESTED" | "ON_HOLD" | "LOST";
+  opportunity_stage: "INTERESTED" | "DISCOVERY_CALL" | "NEEDS_ANALYSIS" | "PROPOSAL_REQUESTED" | "PROPOSAL_SENT" | "NEGOTIATION" | "VERBAL_AGREEMENT" | "WON" | "LOST" | "ON_HOLD";
   opportunity_probability: number;
   opportunity_rationale: string;
   follow_up_required: boolean;

@@ -182,6 +182,16 @@ export class NovaService {
               ],
             );
             opportunityId = created.rows[0]!.id;
+            await tx.query(
+              `INSERT INTO "StatusHistory" ("tenantId","entityType","entityId","fieldName","oldValue","newValue","actorUserId","reason")
+               VALUES ($1::uuid,'Opportunity',$2::uuid,'stage',NULL,$3,$4::uuid,$5)`,
+              [tenantId,opportunityId,recommendation.opportunityStage,userId,"Created from a human-approved Nova recommendation."],
+            );
+            await tx.query(
+              `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","newValues")
+               VALUES ($1::uuid,$2::uuid,'CREATE','Opportunity',$3,$4::jsonb)`,
+              [tenantId,userId,opportunityId,JSON.stringify({ source: "NOVA_REVIEW", interactionId, stage: recommendation.opportunityStage, probability: recommendation.opportunityProbability })],
+            );
           }
         }
         await tx.query(
@@ -203,6 +213,29 @@ export class NovaService {
             [tenantId, row.outreachRecordId, opportunityId],
           );
         }
+      }
+
+      if (recommendation.shouldCreateOpportunity && opportunityId && !recommendation.createMeetingTask) {
+        await tx.query(
+          `INSERT INTO "Task" ("tenantId","companyId","contactId","opportunityId","ownerId","automationKey","title","description","type","status","dueAt","source","updatedAt")
+           SELECT $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,'Confirm the next commercial step',$7,'FOLLOW_UP','OPEN',CURRENT_TIMESTAMP+INTERVAL '2 days','SYSTEM_GENERATED',CURRENT_TIMESTAMP
+           WHERE NOT EXISTS (SELECT 1 FROM "Task" WHERE "tenantId"=$1::uuid AND "opportunityId"=$4::uuid AND "status" IN ('OPEN','IN_PROGRESS'))
+           ON CONFLICT ("tenantId","automationKey") DO NOTHING`,
+          [tenantId,row.companyId,row.contactId,opportunityId,userId,`nova:${interactionId}:opportunity-next-action`,`Created when Nova's ${recommendation.opportunityStage.replaceAll("_", " ").toLowerCase()} opportunity was approved.`],
+        );
+      }
+
+      let meetingTaskCreated = false;
+      if (recommendation.createMeetingTask) {
+        if (!recommendation.shouldRecommendMeeting) throw new BadRequestException("A scheduling task requires an approved meeting recommendation.");
+        if (!row.companyId) throw new BadRequestException("Nova cannot create a meeting task without a company.");
+        const task = await tx.query(
+          `INSERT INTO "Task" ("tenantId","companyId","contactId","opportunityId","ownerId","automationKey","title","description","type","status","dueAt","source","updatedAt")
+           VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,'MEETING_PREP','OPEN',CURRENT_TIMESTAMP+INTERVAL '1 day','AI_GENERATED',CURRENT_TIMESTAMP)
+           ON CONFLICT ("tenantId","automationKey") DO NOTHING RETURNING "id"`,
+          [tenantId,row.companyId,row.contactId,opportunityId,userId,`nova:${interactionId}:schedule-meeting`,`Schedule ${recommendation.meetingTitle}`,`${recommendation.meetingObjective}\n\nSuggested duration: ${recommendation.meetingDurationMinutes} minutes.\nAgenda: ${recommendation.meetingAgenda}`],
+        );
+        meetingTaskCreated = task.rowCount === 1;
       }
 
       await tx.query(
@@ -235,9 +268,9 @@ export class NovaService {
       );
       await this.recordReview(
         tx, tenantId, userId, row, input, notes, opportunityId,
-        input.decision === "EDIT" ? "NEEDS_TUNING" : "ACCEPTED",
+        input.decision === "EDIT" ? "NEEDS_TUNING" : "ACCEPTED", meetingTaskCreated,
       );
-      return { id: interactionId, status: "REVIEWED", opportunityId, reused: false };
+      return { id: interactionId, status: "REVIEWED", opportunityId, meetingTaskCreated, reused: false };
     });
   }
 
@@ -295,6 +328,7 @@ export class NovaService {
       opportunityProbability: input.opportunityProbability ?? row.opportunityProbability ?? 0,
       opportunityRationale: input.opportunityRationale?.trim() ?? row.opportunityRationale ?? "",
       shouldRecommendMeeting: input.shouldRecommendMeeting ?? row.shouldRecommendMeeting,
+      createMeetingTask: input.createMeetingTask ?? false,
       meetingTitle: input.meetingTitle?.trim() ?? row.meetingTitle ?? "",
       meetingObjective: input.meetingObjective?.trim() ?? row.meetingObjective ?? "",
       meetingDurationMinutes: input.meetingDurationMinutes ?? row.meetingDurationMinutes ?? 0,
@@ -326,6 +360,9 @@ export class NovaService {
     if (value.shouldRecommendMeeting && !meetingIntents.has(row.replyIntent)) {
       throw new BadRequestException("This reply is not qualified for a meeting recommendation.");
     }
+    if (value.createMeetingTask && !value.shouldRecommendMeeting) {
+      throw new BadRequestException("A scheduling task requires a meeting recommendation.");
+    }
   }
 
   private async recordReview(
@@ -337,6 +374,7 @@ export class NovaService {
     notes: string | null,
     opportunityId: string | null,
     reviewStatus: "ACCEPTED" | "NEEDS_TUNING" | "REJECTED",
+    meetingTaskCreated = false,
   ) {
     if (row.agentRunId) {
       await tx.query(
@@ -355,7 +393,7 @@ export class NovaService {
         JSON.stringify({ novaStatus: row.status }),
         JSON.stringify({
           novaStatus: input.decision === "REJECT" ? "REJECTED" : "REVIEWED",
-          decision: input.decision, notes, opportunityId, externalMessageSent: false, meetingBooked: false,
+          decision: input.decision, notes, opportunityId, meetingTaskCreated, externalMessageSent: false, meetingBooked: false,
         }),
       ],
     );

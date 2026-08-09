@@ -63,6 +63,9 @@ export class ReviewNovaDto {
   @IsOptional() @IsBoolean()
   shouldRecommendMeeting?: boolean;
 
+  @IsOptional() @IsBoolean()
+  createMeetingTask?: boolean;
+
   @IsOptional() @IsString() @MaxLength(300)
   meetingTitle?: string;
 

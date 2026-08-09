@@ -57,9 +57,10 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
   {
     label: "Organise",
     items: [
+      { label: "Calendar", href: "/calendar", icon: CalendarDays, keywords: "calendar schedule deadlines calls appointments close dates" },
       { label: "Tasks", href: "/tasks", icon: ListTodo, keywords: "follow ups actions due" },
       { label: "Interactions", href: "/interactions", icon: MessageSquareText, keywords: "timeline replies calls notes" },
-      { label: "Meetings", href: "/meetings", icon: CalendarDays, keywords: "calendar calls appointments" },
+      { label: "Meetings", href: "/meetings", icon: CalendarDays, keywords: "calls appointments preparation outcomes" },
     ],
   },
   {

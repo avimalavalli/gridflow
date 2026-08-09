@@ -52,6 +52,7 @@ export interface NovaStrategy {
   opportunityProbability: number | null;
   opportunityRationale: string | null;
   shouldRecommendMeeting: boolean;
+  createMeetingTask: boolean;
   meetingTitle: string | null;
   meetingObjective: string | null;
   meetingDurationMinutes: number | null;
@@ -79,6 +80,7 @@ interface Draft {
   opportunityProbability: number;
   opportunityRationale: string;
   shouldRecommendMeeting: boolean;
+  createMeetingTask: boolean;
   meetingTitle: string;
   meetingObjective: string;
   meetingDurationMinutes: number;
@@ -112,6 +114,7 @@ function initial(strategy: NovaStrategy): Draft {
     opportunityProbability: strategy.opportunityProbability ?? 0,
     opportunityRationale: strategy.opportunityRationale ?? "",
     shouldRecommendMeeting: strategy.shouldRecommendMeeting,
+    createMeetingTask: strategy.shouldRecommendMeeting,
     meetingTitle: strategy.meetingTitle ?? "",
     meetingObjective: strategy.meetingObjective ?? "",
     meetingDurationMinutes: strategy.meetingDurationMinutes ?? 0,
@@ -170,7 +173,7 @@ export function NovaReviewDesk({ strategies }: { strategies: NovaStrategy[] }) {
           body: decision === "RETRY" ? undefined : JSON.stringify({ decision, ...draft }),
         },
       );
-      const payload = await response.json().catch(() => ({})) as { message?: string | string[]; opportunityId?: string | null };
+      const payload = await response.json().catch(() => ({})) as { message?: string | string[]; opportunityId?: string | null; meetingTaskCreated?: boolean };
       if (!response.ok) {
         const detail = Array.isArray(payload.message) ? payload.message.join(" ") : payload.message;
         throw new Error(detail || "Nova could not save that decision.");
@@ -181,9 +184,7 @@ export function NovaReviewDesk({ strategies }: { strategies: NovaStrategy[] }) {
           ? "Nova is trying this recommendation again."
           : decision === "REJECT"
             ? "Recommendation rejected. Nothing was sent or created."
-            : payload.opportunityId
-              ? "Approved. The opportunity was created; the reply remains unsent for your control."
-              : "Approved. The reply remains unsent for your control.",
+            : `${payload.opportunityId ? "Approved. The opportunity is ready." : "Approved."}${payload.meetingTaskCreated ? " A scheduling task was added." : ""} The reply remains unsent for your control.`,
       }));
       router.refresh();
     } catch (error) {
@@ -290,6 +291,7 @@ export function NovaReviewDesk({ strategies }: { strategies: NovaStrategy[] }) {
                 <input aria-label="Meeting duration" type="number" min={0} max={120} value={draft.meetingDurationMinutes} onChange={(event) => update(strategy, { meetingDurationMinutes: Number(event.target.value) })} />
                 <textarea aria-label="Meeting objective" value={draft.meetingObjective} onChange={(event) => update(strategy, { meetingObjective: event.target.value })} />
                 <textarea aria-label="Meeting agenda" value={draft.meetingAgenda} onChange={(event) => update(strategy, { meetingAgenda: event.target.value })} />
+                <label className="nova-check"><input type="checkbox" checked={draft.createMeetingTask} onChange={(event) => update(strategy, { createMeetingTask: event.target.checked })} /><span>Create an internal scheduling task when I approve</span></label>
               </div> : <p>No meeting is recommended or booked.</p>}
             </section>
           </div>

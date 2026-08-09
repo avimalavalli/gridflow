@@ -16,7 +16,7 @@ The `Production database backup and restore proof` workflow:
 1. runs `pg_dump` against Railway's public database endpoint;
 2. records a SHA-256 checksum and encrypts the dump with AES-256-CBC and PBKDF2 (600,000 iterations);
 3. retains only the encrypted artifact for 30 days. Because this repository is public, treat the artifact as externally visible; confidentiality depends on an independent 32+-character passphrase;
-4. decrypts and restores into a clean PostgreSQL service, then verifies at least 13 migrations and the critical application tables;
+4. decrypts and restores into a clean PostgreSQL service, then verifies at least 14 migrations and the critical application tables;
 5. signs and records a release proof only after the restore passes; and
 6. opens or updates a GitHub incident on failure and closes it after recovery.
 

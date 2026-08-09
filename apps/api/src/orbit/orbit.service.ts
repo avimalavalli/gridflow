@@ -12,6 +12,7 @@ interface OrbitRow extends Record<string, unknown> {
   companyId: string | null;
   contactId: string | null;
   opportunityId: string | null;
+  meetingStatus: string;
   prepStatus: string;
   prepDraft: unknown;
   prepAgentRunId: string | null;
@@ -23,7 +24,7 @@ interface OrbitRow extends Record<string, unknown> {
 
 const prepStatuses = new Set(["NOT_STARTED", "FAILED", "REJECTED"]);
 const debriefStatuses = new Set(["NOT_STARTED", "FAILED", "REJECTED"]);
-const opportunityStages = new Set(["INTERESTED", "DISCOVERY_CALL", "NEEDS_ANALYSIS", "PROPOSAL_REQUESTED", "ON_HOLD", "LOST"]);
+const opportunityStages = new Set(["INTERESTED", "DISCOVERY_CALL", "NEEDS_ANALYSIS", "PROPOSAL_REQUESTED", "PROPOSAL_SENT", "NEGOTIATION", "VERBAL_AGREEMENT", "WON", "LOST", "ON_HOLD"]);
 const taskTypes = new Set(["MANUAL_ACTION", "FOLLOW_UP", "PROPOSAL", "DATA_REVIEW"]);
 
 function text(value: unknown, name: string, maxLength: number, required = false): string {
@@ -281,18 +282,67 @@ export class OrbitService {
         }
       }
       if (input.applyOpportunityUpdate) {
+        const previous = await tx.query<{ stage: string; probability: number; companyId: string }>(
+          `SELECT "stage"::text AS "stage","probability","companyId" FROM "Opportunity" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid FOR UPDATE`,
+          [tenantId, row.opportunityId],
+        );
         await tx.query(
           `UPDATE "Opportunity" SET "stage"=$3::"OpportunityStage","probability"=$4,
                   "notes"=CONCAT_WS(E'\n\n',NULLIF("notes",''),$5::text),"updatedAt"=CURRENT_TIMESTAMP
            WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
           [tenantId, row.opportunityId, approved.opportunity_stage, approved.opportunity_probability, `Orbit meeting debrief: ${approved.opportunity_rationale}`],
         );
+        const old = previous.rows[0];
+        if (old && old.stage !== approved.opportunity_stage) {
+          await tx.query(
+            `INSERT INTO "StatusHistory" ("tenantId","entityType","entityId","fieldName","oldValue","newValue","actorUserId","reason")
+             VALUES ($1::uuid,'Opportunity',$2::uuid,'stage',$3,$4,$5::uuid,$6)`,
+            [tenantId,row.opportunityId,old.stage,approved.opportunity_stage,userId,`Orbit-approved meeting debrief: ${approved.opportunity_rationale}`],
+          );
+          await tx.query(
+            `UPDATE "Opportunity" SET "stageEnteredAt"=CURRENT_TIMESTAMP,
+                    "closedAt"=CASE WHEN $3 IN ('WON','LOST') THEN CURRENT_TIMESTAMP ELSE NULL END,
+                    "closeReason"=CASE WHEN $3 IN ('WON','LOST') THEN $4 ELSE NULL END
+             WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+            [tenantId,row.opportunityId,approved.opportunity_stage,approved.opportunity_rationale],
+          );
+          await tx.query(
+            `UPDATE "Company" SET "currentStage"=$3::"CommercialStage","updatedAt"=CURRENT_TIMESTAMP
+             WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+            [tenantId,old.companyId,["WON","LOST"].includes(approved.opportunity_stage) ? approved.opportunity_stage : "OPPORTUNITY"],
+          );
+        }
+        if (old && (old.stage !== approved.opportunity_stage || old.probability !== approved.opportunity_probability)) {
+          await tx.query(
+            `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","oldValues","newValues")
+             VALUES ($1::uuid,$2::uuid,$3::"AuditAction",'Opportunity',$4,$5::jsonb,$6::jsonb)`,
+            [tenantId,userId,old.stage !== approved.opportunity_stage ? "STATUS_CHANGE" : "UPDATE",row.opportunityId,JSON.stringify({ stage: old.stage, probability: old.probability }),JSON.stringify({ stage: approved.opportunity_stage, probability: approved.opportunity_probability, source: "ORBIT_DEBRIEF", meetingId })],
+          );
+        }
+        if (!["WON","LOST"].includes(approved.opportunity_stage)) {
+          await tx.query(
+            `INSERT INTO "Task" ("tenantId","companyId","contactId","opportunityId","meetingId","ownerId","automationKey","title","description","type","status","dueAt","source","updatedAt")
+             SELECT $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,'Opportunity safeguard after the approved Orbit debrief.','FOLLOW_UP','OPEN',CURRENT_TIMESTAMP+INTERVAL '2 days','SYSTEM_GENERATED',CURRENT_TIMESTAMP
+             WHERE NOT EXISTS (SELECT 1 FROM "Task" WHERE "tenantId"=$1::uuid AND "opportunityId"=$4::uuid AND "status" IN ('OPEN','IN_PROGRESS'))
+             ON CONFLICT ("tenantId","automationKey") DO NOTHING`,
+            [tenantId,row.companyId,row.contactId,row.opportunityId,meetingId,userId,`orbit:${meetingId}:opportunity-next-action`,approved.recommended_next_action],
+          );
+        }
       }
       await tx.query(
-        `UPDATE "Meeting" SET "outcome"=$3,"nextAction"=$4,"updatedAt"=CURRENT_TIMESTAMP
+        `UPDATE "Meeting" SET "outcome"=$3,"nextAction"=$4,"status"='COMPLETED',
+                "statusUpdatedAt"=CASE WHEN "status"<>'COMPLETED' THEN CURRENT_TIMESTAMP ELSE "statusUpdatedAt" END,
+                "completedAt"=COALESCE("completedAt",CURRENT_TIMESTAMP),"cancelledAt"=NULL,"updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
         [tenantId, meetingId, approved.meeting_summary, approved.recommended_next_action],
       );
+      if (row.meetingStatus !== "COMPLETED") {
+        await tx.query(
+          `INSERT INTO "StatusHistory" ("tenantId","entityType","entityId","fieldName","oldValue","newValue","actorUserId","reason")
+           VALUES ($1::uuid,'Meeting',$2::uuid,'status',$3,'COMPLETED',$4::uuid,'Orbit debrief approved from human meeting notes.')`,
+          [tenantId,meetingId,row.meetingStatus,userId],
+        );
+      }
       await tx.query(
         `UPDATE "OrbitWorkspace" SET "debriefStatus"='REVIEWED',"debriefDraft"=$3::jsonb,"approvedDebrief"=$3::jsonb,
                 "debriefReviewedAt"=CURRENT_TIMESTAMP,"debriefReviewedByUserId"=$4::uuid,
@@ -379,7 +429,7 @@ export class OrbitService {
 
   private async lockWorkspace(tx: Parameters<Parameters<DatabaseService["tenantTransaction"]>[1]>[0], tenantId: string, meetingId: string): Promise<OrbitRow> {
     const result = await tx.query<OrbitRow>(
-      `SELECT ow."id" AS "workspaceId",m."id" AS "meetingId",m."title",m."startsAt",m."companyId",m."contactId",m."opportunityId",
+      `SELECT ow."id" AS "workspaceId",m."id" AS "meetingId",m."title",m."startsAt",m."status"::text AS "meetingStatus",m."companyId",m."contactId",m."opportunityId",
               ow."prepStatus"::text AS "prepStatus",ow."prepDraft",ow."prepAgentRunId",
               ow."debriefStatus"::text AS "debriefStatus",ow."debriefDraft",ow."debriefAgentRunId",ow."debriefAppliedAt"
        FROM "OrbitWorkspace" ow JOIN "Meeting" m ON m."id"=ow."meetingId" AND m."tenantId"=ow."tenantId"

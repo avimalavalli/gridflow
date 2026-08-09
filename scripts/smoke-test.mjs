@@ -197,7 +197,7 @@ try {
   assert(contactDetail.interactions.length === 1, "Contact workspace did not return its linked interaction.");
   assert(contactDetail.meetings.length === 1, "Contact workspace did not return its linked meeting.");
 
-  await request(`/opportunities/${opportunity.id}`, { method: "PATCH", body: { stage: "PROPOSAL_REQUESTED", probability: 55 } });
+  await request(`/opportunities/${opportunity.id}`, { method: "PATCH", body: { stage: "PROPOSAL_REQUESTED", probability: 55, stageChangeReason: "Sponsor requested a formal commercial proposal." } });
   const forge = await request("/forge", {
     method: "POST",
     body: {

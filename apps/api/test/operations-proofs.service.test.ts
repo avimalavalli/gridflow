@@ -51,13 +51,13 @@ describe("OperationsProofsService", () => {
     await expect(service.record({
       kind: "BACKUP_RESTORE_VERIFIED", runId: "run-backup-invalid",
       sourceUrl: "https://github.com/avimalavalli/gridflow/actions/runs/101", observedAt: now.toISOString(),
-      restoreVerified: true, checksumSha256: "a".repeat(64), backupBytes: 128, migrationsVerified: 12,
-    })).rejects.toThrow(/all 13 production migrations/i);
+      restoreVerified: true, checksumSha256: "a".repeat(64), backupBytes: 128, migrationsVerified: 13,
+    })).rejects.toThrow(/all 14 production migrations/i);
 
     await expect(service.record({
       kind: "BACKUP_RESTORE_VERIFIED", runId: "run-backup-1",
       sourceUrl: "https://github.com/avimalavalli/gridflow/actions/runs/102", observedAt: now.toISOString(),
-      restoreVerified: true, checksumSha256: "b".repeat(64), backupBytes: 2048, migrationsVerified: 13,
+      restoreVerified: true, checksumSha256: "b".repeat(64), backupBytes: 2048, migrationsVerified: 14,
     })).resolves.toEqual({ accepted: true, duplicate: false });
 
     const status = await service.status(now, "abc1234");

@@ -5,6 +5,7 @@ import { currentReleaseCommit } from "../release-metadata.js";
 import type { RecordOperationsProofDto } from "./operations-proofs.dto.js";
 
 type ProofKind = RecordOperationsProofDto["kind"];
+const REQUIRED_PRODUCTION_MIGRATIONS = 14;
 
 interface ProofRow extends Record<string, unknown> {
   action: ProofKind;
@@ -68,8 +69,8 @@ export class OperationsProofsService {
       throw new BadRequestException("Operations proof timestamp must be within 60 minutes of the API clock.");
     }
     if (input.kind === "BACKUP_RESTORE_VERIFIED") {
-      if (!input.restoreVerified || !input.checksumSha256 || !input.backupBytes || !input.migrationsVerified || input.migrationsVerified < 13) {
-        throw new BadRequestException("Backup proof requires a verified restore, checksum, byte count and all 13 production migrations.");
+      if (!input.restoreVerified || !input.checksumSha256 || !input.backupBytes || !input.migrationsVerified || input.migrationsVerified < REQUIRED_PRODUCTION_MIGRATIONS) {
+        throw new BadRequestException(`Backup proof requires a verified restore, checksum, byte count and all ${REQUIRED_PRODUCTION_MIGRATIONS} production migrations.`);
       }
     }
 

@@ -51,7 +51,7 @@ export class AuthEmailProcessor {
       const content = row.template === "PASSWORD_RESET"
         ? passwordResetContent(row.payload)
         : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
-      await this.deliver(row.recipient, content);
+      await this.deliver(row.id, row.recipient, content);
       await this.database.query(
         `UPDATE "AuthEmailOutbox" SET "status"='SENT',"sentAt"=CURRENT_TIMESTAMP,"errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
         [row.id],
@@ -81,7 +81,7 @@ export class AuthEmailProcessor {
     });
   }
 
-  private async deliver(recipient: string, content: { subject: string; text: string; html: string }): Promise<void> {
+  private async deliver(outboxId: string, recipient: string, content: { subject: string; text: string; html: string }): Promise<void> {
     const provider = (process.env.AUTH_MAIL_PROVIDER ?? (process.env.NODE_ENV === "production" ? "RESEND" : "CONSOLE")).toUpperCase();
     if (provider === "CONSOLE") {
       if (process.env.NODE_ENV === "production") throw new Error("Console auth email delivery is disabled in production.");
@@ -94,7 +94,7 @@ export class AuthEmailProcessor {
     if (!apiKey || !from) throw new Error("RESEND_API_KEY and AUTH_FROM_EMAIL are required for auth email delivery.");
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `gridflow-auth-${outboxId}` },
       body: JSON.stringify({ from, to: [recipient], subject: content.subject, text: content.text, html: content.html }),
     });
     if (!response.ok) {

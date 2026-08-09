@@ -107,11 +107,26 @@ function isConfigured(): boolean {
   );
 }
 
+function gmailSetupStatus(): { configured: boolean; redirectUri: string | null; missingVariables: string[] } {
+  const required = [
+    ["GOOGLE_OAUTH_CLIENT_ID", process.env.GOOGLE_OAUTH_CLIENT_ID],
+    ["GOOGLE_OAUTH_CLIENT_SECRET", process.env.GOOGLE_OAUTH_CLIENT_SECRET],
+    ["GOOGLE_OAUTH_REDIRECT_URI", process.env.GOOGLE_OAUTH_REDIRECT_URI],
+    ["INTEGRATION_ENCRYPTION_KEY", process.env.INTEGRATION_ENCRYPTION_KEY],
+  ] as const;
+  return {
+    configured: isConfigured(),
+    redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() || null,
+    missingVariables: required.filter(([, value]) => !value?.trim()).map(([name]) => name),
+  };
+}
+
 @Injectable()
 export class IntegrationsService {
   constructor(private readonly database: DatabaseService) {}
 
   async status(tenantId: string) {
+    const setup = gmailSetupStatus();
     return this.database.tenantTransaction(tenantId, async (tx) => {
       const result = await tx.query<IntegrationRow>(
         `SELECT "id","status"::text AS "status","externalEmail","tokenExpiresAt","scopes","metadata","lastSyncedAt","errorDetails"
@@ -121,13 +136,15 @@ export class IntegrationsService {
       const row = result.rows[0];
       return {
         gmail: {
-          configured: isConfigured(),
+          configured: setup.configured,
           connected: row?.status === "CONNECTED",
           status: row?.status ?? "DISCONNECTED",
           email: row?.externalEmail ?? null,
           lastSyncedAt: row?.lastSyncedAt ?? null,
           errorDetails: row?.errorDetails ?? null,
           historyId: metadata(row?.metadata).historyId ?? null,
+          redirectUri: setup.redirectUri,
+          missingVariables: setup.missingVariables,
         },
       };
     });

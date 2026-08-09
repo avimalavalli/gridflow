@@ -70,7 +70,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content" tabIndex={-1}>
       <section className="auth-card auth-card-wide">
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Athlete-specific from day one</div>

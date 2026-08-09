@@ -7,7 +7,28 @@
 - Store backups outside the application host and outside the primary database provider.
 - Verify every backup checksum automatically.
 - Perform a full restore rehearsal at least monthly using a non-production database.
-- Never place backup files, database URLs or encryption keys in GitHub.
+- Never place backup files, database URLs or encryption keys in repository files, issue bodies or logs. Production values belong only in the encrypted Actions secret vault.
+
+## Automated production recovery point
+
+The `Production database backup and restore proof` workflow:
+
+1. runs `pg_dump` against Railway's public database endpoint;
+2. records a SHA-256 checksum and encrypts the dump with AES-256-CBC and PBKDF2 (600,000 iterations);
+3. retains only the encrypted artifact for 30 days. Because this repository is public, treat the artifact as externally visible; confidentiality depends on an independent 32+-character passphrase;
+4. decrypts and restores into a clean PostgreSQL service, then verifies at least 13 migrations and the critical application tables;
+5. signs and records a release proof only after the restore passes; and
+6. opens or updates a GitHub incident on failure and closes it after recovery.
+
+Required GitHub Actions secrets:
+
+- `GRIDFLOW_DATABASE_PUBLIC_URL`
+- `GRIDFLOW_BACKUP_PASSPHRASE`
+- `OPERATIONS_PROBE_TOKEN`
+
+After saving the secrets, set the repository variable `GRIDFLOW_BACKUPS_ENABLED=true`, run the workflow manually once, and confirm the restore proof. It then runs daily at 02:17 UTC.
+
+GitHub Actions artifact retention is the initial recovery layer. Before onboarding high-value tenants or promising a tighter RPO, move encrypted backups to independent object storage or enable and test Railway Pro point-in-time recovery.
 
 ## Create a backup
 

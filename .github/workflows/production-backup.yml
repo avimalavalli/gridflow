@@ -1,0 +1,171 @@
+name: GridFlow encrypted production backup
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: gridflow-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup-and-restore:
+    if: github.event_name == 'workflow_dispatch' || vars.GRIDFLOW_BACKUPS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gridflow-restore-only
+          POSTGRES_DB: gridflow_restore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gridflow_restore"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      GRIDFLOW_DATABASE_PUBLIC_URL: ${{ secrets.GRIDFLOW_DATABASE_PUBLIC_URL }}
+      GRIDFLOW_BACKUP_PASSPHRASE: ${{ secrets.GRIDFLOW_BACKUP_PASSPHRASE }}
+      OPERATIONS_PROBE_TOKEN: ${{ secrets.OPERATIONS_PROBE_TOKEN }}
+      GRIDFLOW_WEB_URL: https://web-production-24fce.up.railway.app
+      RESTORE_DATABASE_URL: postgresql://postgres:gridflow-restore-only@localhost:5432/gridflow_restore
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate protected backup configuration
+        run: |
+          test -n "$GRIDFLOW_DATABASE_PUBLIC_URL"
+          test "${#GRIDFLOW_BACKUP_PASSPHRASE}" -ge 32
+          test "${#OPERATIONS_PROBE_TOKEN}" -ge 32
+
+      - name: Create, checksum and encrypt production backup
+        id: backup
+        run: |
+          set -euo pipefail
+          mkdir -p backup-evidence
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          dump="/tmp/gridflow-${stamp}.dump"
+          encrypted="backup-evidence/gridflow-${stamp}.dump.enc"
+          pg_dump "$GRIDFLOW_DATABASE_PUBLIC_URL" --format=custom --no-owner --no-privileges --file="$dump"
+          checksum="$(sha256sum "$dump" | awk '{print $1}')"
+          bytes="$(wc -c < "$dump" | tr -d ' ')"
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -in "$dump" -out "$encrypted" -pass env:GRIDFLOW_BACKUP_PASSPHRASE
+          encrypted_checksum="$(sha256sum "$encrypted" | awk '{print $1}')"
+          printf '%s  %s\n' "$encrypted_checksum" "$(basename "$encrypted")" > "${encrypted}.sha256"
+          BACKUP_FILE="$encrypted" BACKUP_CHECKSUM="$checksum" BACKUP_BYTES="$bytes" node --input-type=module <<'NODE'
+          import { writeFile } from "node:fs/promises";
+          const manifest = {
+            createdAt: new Date().toISOString(),
+            format: "postgres-custom-encrypted-aes-256-cbc-pbkdf2",
+            encryptedFile: process.env.BACKUP_FILE.split("/").pop(),
+            unencryptedSha256: process.env.BACKUP_CHECKSUM,
+            unencryptedBytes: Number(process.env.BACKUP_BYTES),
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            repository: process.env.GITHUB_REPOSITORY,
+          };
+          await writeFile(`${process.env.BACKUP_FILE}.manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+          NODE
+          echo "file=$encrypted" >> "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+          shred --remove "$dump"
+
+      - name: Decrypt and restore into clean PostgreSQL
+        id: restore
+        run: |
+          set -euo pipefail
+          restored="/tmp/gridflow-restore.dump"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "${{ steps.backup.outputs.file }}" -out "$restored" -pass env:GRIDFLOW_BACKUP_PASSPHRASE
+          test "$(sha256sum "$restored" | awk '{print $1}')" = "${{ steps.backup.outputs.checksum }}"
+          pg_restore --clean --if-exists --no-owner --no-privileges --dbname="$RESTORE_DATABASE_URL" "$restored"
+          migration_count="$(psql "$RESTORE_DATABASE_URL" --tuples-only --no-align --command 'SELECT COUNT(*) FROM "_GridFlowMigration"')"
+          test "$migration_count" -ge 13
+          psql "$RESTORE_DATABASE_URL" --set=ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE missing text;
+          BEGIN
+            SELECT string_agg(required.name, ', ')
+              INTO missing
+              FROM (VALUES ('Organisation'),('User'),('Company'),('Contact'),('OutreachRecord'),('Opportunity'),('AgentRun'),('Proposal'),('ProposalVersion')) AS required(name)
+              WHERE to_regclass('public."' || required.name || '"') IS NULL;
+            IF missing IS NOT NULL THEN RAISE EXCEPTION 'Restored GridFlow database is missing: %', missing; END IF;
+          END $$;
+          SQL
+          echo "migration_count=$migration_count" >> "$GITHUB_OUTPUT"
+          shred --remove "$restored"
+
+      - name: Upload encrypted recovery point
+        uses: actions/upload-artifact@v7
+        with:
+          name: gridflow-encrypted-backup-${{ github.run_id }}
+          path: backup-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record signed backup and restore proof
+        env:
+          PROOF_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROOF_RUN_ID: backup-${{ github.run_id }}-${{ github.run_attempt }}
+          BACKUP_CHECKSUM: ${{ steps.backup.outputs.checksum }}
+          BACKUP_BYTES: ${{ steps.backup.outputs.bytes }}
+          MIGRATIONS_VERIFIED: ${{ steps.restore.outputs.migration_count }}
+        run: |
+          node --input-type=module <<'NODE'
+          const response = await fetch(`${process.env.GRIDFLOW_WEB_URL}/backend/operations/proofs`, {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPERATIONS_PROBE_TOKEN}` },
+            body: JSON.stringify({
+              kind: "BACKUP_RESTORE_VERIFIED",
+              runId: process.env.PROOF_RUN_ID,
+              sourceUrl: process.env.PROOF_SOURCE_URL,
+              observedAt: new Date().toISOString(),
+              checksumSha256: process.env.BACKUP_CHECKSUM,
+              backupBytes: Number(process.env.BACKUP_BYTES),
+              restoreVerified: true,
+              migrationsVerified: Number(process.env.MIGRATIONS_VERIFIED),
+            }),
+          });
+          if (response.status !== 202) throw new Error(`Operations proof endpoint returned HTTP ${response.status}.`);
+          NODE
+
+      - name: Open or update backup incident
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = "[GridFlow backup] Production recovery failed";
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner: context.repo.owner, repo: context.repo.repo, state: "all", per_page: 100 });
+            const existing = issues.find((issue) => !issue.pull_request && issue.title === title);
+            const body = `The encrypted production backup or clean restore rehearsal failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\nDetected: ${new Date().toISOString()}\n\nNo database credentials or backup contents are included.`;
+            if (!existing) await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+            else {
+              if (existing.state === "closed") await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: "open" });
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body });
+            }
+
+      - name: Close recovered backup incident
+        if: success()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = "[GridFlow backup] Production recovery failed";
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100 });
+            const existing = issues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body: `Backup and clean restore recovered. Verified by ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}.` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: "closed", state_reason: "completed" });
+            }

@@ -213,7 +213,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
             <div><div className="topbar-kicker">GridFlow</div><div className="topbar-title">{title}</div></div>
           </div>
           <div className="topbar-actions">
-            <button className="search-trigger" type="button" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search GridFlow</span><kbd>⌘ K</kbd></button>
+            <button className="search-trigger" type="button" aria-label="Search GridFlow" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search GridFlow</span><kbd>⌘ K</kbd></button>
             <Link className="avatar" href="/team" title={auth?.user.name ?? "Current account"}>{accountInitials}</Link>
           </div>
         </header>

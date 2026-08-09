@@ -3,6 +3,7 @@ import type { SqlExecutor } from "@gridflow/database";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
 import { currentReleaseCommit, currentReleaseVersion, releaseMetadataConfigured } from "../release-metadata.js";
+import { OperationsProofsService } from "../operations-proofs/operations-proofs.service.js";
 import type { CreateReleaseAcceptanceDto, UpdateAcceptanceCheckDto } from "./release-acceptance.dto.js";
 
 type AcceptanceStatus = "PENDING" | "PASS" | "FAIL" | "BLOCKED" | "WAIVED";
@@ -28,8 +29,8 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "openai_configuration", category: "AGENTS", title: "Live agent provider", description: "A release-owned OpenAI key and production agent model are configured server-side.", required: true, automated: true },
   { key: "gmail_oauth_configuration", category: "OUTREACH", title: "Gmail OAuth configuration", description: "Google OAuth, callback and encrypted token storage are configured.", required: true, automated: true },
   { key: "password_mail_configuration", category: "AUTH", title: "Password email delivery", description: "The production password-reset email provider and sender identity are configured.", required: true, automated: true },
-  { key: "backup_configuration", category: "DATA", title: "Off-host backups", description: "Managed point-in-time recovery or encrypted off-host backup storage is configured.", required: true, automated: true },
-  { key: "alerting_configuration", category: "INFRASTRUCTURE", title: "Failure alerting", description: "Structured logs reach an alert-capable drain or an operations webhook is configured.", required: true, automated: true },
+  { key: "backup_configuration", category: "DATA", title: "Off-host backups", description: "A recent encrypted off-host backup has completed and supplied signed evidence.", required: true, automated: true },
+  { key: "alerting_configuration", category: "INFRASTRUCTURE", title: "Failure alerting", description: "The external production monitor is running and supplied a recent signed heartbeat.", required: true, automated: true },
   { key: "queue_health", category: "INFRASTRUCTURE", title: "Queue health", description: "No automation or authentication-email job is currently in dead letter.", required: true, automated: true },
   { key: "agent_failure_health", category: "AGENTS", title: "Agent failure health", description: "No unresolved agent failure remains in the release acceptance workspace.", required: true, automated: true },
   { key: "outreach_failure_health", category: "OUTREACH", title: "Outreach failure health", description: "No unresolved failed email or LinkedIn channel action remains.", required: true, automated: true },
@@ -47,7 +48,7 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "password_reset_live_acceptance", category: "AUTH", title: "Password recovery acceptance", description: "A real password-reset email arrives, the token works once and existing sessions are revoked.", required: true, automated: false },
   { key: "mfa_device_acceptance", category: "AUTH", title: "Authenticator-device acceptance", description: "MFA setup, login challenge and one-time recovery codes work on a real authenticator device.", required: true, automated: false },
   { key: "permissions_review", category: "SECURITY", title: "Permission and tenant-isolation review", description: "Owner, admin, operator, reviewer and read-only permissions are verified across separate athlete organisations.", required: true, automated: false },
-  { key: "backup_restore_rehearsal", category: "DATA", title: "Production restore rehearsal", description: "A production-format backup is restored into a clean non-production database and verified.", required: true, automated: false },
+  { key: "backup_restore_rehearsal", category: "DATA", title: "Production restore rehearsal", description: "The latest encrypted production backup was restored into clean PostgreSQL and its GridFlow schema was verified.", required: true, automated: true },
   { key: "browser_qa", category: "QA", title: "Desktop browser QA", description: "Core journeys pass on current Chrome, Edge, Safari and Firefox releases.", required: true, automated: false },
   { key: "mobile_qa", category: "QA", title: "Mobile and tablet QA", description: "Core journeys remain usable on representative iOS, Android and tablet viewports.", required: true, automated: false },
   { key: "accessibility_qa", category: "QA", title: "Accessibility acceptance", description: "Keyboard navigation, focus order, contrast, labels, reduced motion and screen-reader basics are verified.", required: true, automated: false },
@@ -99,7 +100,8 @@ interface HealthCounts extends Record<string, unknown> {
   awaitingHumanReview: number;
 }
 
-type AutomatedResult = { status: "PASS" | "FAIL" | "BLOCKED"; detail: string };
+type AutomatedResult = { status: "PASS" | "FAIL" | "BLOCKED"; detail: string; evidenceUrl?: string | null };
+type OperationsProofStatus = Awaited<ReturnType<OperationsProofsService["status"]>>;
 
 function clean(value?: string | null): string | null {
   const trimmed = value?.trim();
@@ -112,14 +114,14 @@ function configured(value: string | undefined): boolean {
 
 @Injectable()
 export class ReleaseAcceptanceService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly proofs: OperationsProofsService) {}
 
   async overview(tenantId: string) {
-    const databaseHealth = await this.database.ping();
+    const [databaseHealth, proofStatus] = await Promise.all([this.database.ping(), this.proofs.status()]);
     return this.database.tenantTransaction(tenantId, async (tx) => {
       const release = await this.ensureCurrentRelease(tx, tenantId);
       await this.ensureDefaultChecks(tx, tenantId, release.id);
-      await this.evaluateAutomatedChecks(tx, tenantId, release.id, databaseHealth.database === "ok");
+      await this.evaluateAutomatedChecks(tx, tenantId, release.id, databaseHealth.database === "ok", proofStatus);
       await this.refreshReleaseStatus(tx, tenantId, release.id);
       return this.loadOverview(tx, tenantId, release.id);
     });
@@ -328,7 +330,7 @@ export class ReleaseAcceptanceService {
     }
   }
 
-  private async evaluateAutomatedChecks(tx: SqlExecutor, tenantId: string, releaseId: string, databaseReady: boolean): Promise<void> {
+  private async evaluateAutomatedChecks(tx: SqlExecutor, tenantId: string, releaseId: string, databaseReady: boolean, proofStatus: OperationsProofStatus): Promise<void> {
     const counts = await tx.query<HealthCounts>(
       `SELECT
          (SELECT COUNT(*)::int FROM "AutomationJob" WHERE "tenantId"=$1::uuid AND "status"='DEAD_LETTER') AS "deadLetterJobs",
@@ -376,12 +378,21 @@ export class ReleaseAcceptanceService {
       password_mail_configuration: apiConfig.authMailProvider === "RESEND" && configured(apiConfig.resendApiKey) && configured(apiConfig.authFromEmail)
         ? { status: "PASS", detail: "Production password email delivery is configured." }
         : { status: "BLOCKED", detail: "Production requires AUTH_MAIL_PROVIDER=RESEND, RESEND_API_KEY and AUTH_FROM_EMAIL." },
-      backup_configuration: process.env.DATABASE_PROVIDER_BACKUPS === "true" || configured(process.env.BACKUP_STORAGE_URL)
-        ? { status: "PASS", detail: process.env.DATABASE_PROVIDER_BACKUPS === "true" ? "Managed database backups are declared." : "Encrypted off-host backup storage is declared." }
-        : { status: "BLOCKED", detail: "Configure managed backups or BACKUP_STORAGE_URL." },
-      alerting_configuration: process.env.LOG_DRAIN_CONFIGURED === "true" || configured(process.env.OPERATIONS_ALERT_WEBHOOK_URL)
-        ? { status: "PASS", detail: "External failure alerting is configured." }
-        : { status: "BLOCKED", detail: "Configure an alert-capable log drain or OPERATIONS_ALERT_WEBHOOK_URL." },
+      backup_configuration: apiConfig.nodeEnv !== "production"
+        ? { status: "PASS", detail: "Development environment; signed backup proof is required in production." }
+        : proofStatus.backup.fresh
+          ? { status: "PASS", detail: proofStatus.backup.detail, evidenceUrl: proofStatus.backup.sourceUrl }
+          : { status: "BLOCKED", detail: proofStatus.backup.detail, evidenceUrl: proofStatus.backup.sourceUrl },
+      backup_restore_rehearsal: apiConfig.nodeEnv !== "production"
+        ? { status: "PASS", detail: "Development environment; production restore evidence is checked after deployment." }
+        : proofStatus.backup.fresh
+          ? { status: "PASS", detail: proofStatus.backup.detail, evidenceUrl: proofStatus.backup.sourceUrl }
+          : { status: "BLOCKED", detail: proofStatus.backup.detail, evidenceUrl: proofStatus.backup.sourceUrl },
+      alerting_configuration: apiConfig.nodeEnv !== "production"
+        ? { status: "PASS", detail: "Development environment; signed external monitor proof is required in production." }
+        : proofStatus.monitor.fresh
+          ? { status: "PASS", detail: proofStatus.monitor.detail, evidenceUrl: proofStatus.monitor.sourceUrl }
+          : { status: "BLOCKED", detail: proofStatus.monitor.detail, evidenceUrl: proofStatus.monitor.sourceUrl },
       queue_health: health.deadLetterJobs + health.deadLetterAuthMail === 0
         ? { status: "PASS", detail: "No dead-letter jobs are recorded." }
         : { status: "FAIL", detail: `${health.deadLetterJobs} automation and ${health.deadLetterAuthMail} authentication-email jobs are dead-lettered.` },
@@ -399,9 +410,9 @@ export class ReleaseAcceptanceService {
     for (const [key, result] of Object.entries(results)) {
       await tx.query(
         `UPDATE "ReleaseAcceptanceCheck" SET
-           "status"=$4::"AcceptanceCheckStatus","automatedDetail"=$5,"lastEvaluatedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+           "status"=$4::"AcceptanceCheckStatus","automatedDetail"=$5,"evidenceUrl"=$6,"lastEvaluatedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid AND "releaseAcceptanceId"=$2::uuid AND "key"=$3 AND "automated"=TRUE`,
-        [tenantId, releaseId, key, result.status, result.detail],
+        [tenantId, releaseId, key, result.status, result.detail, result.evidenceUrl ?? null],
       );
     }
   }

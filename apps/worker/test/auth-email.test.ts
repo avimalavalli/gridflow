@@ -40,6 +40,8 @@ class FakeDatabase {
 afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.AUTH_MAIL_PROVIDER;
+  delete process.env.AUTH_FROM_EMAIL;
+  delete process.env.RESEND_API_KEY;
 });
 
 describe("GridFlow auth email outbox", () => {
@@ -52,5 +54,20 @@ describe("GridFlow auth email outbox", () => {
     expect(await processor.processNext()).toEqual({ processed: false });
     expect(database.snapshot()).toMatchObject({ status: "SENT", attempts: 1 });
     expect(log).toHaveBeenCalled();
+  });
+
+  it("uses a stable Resend idempotency key for the outbox row", async () => {
+    process.env.AUTH_MAIL_PROVIDER = "RESEND";
+    process.env.AUTH_FROM_EMAIL = "GridFlow <no-reply@gridflow.test>";
+    process.env.RESEND_API_KEY = "resend-test-key";
+    const request = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const database = new FakeDatabase();
+    const processor = new AuthEmailProcessor(database as never);
+
+    expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({ "Idempotency-Key": "gridflow-auth-11111111-1111-4111-8111-111111111111" }),
+    });
   });
 });

@@ -80,7 +80,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
   }
 
   return (
-    <main className="auth-shell" id="main-content">
+    <main className="auth-shell" id="main-content" tabIndex={-1}>
       <section className="auth-card" aria-labelledby="auth-title">
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Secure commercial workspace</div>

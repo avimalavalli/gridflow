@@ -59,7 +59,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   const visibleMessage = token ? message : "This invitation link is incomplete.";
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content" tabIndex={-1}>
       <section className="auth-card">
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Organisation invitation</div>

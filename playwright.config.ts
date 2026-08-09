@@ -19,7 +19,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "npm run start --workspace @gridflow/api",
+      command: "node apps/api/dist/main.js",
       url: "http://127.0.0.1:3001/api/v1/health/live",
       timeout: 120_000,
       reuseExistingServer: false,

@@ -28,6 +28,7 @@ import { PlatformModule } from "./platform/platform.module.js";
 import { AiSettingsModule } from "./ai-settings/ai-settings.module.js";
 import { OrbitModule } from "./orbit/orbit.module.js";
 import { ForgeModule } from "./forge/forge.module.js";
+import { SealModule } from "./seal/seal.module.js";
 import { OperationsProofsModule } from "./operations-proofs/operations-proofs.module.js";
 import { ExperienceModule } from "./experience/experience.module.js";
 import { AutomationModule } from "./automation/automation.module.js";
@@ -63,6 +64,7 @@ import { AutomationModule } from "./automation/automation.module.js";
     AiSettingsModule,
     OrbitModule,
     ForgeModule,
+    SealModule,
     OperationsProofsModule,
     ExperienceModule,
     AutomationModule,

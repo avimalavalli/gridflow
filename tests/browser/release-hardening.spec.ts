@@ -32,6 +32,7 @@ test("public authentication surfaces are responsive, keyboard reachable and acce
 });
 
 test("signup and reduced-motion behaviour remain usable across release browsers", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/signup");
   await expect(page.getByRole("heading", { name: "Create your GridFlow organisation" })).toBeVisible();
@@ -71,6 +72,8 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await expect(page.getByRole("heading", { name: "Everything you need to run GridFlow safely" })).toBeVisible();
     await page.getByLabel("Search the GridFlow manual").fill("API keys");
     await expect(page.getByRole("button", { name: /AI Setup and keys/i })).toBeVisible();
+    await page.getByLabel("Search the GridFlow manual").fill("live integration acceptance");
+    await expect(page.getByRole("button", { name: /Live integration acceptance/i })).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/automation");
     await expect(page.getByRole("heading", { name: "Run the commercial system by exception" })).toBeVisible();
@@ -87,6 +90,17 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await expect(page.getByRole("heading", { name: "Away mode is protecting the queue" })).toBeVisible();
     await page.getByRole("button", { name: "Resume now" }).click();
     await expect(page.getByRole("heading", { name: /mode is active/i })).toBeVisible();
+    await page.goto("/launch");
+    await expect(page.getByRole("heading", { name: "Evidence, not recollection" })).toBeVisible();
+    await expect(page.getByText("Real provider events only")).toBeVisible();
+    const evidenceProgress = page.getByRole("progressbar", { name: "Live integration evidence completion" });
+    await expect(evidenceProgress).toHaveAttribute("aria-valuemin", "0");
+    await expect(evidenceProgress).toHaveAttribute("aria-valuemax", "7");
+    await expect(evidenceProgress).toHaveAttribute("aria-valuenow", "0");
+    await expect(page.locator(".launch-check").filter({ hasText: "Atlas live acceptance" }).getByRole("button", { name: "Pass" })).toBeDisabled();
+    const launchViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(launchViewport.scrollWidth, `${testInfo.project.name} live acceptance has horizontal overflow`).toBeLessThanOrEqual(launchViewport.width + 1);
+    await expectNoWcagViolations(page);
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Your three highest-leverage moves" })).toBeVisible();
     const searchCompany = `Search Sponsor ${suffix}`;

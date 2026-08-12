@@ -4,11 +4,15 @@ Phase 7D closes the main authenticated V1 product scope. The remaining path shou
 
 ## Phase 8A — Live integration acceptance
 
-1. Create release-owned OpenAI, Google Cloud/Gmail and Resend accounts.
-2. Configure production secrets through the hosting provider.
-3. Run real evidence through Atlas → Sage → Relay → Echo and tune prompts only where observed results justify it.
-4. Accept Gmail draft/send/reply flows, password recovery and authenticator devices with real accounts.
-5. Prove monitoring, backups and clean restore against the production database.
+Phase 8A is now the active phase. GridFlow binds each acceptance result to real records created after the deployed commit starts its evidence window.
+
+1. Create release-owned OpenAI, Google Cloud/Gmail and Resend accounts; never place their secrets in source control, chat, screenshots or acceptance notes.
+2. Configure production secrets through the hosting provider and confirm the automated configuration gates in Launch Control.
+3. Run current evidence through Atlas → Sage → Relay → Echo, review every result and tune a prompt only when a real rejected or needs-tuning result identifies a specific defect.
+4. Complete the controlled Gmail draft, send, reply, bounce, opt-out and sequence-stop matrix. LinkedIn remains human-performed and external messaging remains approval-gated.
+5. Complete a real password-reset delivery and single-use token flow, then test authenticator login and consume one recovery code.
+6. Refresh Launch Control. Evidence-bound checks cannot record PASS until their complete internal evidence chains exist.
+7. Confirm signed monitoring and backup/restore proof remain fresh before Phase 8A closes.
 
 ## Phase 8B — Commercial launch layer
 

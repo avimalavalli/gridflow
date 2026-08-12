@@ -2418,6 +2418,7 @@ model ReleaseAcceptance {
   approvedByUserId String?                 @db.Uuid
   approvedAt       DateTime?               @db.Timestamptz(3)
   releasedAt       DateTime?               @db.Timestamptz(3)
+  acceptanceStartedAt DateTime             @default(now()) @db.Timestamptz(3)
   createdAt        DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime                @updatedAt @db.Timestamptz(3)
   tenant           Organisation            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2438,10 +2439,13 @@ model ReleaseAcceptanceCheck {
   description           String
   required              Boolean                 @default(true)
   automated             Boolean                 @default(false)
+  evidenceRequired      Boolean                 @default(false)
   status                AcceptanceCheckStatus   @default(PENDING)
   notes                 String?
   evidenceUrl           String?
   automatedDetail       String?
+  evidenceSnapshot      Json?
+  evidenceObservedAt    DateTime?               @db.Timestamptz(3)
   lastEvaluatedAt       DateTime?               @db.Timestamptz(3)
   testedAt              DateTime?               @db.Timestamptz(3)
   testedByUserId        String?                  @db.Uuid

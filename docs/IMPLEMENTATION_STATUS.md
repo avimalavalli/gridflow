@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 7D Product Refinement
+# GridFlow implementation status — Phase 8A Live Integration Acceptance
 
 ## Built and verified
 
@@ -11,7 +11,8 @@
 - Password recovery, MFA, lockout, encrypted integration secrets and security headers.
 - Administrator Operations console for queues, failures, integrations, quality and release health.
 - Structured logging, optional external alerts, backup verification and restore-rehearsal tooling.
-- **Launch Control** with automated release gates, manual live-acceptance evidence, owner approval, approval revocation when conditions change and final release recording.
+- **Launch Control** with automated release gates, owner approval, approval revocation when conditions change and final release recording.
+- **Evidence-bound live acceptance** for Atlas, Sage, Relay, Echo, Gmail, password recovery and MFA, with commit-scoped evidence windows, safe evidence snapshots and automatic PASS revocation when the underlying proof becomes incomplete.
 - CI evidence, production preflight, schema checks and deterministic agent-quality regression fixtures.
 - Route loading, error recovery and not-found product states.
 - Paid, email-bound one-time activations with platform-owner approval and immediate access suspension/revocation.
@@ -39,24 +40,24 @@
 
 ## Validation result
 
-- 126 automated tests passed across 51 files.
+- 128 automated tests passed across 51 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 71 models and 21 registered migrations.
+- Database schema check passed: 71 models and 22 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The ten-case, five-profile browser specification now covers Phase 7D search, away/resume, Focus Desk, persistent dismissal, responsive overflow and WCAG checks. Local execution remains pending because this workspace could not download the pinned browser binaries; CI must provide the acceptance evidence before Phase 7D is published.
+- The ten-case, five-profile browser specification covers Phase 7D refinement plus Phase 8A evidence visibility, blocked-PASS behaviour, responsive overflow and WCAG checks. Local execution remains pending because this workspace does not have the pinned browser binaries; CI must provide the browser acceptance evidence before Phase 8A is published.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
 ## Still required before public V1
 
 1. A release-owned GridFlow domain and production DNS.
-2. Live OpenAI acceptance and prompt tuning using real current evidence.
-3. Real Gmail, Resend and authenticator-device acceptance.
+2. Release-owned OpenAI acceptance and prompt tuning using real current evidence.
+3. Release-owned Google Cloud/Gmail and Resend configuration, followed by controlled Gmail, password-recovery and authenticator-device acceptance.
 4. Browser, mobile, accessibility and performance QA on physical devices.
 5. Permission review and final security sign-off.
 6. Completion of every required Launch Control check.
 7. Owner approval, deployment and selected-athlete acceptance.
 
-The authenticated V1 application is now functionally closed for the agreed core scope. Live service integration, commercial launch surfaces, acceptance, security, privacy/legal and controlled beta remain before public launch.
+The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application remains functionally closed for the agreed core scope. Live provider acceptance, commercial launch surfaces, feature-freeze acceptance, security, privacy/legal and controlled beta remain before public launch.

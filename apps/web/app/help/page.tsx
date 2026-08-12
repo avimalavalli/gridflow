@@ -93,6 +93,13 @@ const chapters = [
     ["Agent Runs", "Use Agent Runs to inspect queued, running, succeeded and failed work. Retry the failed stage only after correcting its cause."],
     ["Production health", "Owners and admins can inspect readiness and release evidence. Deferred optional services should be labelled; core database, API, worker and web failures are launch blockers."],
   ]},
+  { id: "live-acceptance", title: "Live integration acceptance", summary: "Prove real agents, Gmail, password recovery and MFA before launch.", route: "/launch", sections: [
+    ["Acceptance window", "Every deployed commit starts a fresh evidence window. Older test records cannot make a changed release appear accepted."],
+    ["Agent evidence", "Run Atlas, Sage, Relay and Echo with current real inputs. Review the source evidence and output in Agent Runs, then record the human quality decision. Launch Control unlocks PASS only for a completed production-model run that was genuinely accepted."],
+    ["Controlled Gmail matrix", "Use mailboxes you control to create a draft, send one approved test, ingest a reply, verify the reply stops follow-ups, test a bounce, and record an opt-out. Never use a real prospect for destructive acceptance cases."],
+    ["Account recovery and MFA", "Request and consume one real password-reset email, then verify old sessions and devices are revoked. Complete an authenticator login and consume one saved recovery code. GridFlow detects the audit events without storing the codes."],
+    ["No secret evidence", "Provider keys, OAuth tokens, reset tokens and recovery codes never belong in notes or evidence links. Launch Control records safe event metadata and internal record references only."],
+  ]},
   { id: "automation", title: "Automation Cockpit", summary: "Let GridFlow handle routine internal work while keeping consequential decisions human.", route: "/automation", sections: [
     ["Three operating modes", "Guided explains and asks. Assisted creates safe internal tasks and briefs. Controlled may also schedule the Atlas → Sage → Relay → Echo chain and retry eligible failed runs inside configured budgets."],
     ["Approval Inbox", "All meaningful decisions appear in one inbox with a plain-English reason. Only low-risk internal task creation can be batched; relationship, sending, booking, money, legal and deal decisions open individually."],

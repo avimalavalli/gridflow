@@ -33,6 +33,7 @@ import { ExperienceModule } from "./experience/experience.module.js";
 import { AutomationModule } from "./automation/automation.module.js";
 import { SealModule } from "./seal/seal.module.js";
 import { DeliveryModule } from "./delivery/delivery.module.js";
+import { RenewalsModule } from "./renewals/renewals.module.js";
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { DeliveryModule } from "./delivery/delivery.module.js";
     AutomationModule,
     SealModule,
     DeliveryModule,
+    RenewalsModule,
   ],
 })
 export class AppModule {}

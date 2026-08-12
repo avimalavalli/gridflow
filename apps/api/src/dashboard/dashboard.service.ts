@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, forge, delivery, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, forge, delivery, renewals, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -248,6 +248,16 @@ export class DashboardService {
           [tenantId],
         ),
         tx.query<ActionRow>(
+          `SELECT r."id",'RENEWAL' AS "kind",
+                  CASE WHEN r."status"='REVIEW_READY' THEN 'Approve renewal for '||co."companyName" WHEN r."status"='APPROVED' THEN 'Open renewal opportunity for '||co."companyName" ELSE 'Prepare renewal for '||co."companyName" END AS "title",
+                  c."title" AS "detail",COALESCE(r."expectedDecisionDate"::timestamptz,p."renewalReviewDate"::timestamptz,r."updatedAt") AS "dueAt",'/renewals/'||r."id" AS "href",
+                  CASE WHEN r."status"='REVIEW_READY' THEN 'REVIEW' WHEN r."status"='APPROVED' THEN 'READY' WHEN p."renewalReviewDate"<=CURRENT_DATE THEN 'TODAY' ELSE 'UPCOMING' END AS "urgency"
+           FROM "RenewalCase" r JOIN "DeliveryProgramme" p ON p."id"=r."programmeId" AND p."tenantId"=r."tenantId" JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+           WHERE r."tenantId"=$1::uuid AND r."status" IN ('DRAFT','REVIEW_READY','APPROVED','ON_HOLD')
+           ORDER BY CASE r."status" WHEN 'REVIEW_READY' THEN 0 WHEN 'APPROVED' THEN 1 ELSE 2 END,COALESCE(r."expectedDecisionDate",p."renewalReviewDate") NULLS LAST LIMIT 8`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
           `SELECT a."id", 'AGENT_FAILURE' AS "kind", a."agentName"::text || ' needs attention' AS "title",
                   COALESCE(a."errorCode", a."errorDetails", 'Agent run failed') AS "detail", a."updatedAt" AS "dueAt",
                   '/agent-runs' AS "href", 'FAILED' AS "urgency"
@@ -277,7 +287,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...delivery.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...delivery.rows, ...renewals.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

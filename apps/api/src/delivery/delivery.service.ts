@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { SqlExecutor } from "@gridflow/database";
 import { DatabaseService } from "../database/database.service.js";
-import type { ApproveDeliveryReportDto, CompleteDeliveryProgrammeDto, ConfigureDeliveryProgrammeDto, CreateDeliveryObligationDto, GenerateDeliveryReportDto, RecordDeliveryEvidenceDto, ShareDeliveryReportDto, TransitionDeliveryObligationDto, UpdateDeliveryObligationDto, UpdateDeliveryRenewalDto, VerifyDeliveryEvidenceDto } from "./delivery.dto.js";
+import type { ApproveDeliveryReportDto, CompleteDeliveryProgrammeDto, ConfigureDeliveryProgrammeDto, CreateDeliveryObligationDto, GenerateDeliveryReportDto, RecordDeliveryEvidenceDto, ShareDeliveryReportDto, TransitionDeliveryObligationDto, UpdateDeliveryObligationDto, VerifyDeliveryEvidenceDto } from "./delivery.dto.js";
+import { RenewalsService } from "../renewals/renewals.service.js";
 
 interface ProgrammeRow extends Record<string, unknown> {
   id: string; contractId: string; contractVersionId: string; status: string; deliveryStartDate: Date | string; deliveryEndDate: Date | string;
@@ -41,7 +42,7 @@ async function audit(tx: SqlExecutor, tenantId: string, userId: string, action: 
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly renewals:RenewalsService) {}
 
   async overview(tenantId: string) {
     return this.database.tenantTransaction(tenantId, async (tx) => {
@@ -73,8 +74,8 @@ export class DeliveryService {
 
   async detail(tenantId: string, programmeId: string) {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const programme = await tx.query(`SELECT p.*,p."status"::text AS "status",p."renewalStatus"::text AS "renewalStatus",c."contractNumber",c."title" AS "contractTitle",c."valueMinor",c."currency",c."signedDocumentUrl",co."companyName",o."opportunityName",v."versionNumber",v."checksumSha256" AS "contractChecksum"
-        FROM "DeliveryProgramme" p JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId" JOIN "Opportunity" o ON o."id"=c."opportunityId" AND o."tenantId"=c."tenantId" JOIN "ContractVersion" v ON v."id"=p."contractVersionId" AND v."tenantId"=p."tenantId"
+      const programme = await tx.query(`SELECT p.*,p."status"::text AS "status",p."renewalStatus"::text AS "renewalStatus",c."contractNumber",c."title" AS "contractTitle",c."valueMinor",c."currency",c."signedDocumentUrl",co."companyName",o."opportunityName",v."versionNumber",v."checksumSha256" AS "contractChecksum",r."id" AS "renewalCaseId"
+        FROM "DeliveryProgramme" p JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId" JOIN "Opportunity" o ON o."id"=c."opportunityId" AND o."tenantId"=c."tenantId" JOIN "ContractVersion" v ON v."id"=p."contractVersionId" AND v."tenantId"=p."tenantId" LEFT JOIN "RenewalCase" r ON r."programmeId"=p."id" AND r."tenantId"=p."tenantId"
         WHERE p."tenantId"=$1::uuid AND p."id"=$2::uuid`, [tenantId, programmeId]);
       if (!programme.rows[0]) throw new NotFoundException("Delivery programme was not found.");
       const [obligations, evidence, reports] = await Promise.all([
@@ -104,7 +105,8 @@ export class DeliveryService {
       await tx.query(`UPDATE "DeliveryProgramme" SET "status"='ACTIVE',"internalOwner"=$3,"renewalReviewDate"=$4::date,"activatedAt"=COALESCE("activatedAt",CURRENT_TIMESTAMP),"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, programmeId, input.internalOwner.trim(), renewal]);
       await tx.query(`UPDATE "DeliveryObligation" SET "status"='READY',"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "programmeId"=$2::uuid AND "status"='PLANNED'`, [tenantId, programmeId]);
       await audit(tx, tenantId, userId, "APPROVE", "DeliveryProgramme", programmeId, { event:"ACTIVATE_DELIVERY_PLAN", contractId:programme.contractId, renewalReviewDate:renewal, obligations:check.rows[0].total });
-      return { programmeId, status:"ACTIVE" };
+      const renewalCase=renewal?await this.renewals.prepareInTransaction(tx,tenantId,userId,programmeId,{}):null;
+      return { programmeId, status:"ACTIVE", renewalCaseId:renewalCase?.caseId??null };
     });
   }
 
@@ -204,11 +206,6 @@ export class DeliveryService {
   async shareReport(tenantId:string,userId:string,programmeId:string,reportId:string,input:ShareDeliveryReportDto){
     if(!input.confirmSharedExternally)throw new BadRequestException("Confirm that the approved report was actually shared outside GridFlow.");const url=httpsUrl(input.sharedUrl,"Shared report URL");
     return this.database.tenantTransaction(tenantId,async tx=>{await this.lockProgramme(tx,tenantId,programmeId);const updated=await tx.query<{id:string}>(`UPDATE "DeliveryReport" SET "status"='SHARED',"sharedAt"=CURRENT_TIMESTAMP,"sharedByUserId"=$4::uuid,"sharedUrl"=$5,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "programmeId"=$2::uuid AND "id"=$3::uuid AND "status"='APPROVED' RETURNING "id"`,[tenantId,programmeId,reportId,userId,url]);if(!updated.rows[0])throw new BadRequestException("Only an approved report can be marked shared.");await audit(tx,tenantId,userId,"STATUS_CHANGE","DeliveryReport",reportId,{programmeId,event:"REPORT_SHARED",sharedUrl:url,confirmedExternalAction:true});return{reportId,status:"SHARED"};});
-  }
-
-  async updateRenewal(tenantId:string,userId:string,programmeId:string,input:UpdateDeliveryRenewalDto){
-    if(["RENEWED","DECLINED"].includes(input.status)&&!input.confirmOutcome)throw new BadRequestException("Confirm the externally agreed renewal outcome.");
-    return this.database.tenantTransaction(tenantId,async tx=>{const p=await this.lockProgramme(tx,tenantId,programmeId);if(!p)throw new NotFoundException();await tx.query(`UPDATE "DeliveryProgramme" SET "renewalStatus"=$3::"DeliveryRenewalStatus","updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,[tenantId,programmeId,input.status]);await audit(tx,tenantId,userId,"STATUS_CHANGE","DeliveryProgramme",programmeId,{event:"RENEWAL",status:input.status,confirmedOutcome:input.confirmOutcome??false,notes:clean(input.notes,2000)});return{programmeId,renewalStatus:input.status};});
   }
 
   async complete(tenantId:string,userId:string,programmeId:string,input:CompleteDeliveryProgrammeDto){

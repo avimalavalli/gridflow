@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { createDatabase, migrateDatabase, setTenantContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
 import { DeliveryService } from "../src/delivery/delivery.service.js";
+import { RenewalsService } from "../src/renewals/renewals.service.js";
 
 class TestDatabaseService {
   constructor(private readonly database: GridFlowDatabase) {}
@@ -10,6 +11,7 @@ class TestDatabaseService {
 let database:GridFlowDatabase|undefined;
 beforeEach(async()=>{database=await createDatabase("pglite://memory");await migrateDatabase(database);});
 afterEach(async()=>{await database?.close();database=undefined;});
+function deliveryService(){const db=new TestDatabaseService(database!) as never;return new DeliveryService(db,new RenewalsService(db));}
 
 async function seed(suffix="main"){
   const user=await database!.query<{id:string}>(`INSERT INTO "User" ("email","passwordHash","name","emailVerifiedAt","updatedAt") VALUES ($1,'hash','Delivery Owner',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`,[`delivery-${suffix}@test.local`]);
@@ -26,7 +28,7 @@ async function seed(suffix="main"){
 
 describe("DeliveryService",()=>{
   it("hands an active Seal contract to one version-anchored delivery programme",async()=>{
-    const data=await seed();const service=new DeliveryService(new TestDatabaseService(database!) as never);
+    const data=await seed();const service=deliveryService();
     const first=await service.start(data.tenantId,data.userId,data.contractId);const second=await service.start(data.tenantId,data.userId,data.contractId);
     expect(first).toMatchObject({status:"SETUP",reused:false});expect(second).toMatchObject({programmeId:first.programmeId,reused:true});
     const detail=await service.detail(data.tenantId,first.programmeId);expect(detail.obligations).toHaveLength(2);expect(detail.obligations.map((item:any)=>item.title)).toEqual(["Race car branding","Quarterly performance report"]);
@@ -35,11 +37,11 @@ describe("DeliveryService",()=>{
   });
 
   it("requires real deadlines and verified evidence before fulfilment, reporting and completion",async()=>{
-    const data=await seed("lifecycle");const service=new DeliveryService(new TestDatabaseService(database!) as never);const started=await service.start(data.tenantId,data.userId,data.contractId);let detail=await service.detail(data.tenantId,started.programmeId);const first=detail.obligations[0] as any;const second=detail.obligations[1] as any;
+    const data=await seed("lifecycle");const service=deliveryService();const started=await service.start(data.tenantId,data.userId,data.contractId);let detail=await service.detail(data.tenantId,started.programmeId);const first=detail.obligations[0] as any;const second=detail.obligations[1] as any;
     await expect(service.configure(data.tenantId,data.userId,started.programmeId,{internalOwner:"Commercial Lead",confirmPlanReviewed:true})).rejects.toThrow(/deadline/i);
     await service.updateObligation(data.tenantId,data.userId,started.programmeId,first.id,{title:first.title,description:"Primary car placement",category:"BRANDING",dueDate:"2026-09-01",proofRequired:true});
     await service.updateObligation(data.tenantId,data.userId,started.programmeId,second.id,{title:second.title,category:"REPORTING",dueDate:"2026-10-01",proofRequired:true});
-    expect(await service.configure(data.tenantId,data.userId,started.programmeId,{internalOwner:"Commercial Lead",renewalReviewDate:"2027-05-01",confirmPlanReviewed:true})).toMatchObject({status:"ACTIVE"});
+    expect(await service.configure(data.tenantId,data.userId,started.programmeId,{internalOwner:"Commercial Lead",renewalReviewDate:"2027-05-01",confirmPlanReviewed:true})).toMatchObject({status:"ACTIVE",renewalCaseId:expect.any(String)});
     await service.transition(data.tenantId,data.userId,started.programmeId,first.id,{status:"IN_PROGRESS"});
     await expect(service.transition(data.tenantId,data.userId,started.programmeId,first.id,{status:"DELIVERED"})).rejects.toThrow(/evidence/i);
     await expect(service.recordEvidence(data.tenantId,data.userId,started.programmeId,first.id,{type:"IMAGE",title:"Car livery proof",evidenceUrl:"http://unsafe.test/proof.jpg",occurredAt:"2026-08-10T10:00:00Z"})).rejects.toBeInstanceOf(BadRequestException);
@@ -61,7 +63,7 @@ describe("DeliveryService",()=>{
   });
 
   it("does not expose one athlete's delivery records to another tenant",async()=>{
-    const owner=await seed("owner");const outsider=await seed("outsider");const service=new DeliveryService(new TestDatabaseService(database!) as never);const programme=await service.start(owner.tenantId,owner.userId,owner.contractId);
+    const owner=await seed("owner");const outsider=await seed("outsider");const service=deliveryService();const programme=await service.start(owner.tenantId,owner.userId,owner.contractId);
     await expect(service.detail(outsider.tenantId,programme.programmeId)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.recordEvidence(outsider.tenantId,outsider.userId,programme.programmeId,"00000000-0000-4000-8000-000000000000",{type:"URL",title:"Cross tenant",evidenceUrl:"https://evidence.test/cross",occurredAt:"2026-08-10T10:00:00Z"})).rejects.toBeInstanceOf(NotFoundException);
   });

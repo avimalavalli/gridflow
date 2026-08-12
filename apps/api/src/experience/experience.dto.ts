@@ -10,7 +10,7 @@ export class UpdateExperienceDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(8)
+  @Max(9)
   tutorialStep?: number;
 
   @IsOptional()

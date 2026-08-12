@@ -45,6 +45,7 @@ interface MissingContactRow extends Record<string, unknown> { id: string; compan
 interface IntegrationIssueRow extends Record<string, unknown> { id: string; provider: string; status: string; errorDetails: string | null; updatedAt: Date }
 interface FailedRunRow extends Record<string, unknown> { id: string; agentName: string; errorDetails: string | null; retryCount: number }
 interface BriefRow extends Record<string, unknown> { id: string; briefName: string }
+interface SealRiskRow extends Record<string, unknown> { id: string; opportunityId: string; companyName: string; contractTitle: string; kind: string; detail: string; dueAt: Date }
 
 export interface AutomationReconcileResult extends Record<string, unknown> {
   tenants: number;
@@ -168,7 +169,7 @@ export class AutomationControlEngine {
       const withinBudget = usage.agentRuns < policy.dailyAgentRunLimit && usage.researchRuns < policy.dailyResearchCreditLimit
         && Number(usage.estimatedCostUsd) < Number(policy.dailyEstimatedCostLimitUsd) && usage.activeRuns < policy.maxConcurrentRuns;
 
-      const [stale, missing, integrations, failed] = await Promise.all([
+      const [stale, missing, integrations, failed, sealRisks] = await Promise.all([
         tx.query<StaleOpportunityRow>(
           `SELECT o."id",o."opportunityName",c."companyName",o."stage"::text AS "stage",o."stageEnteredAt"
            FROM "Opportunity" o JOIN "Company" c ON c."id"=o."companyId"
@@ -188,6 +189,19 @@ export class AutomationControlEngine {
            WHERE ar."tenantId"=$1::uuid AND ar."status"='FAILED' AND ar."retryCount"<3
              AND NOT EXISTS (SELECT 1 FROM "AutomationDecision" d WHERE d."tenantId"=$1::uuid AND d."kind"='RETRY_AGENT_RUN' AND d."sourceId"=ar."id"::text AND d."status" IN ('PENDING','APPROVED','EXECUTED'))
            ORDER BY ar."updatedAt" DESC LIMIT 10`, [tenantId]) : Promise.resolve({ rows: [] as FailedRunRow[], rowCount: 0 }),
+        tx.query<SealRiskRow>(
+          `SELECT * FROM (
+             SELECT c."id",c."opportunityId",co."companyName",c."title" AS "contractTitle",'SIGNATURE' AS "kind",
+                    'Required signatures have been outstanding for more than seven days.' AS "detail",c."sentForSignatureAt" AS "dueAt"
+             FROM "Contract" c JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+             WHERE c."tenantId"=$1::uuid AND c."status" IN ('SENT_FOR_SIGNATURE','PARTIALLY_SIGNED') AND c."sentForSignatureAt"<CURRENT_TIMESTAMP-interval '7 days'
+             UNION ALL
+             SELECT pm."id",c."opportunityId",co."companyName",c."title",'PAYMENT',
+                    pm."title"||' is overdue and still has an outstanding balance.',pm."dueDate"::timestamptz
+             FROM "PaymentMilestone" pm JOIN "Contract" c ON c."id"=pm."contractId" AND c."tenantId"=pm."tenantId"
+             JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+             WHERE pm."tenantId"=$1::uuid AND pm."status" NOT IN ('PAID','WAIVED','DISPUTED') AND pm."dueDate"<CURRENT_DATE
+           ) risks ORDER BY "dueAt" LIMIT 40`, [tenantId]),
       ]);
 
       for (const item of stale.rows) {
@@ -212,6 +226,21 @@ export class AutomationControlEngine {
           title: `Reconnect ${item.provider.replaceAll("_", " ")}`, summary: item.errorDetails || `The integration is ${item.status.toLowerCase()}.`,
           explanation: "GridFlow can flag and assign the repair, but reconnecting a provider requires an authorised human session.",
           taskType: "AUTOMATION_RETRY", taskDescription: "Open Settings, reconnect the provider and run a test sync before resuming dependent automation.", dueAt: now,
+        });
+      }
+      for (const item of sealRisks.rows) {
+        const payment = item.kind === "PAYMENT";
+        await this.suggestOrCreateTask(tx, policy, ownerId, result, {
+          key: `seal-${item.kind.toLowerCase()}:${item.id}:${new Date(item.dueAt).toISOString().slice(0,10)}`,
+          kind: payment ? "CREATE_OVERDUE_PAYMENT_TASK" : "CREATE_SIGNATURE_FOLLOW_UP_TASK", sourceType: "Opportunity", sourceId: item.opportunityId,
+          title: payment ? `Verify overdue payment from ${item.companyName}` : `Review outstanding signatures for ${item.companyName}`,
+          summary: `${item.contractTitle} · ${item.detail}`,
+          explanation: payment
+            ? "GridFlow detected an overdue contractual milestone. It can create an internal verification task, but it cannot contact the sponsor or alter financial records."
+            : "GridFlow detected stalled signatures. It can create an internal follow-up task, but it cannot send reminders or claim that anyone signed.",
+          taskType: "FOLLOW_UP", taskDescription: payment
+            ? "Check the invoice and bank record, then record the verified status in Seal. Contact the sponsor only through an authorised human action."
+            : "Open Seal, verify the external signature provider or document trail, and choose the authorised human follow-up.", dueAt: now,
         });
       }
 
@@ -341,7 +370,10 @@ export class AutomationControlEngine {
          (SELECT COALESCE(SUM("valueMinor"),0)::int FROM "Opportunity" WHERE "tenantId"=$1::uuid AND "stage" NOT IN ('LOST')) AS "pipelineValueMinor",
          (SELECT COUNT(*)::int FROM "Meeting" WHERE "tenantId"=$1::uuid AND "createdAt">=$2::date AND "createdAt"<$3::date+1) AS "meetingsAdded",
          (SELECT COUNT(*)::int FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "status"='FAILED' AND "createdAt">=$2::date AND "createdAt"<$3::date+1) AS "agentFailures",
-         (SELECT COUNT(*)::int FROM "Task" WHERE "tenantId"=$1::uuid AND "status" IN ('OPEN','IN_PROGRESS') AND "dueAt"<CURRENT_TIMESTAMP) AS "overdueTasks"`,
+         (SELECT COUNT(*)::int FROM "Task" WHERE "tenantId"=$1::uuid AND "status" IN ('OPEN','IN_PROGRESS') AND "dueAt"<CURRENT_TIMESTAMP) AS "overdueTasks",
+         (SELECT COUNT(*)::int FROM "Contract" WHERE "tenantId"=$1::uuid AND "fullySignedAt">=$2::date AND "fullySignedAt"<$3::date+1) AS "contractsSigned",
+         (SELECT COALESCE(SUM("amountPaidMinor"),0)::bigint FROM "PaymentMilestone" WHERE "tenantId"=$1::uuid AND "paidAt">=$2::date AND "paidAt"<$3::date+1) AS "cashCollectedMinor",
+         (SELECT COALESCE(SUM("amountMinor"-"amountPaidMinor"),0)::bigint FROM "PaymentMilestone" WHERE "tenantId"=$1::uuid AND "status" NOT IN ('PAID','WAIVED')) AS "contractedOutstandingMinor"`,
       [tenantId, range.start, range.end],
     );
     const inserted = await tx.query(

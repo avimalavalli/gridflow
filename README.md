@@ -2,13 +2,13 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 6.3 automation-cockpit release candidate: a database-backed, multi-organisation product with paid one-time activation, owner approval, Core and Ultra entitlements, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, stale-opportunity and missing-data detection, weekly outcome briefs, customer-specific Gemini routing, managed evidence-research credits, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting and review, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 7A Seal release candidate: a database-backed, multi-organisation product with paid activation, owner approval, Core and Ultra entitlements, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
 ## Working flow
 
-`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → human acceptance → LinkedIn/Gmail operations → Sentinel → Nova approval → opportunity and next action → Orbit meeting prep/debrief → approved stage and tasks → Forge proposal → human-approved delivery record`
+`Account → isolated organisation → athlete onboarding → personalised Discovery Briefs → Atlas/Sage/Relay/Echo → quality gate → human acceptance → LinkedIn/Gmail operations → Sentinel → Nova approval → opportunity and next action → Orbit meeting prep/debrief → Forge proposal → Seal contract/signatures/payments → human-controlled won deal`
 
 No athlete identity, nationality, championship, sponsor market or outreach strategy is hard-coded.
 
@@ -25,6 +25,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Evidence-first agents with retries, recovery, versioning, tokens, cost and quality reports.
 - Orbit pre-meeting briefs and human-notes-only debriefs with idempotent task creation, explicit opportunity approval and follow-up drafts that cannot send themselves.
 - Forge proposal intelligence with human commercial briefs, grounded packages and pricing, immutable versions, editable approval, print/PDF views and explicit human-confirmed delivery records.
+- Seal contract operations with immutable checksummed terms, owner legal approval, externally verified signer states, signed-document evidence, exact payment schedules, overdue detection and explicit activation/deal-win controls.
 - Human acceptance, tuning and rejection decisions with audit history.
 - Human-controlled LinkedIn workflow and policy-controlled Gmail architecture.
 - Airtable migration review/import and stable duplicate protection.
@@ -72,6 +73,6 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/PHASE_6_3_AUTOMATION_COCKPIT.md`, `docs/PHASE_6_2_GUIDED_EXPERIENCE.md`, `docs/PHASE_6_1_1_TRUSTED_DEVICES.md`, `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/PHASE_7A_SEAL.md`, `docs/PHASE_6_3_AUTOMATION_COCKPIT.md`, `docs/PHASE_6_2_GUIDED_EXPERIENCE.md`, `docs/PHASE_6_1_1_TRUSTED_DEVICES.md`, `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
 
 Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

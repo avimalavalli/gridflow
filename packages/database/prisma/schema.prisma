@@ -444,6 +444,41 @@ enum ForgeStatus {
   ARCHIVED
 }
 
+enum ContractStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  SENT_FOR_SIGNATURE
+  PARTIALLY_SIGNED
+  SIGNED
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  VOID
+}
+
+enum ContractSignerStatus {
+  NOT_REQUESTED
+  REQUESTED
+  VIEWED
+  SIGNED
+  DECLINED
+  EXPIRED
+  VOID
+}
+
+enum PaymentMilestoneStatus {
+  DRAFT
+  DUE
+  INVOICED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  WAIVED
+  DISPUTED
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -608,6 +643,11 @@ model User {
   productExperienceProgress ProductExperienceProgress[]
   automationPoliciesUpdated AutomationControlPolicy[] @relation("AutomationPolicyUpdatedBy")
   automationDecisionsMade AutomationDecision[] @relation("AutomationDecisionDecidedBy")
+  contractsCreated Contract[] @relation("ContractCreatedBy")
+  contractsReviewed Contract[] @relation("ContractReviewedBy")
+  contractVersionsCreated ContractVersion[] @relation("ContractVersionCreatedBy")
+  contractSignaturesRecorded ContractSigner[] @relation("ContractSignerRecordedBy")
+  contractPaymentsRecorded PaymentMilestone[] @relation("PaymentMilestoneRecordedBy")
 }
 
 model Organisation {
@@ -666,6 +706,10 @@ model Organisation {
   automationDecisions AutomationDecision[]
   automationEvents AutomationEvent[]
   automationBriefs AutomationBrief[]
+  contracts Contract[]
+  contractVersions ContractVersion[]
+  contractSigners ContractSigner[]
+  paymentMilestones PaymentMilestone[]
 }
 
 model ActivationGrant {
@@ -1206,6 +1250,7 @@ model Company {
   tasks                  Task[]
   meetings               Meeting[]
   proposals              Proposal[]
+  contracts              Contract[]
   leadSources            CompanyLeadSource[]
   agentRuns              AgentRun[]
 
@@ -1275,6 +1320,7 @@ model Contact {
   tasks                  Task[]
   meetings               Meeting[]
   agentRuns              AgentRun[]
+  contractSigners        ContractSigner[]
 
   @@unique([tenantId, contactKey])
   @@index([tenantId, echoStatus, status])
@@ -1511,6 +1557,7 @@ model Opportunity {
   tasks             Task[]
   meetings          Meeting[]
   proposals         Proposal[]
+  contracts         Contract[]
 
   @@index([tenantId, stage])
 }
@@ -1712,10 +1759,130 @@ model Proposal {
   currentVersion     ProposalVersion?    @relation("CurrentProposalVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   currentAgentRun    AgentRun?           @relation("ProposalCurrentAgentRun", fields: [currentAgentRunId], references: [id], onDelete: SetNull)
   agentRuns          AgentRun[]           @relation("ProposalAgentRuns")
+  contracts          Contract[]
 
   @@unique([tenantId, requestKey])
   @@index([tenantId, status, updatedAt])
   @@index([tenantId, opportunityId, updatedAt])
+}
+
+model Contract {
+  id                    String         @id @default(uuid()) @db.Uuid
+  tenantId              String         @db.Uuid
+  companyId             String         @db.Uuid
+  opportunityId         String         @db.Uuid
+  proposalId            String?        @db.Uuid
+  contractNumber        String
+  title                 String
+  status                ContractStatus @default(DRAFT)
+  valueMinor            Int
+  currency              String         @default("GBP")
+  startDate             DateTime?      @db.Date
+  endDate               DateTime?      @db.Date
+  governingLaw          String?
+  internalOwner         String?
+  documentUrl           String?
+  signedDocumentUrl     String?
+  currentVersionId      String?        @unique @db.Uuid
+  reviewNote            String?
+  reviewedAt            DateTime?      @db.Timestamptz(3)
+  reviewedByUserId      String?        @db.Uuid
+  sentForSignatureAt    DateTime?      @db.Timestamptz(3)
+  fullySignedAt         DateTime?      @db.Timestamptz(3)
+  activatedAt           DateTime?      @db.Timestamptz(3)
+  terminatedAt          DateTime?      @db.Timestamptz(3)
+  terminationReason     String?
+  createdByUserId       String?        @db.Uuid
+  createdAt             DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime       @updatedAt @db.Timestamptz(3)
+  tenant                Organisation   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company               Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  opportunity           Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  proposal              Proposal?      @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  currentVersion        ContractVersion? @relation("CurrentContractVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  createdBy             User?          @relation("ContractCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reviewedBy            User?          @relation("ContractReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  versions              ContractVersion[] @relation("ContractVersions")
+  signers               ContractSigner[]
+  paymentMilestones     PaymentMilestone[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([tenantId, status, updatedAt])
+  @@index([tenantId, opportunityId, updatedAt])
+}
+
+model ContractVersion {
+  id                    String       @id @default(uuid()) @db.Uuid
+  tenantId              String       @db.Uuid
+  contractId            String       @db.Uuid
+  versionNumber         Int
+  terms                  Json
+  checksumSha256         String
+  createdByUserId        String?      @db.Uuid
+  createdAt              DateTime     @default(now()) @db.Timestamptz(3)
+  tenant                 Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract               Contract     @relation("ContractVersions", fields: [contractId], references: [id], onDelete: Cascade)
+  currentFor             Contract?    @relation("CurrentContractVersion")
+  createdBy              User?        @relation("ContractVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([contractId, versionNumber])
+  @@index([tenantId, contractId, versionNumber])
+}
+
+model ContractSigner {
+  id                    String               @id @default(uuid()) @db.Uuid
+  tenantId              String               @db.Uuid
+  contractId            String               @db.Uuid
+  contactId             String?              @db.Uuid
+  name                  String
+  email                 String?
+  role                  String
+  party                 String
+  required              Boolean              @default(true)
+  sequence              Int                  @default(1)
+  status                ContractSignerStatus @default(NOT_REQUESTED)
+  requestedAt           DateTime?            @db.Timestamptz(3)
+  viewedAt              DateTime?            @db.Timestamptz(3)
+  signedAt              DateTime?            @db.Timestamptz(3)
+  declinedAt            DateTime?            @db.Timestamptz(3)
+  declineReason         String?
+  recordedByUserId      String?              @db.Uuid
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+  tenant                Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract              Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contact               Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  recordedBy            User?                @relation("ContractSignerRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([contractId, sequence])
+  @@index([tenantId, status, updatedAt])
+}
+
+model PaymentMilestone {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  tenantId              String                 @db.Uuid
+  contractId            String                 @db.Uuid
+  title                 String
+  sequence              Int
+  amountMinor           Int
+  amountPaidMinor       Int                    @default(0)
+  currency              String                 @default("GBP")
+  dueDate               DateTime               @db.Date
+  status                PaymentMilestoneStatus @default(DRAFT)
+  invoiceReference      String?
+  paymentReference      String?
+  invoicedAt            DateTime?              @db.Timestamptz(3)
+  paidAt                DateTime?              @db.Timestamptz(3)
+  notes                 String?
+  recordedByUserId      String?                @db.Uuid
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(3)
+  tenant                Organisation           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract              Contract               @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  recordedBy            User?                  @relation("PaymentMilestoneRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([contractId, sequence])
+  @@index([tenantId, status, dueDate])
 }
 
 model ProposalVersion {

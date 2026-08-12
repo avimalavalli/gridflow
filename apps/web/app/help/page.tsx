@@ -13,7 +13,7 @@ const chapters = [
     ["3. Activate one brief", "Choose one focused Discovery Brief. Start small: one region, a few realistic industries and ten companies. Then use Run full pipeline once."],
     ["4. Review before outreach", "Open the companies, evidence and contacts created by the pipeline. Approve or edit Echo’s draft before performing the LinkedIn action."],
   ]},
-  { id: "agents", title: "The GridFlow agents", summary: "What Atlas, Sage, Relay, Echo, Pulse, Sentinel, Nova, Orbit and Forge actually do.", route: "/agent-runs", sections: [
+  { id: "agents", title: "The GridFlow agents", summary: "What Atlas, Sage, Relay, Echo, Pulse, Sentinel, Nova, Orbit, Forge and Seal actually do.", route: "/agent-runs", sections: [
     ["Atlas → Sage → Relay → Echo", "Atlas discovers companies. Sage researches and scores evidence. Relay finds decision-makers. Echo prepares personalised drafts. A full pipeline coordinates all four automatically; manual agent buttons are for recovery and expert use."],
     ["Pulse", "Pulse monitors follow-up timing and creates the next safe action. It stops when a reply, meeting, opt-out or suppression is recorded."],
     ["Sentinel + Nova", "Sentinel classifies inbound replies and safety signals. Nova recommends a response strategy, draft and opportunity action. You review the result."],
@@ -56,6 +56,13 @@ const chapters = [
   { id: "forge", title: "Forge proposals", summary: "Create controlled proposal packages from approved opportunity context.", route: "/forge", sections: [
     ["Inputs", "Forge needs a real opportunity, meeting context, objectives, inventory and commercial boundaries. Missing facts should remain explicit rather than invented."],
     ["Review and versions", "Compare package options, pricing and deliverables. Approve a version before producing the final document. Sending remains a deliberate human action."],
+  ]},
+  { id: "seal", title: "Seal contracts and payments", summary: "Move negotiated proposals through review, signature, activation and collection without losing control.", route: "/seal", sections: [
+    ["Create from negotiation", "Seal accepts opportunities only after a proposal has been sent and the deal is in proposal sent, negotiation or verbal agreement. Record only terms that were actually agreed."],
+    ["Immutable versions", "Every contract workspace receives a numbered version and SHA-256 checksum. A later revision must create new evidence; previously reviewed terms remain traceable."],
+    ["Legal and signature gates", "Owners or admins approve terms, confirm when the agreement was externally sent, and record signer states only after checking the signature provider or signed document. GridFlow never signs for anyone."],
+    ["Payment milestones", "The schedule must equal the contract value. Record invoiced, partial, paid, disputed or waived states only against verified invoice or bank evidence. Overdue milestones appear in Automation."],
+    ["Activation and deal wins", "A contract activates only after every required signer is verified and a secure signed-document URL is attached. Marking the opportunity won is a separate explicit choice."],
   ]},
   { id: "ai", title: "AI Setup and keys", summary: "Connect AI safely and know which agents use which provider.", route: "/settings/ai", sections: [
     ["Where to put a key", "Open Settings → AI Setup. Paste the key only into that secure form. Never send an API key through chat, email, screenshots or support messages."],

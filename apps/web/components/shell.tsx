@@ -16,6 +16,7 @@ import {
   DatabaseZap,
   Handshake,
   Hammer,
+  FileSignature,
   LifeBuoy,
   LayoutDashboard,
   ListTodo,
@@ -56,6 +57,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Orbit", href: "/orbit", icon: OrbitIcon, keywords: "meeting preparation agenda briefing debrief notes follow up tasks" },
       { label: "Opportunities", href: "/opportunities", icon: Handshake, keywords: "pipeline deals sponsorship revenue" },
       { label: "Forge", href: "/forge", icon: Hammer, keywords: "proposal packages pricing activation commercial approval pdf" },
+      { label: "Seal", href: "/seal", icon: FileSignature, keywords: "contracts signatures legal payments milestones invoices revenue" },
     ],
   },
   {

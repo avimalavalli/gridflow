@@ -67,4 +67,28 @@ describe("AutomationService", () => {
     const service = new AutomationService(new TestDatabaseService(database!) as never);
     await expect(service.updatePolicy(identity, { timezone: "Mars/Paddock" })).rejects.toThrow(/valid IANA timezone/i);
   });
+
+  it("schedules an audited away mode and clears it when its return time has passed", async () => {
+    const service = new AutomationService(new TestDatabaseService(database!) as never);
+    const pauseUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const paused = await service.updatePolicy(identity, { paused: true, pauseUntil, pauseReason: "Race weekend" });
+    expect(paused.policy).toMatchObject({ pauseReason: "Race weekend" });
+    expect(paused.policy.pausedAt).toBeTruthy();
+    expect(new Date(paused.policy.pauseUntil!).toISOString()).toBe(pauseUntil);
+    expect((await service.overview(identity)).status.paused).toBe(true);
+
+    await database!.query(
+      `UPDATE "AutomationControlPolicy" SET "pauseUntil"=CURRENT_TIMESTAMP-interval '1 minute' WHERE "tenantId"=$1::uuid`,
+      [identity.tenantId],
+    );
+    const resumed = await service.overview(identity);
+    expect(resumed.status.paused).toBe(false);
+    expect(resumed.policy).toMatchObject({ pausedAt: null, pauseUntil: null, pauseReason: null });
+  });
+
+  it("rejects invalid automatic resume windows", async () => {
+    const service = new AutomationService(new TestDatabaseService(database!) as never);
+    await expect(service.updatePolicy(identity, { paused: true, pauseUntil: new Date(Date.now() - 1000).toISOString() })).rejects.toThrow(/future/i);
+    await expect(service.updatePolicy(identity, { pauseUntil: new Date(Date.now() + 1000).toISOString() })).rejects.toThrow(/choose Pause/i);
+  });
 });

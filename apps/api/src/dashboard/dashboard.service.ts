@@ -13,6 +13,9 @@ interface DashboardMetricRow extends Record<string, unknown> {
   overdueFollowUps: number;
   automationFailures: number;
   estimatedAutomationCostUsd: string;
+  automationPaused: boolean;
+  automationPauseUntil: Date | null;
+  automationPauseReason: string | null;
 }
 
 interface ActionRow extends Record<string, unknown> {
@@ -52,10 +55,35 @@ interface ActivityRow extends Record<string, unknown> {
 
 export interface DashboardSnapshot {
   metrics: DashboardMetricRow;
-  actions: ActionRow[];
+  actions: Array<ActionRow & { reason: string }>;
+  focusActions: Array<ActionRow & { reason: string }>;
+  actionSummary: { total: number; urgent: number; review: number; ready: number; upcoming: number };
+  automationState: { paused: boolean; pauseUntil: Date | null; pauseReason: string | null };
   upcomingMeetings: MeetingRow[];
   opportunityStages: OpportunityStageRow[];
   recentActivity: ActivityRow[];
+}
+
+const urgencyOrder: Record<string, number> = { FAILED: 0, OVERDUE: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
+const kindOrder: Record<string, number> = { SENTINEL: 0, NOVA: 1, ORBIT: 2, RENEWAL: 3, DELIVERY: 4, OUTREACH: 5, PULSE: 6, FORGE: 7, TASK: 8, AGENT_FAILURE: 9 };
+
+function actionReason(action: ActionRow): string {
+  if (action.urgency === "FAILED") return "A blocked workflow needs repair before dependent work can move.";
+  if (action.urgency === "OVERDUE") return "Past due; resolving this protects commercial momentum.";
+  if (action.urgency === "TODAY") return "Due within 24 hours, before it becomes overdue.";
+  if (action.urgency === "REVIEW") return "Prepared and waiting for your judgement; GridFlow will not decide for you.";
+  if (action.urgency === "READY") return "Prepared for the next authorised human action.";
+  return "Upcoming work worth preparing before it becomes urgent.";
+}
+
+function compareActions(a: ActionRow, b: ActionRow): number {
+  const urgency = (urgencyOrder[a.urgency] ?? 4) - (urgencyOrder[b.urgency] ?? 4);
+  if (urgency) return urgency;
+  const kind = (kindOrder[a.kind] ?? 20) - (kindOrder[b.kind] ?? 20);
+  if (kind) return kind;
+  const dueA = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+  const dueB = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+  return dueA - dueB || a.title.localeCompare(b.title);
 }
 
 @Injectable()
@@ -92,7 +120,10 @@ export class DashboardService {
               )
             )::int AS "overdueFollowUps",
             (SELECT COUNT(*)::int FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "status"='FAILED') AS "automationFailures",
-            (SELECT COALESCE(SUM("estimatedCostUsd"),0)::text FROM "AgentRun" WHERE "tenantId"=$1::uuid) AS "estimatedAutomationCostUsd"`,
+            (SELECT COALESCE(SUM("estimatedCostUsd"),0)::text FROM "AgentRun" WHERE "tenantId"=$1::uuid) AS "estimatedAutomationCostUsd",
+            COALESCE((SELECT "pausedAt" IS NOT NULL AND ("pauseUntil" IS NULL OR "pauseUntil">CURRENT_TIMESTAMP) FROM "AutomationControlPolicy" WHERE "tenantId"=$1::uuid),false) AS "automationPaused",
+            (SELECT "pauseUntil" FROM "AutomationControlPolicy" WHERE "tenantId"=$1::uuid AND "pausedAt" IS NOT NULL AND ("pauseUntil" IS NULL OR "pauseUntil">CURRENT_TIMESTAMP)) AS "automationPauseUntil",
+            (SELECT "pauseReason" FROM "AutomationControlPolicy" WHERE "tenantId"=$1::uuid AND "pausedAt" IS NOT NULL AND ("pauseUntil" IS NULL OR "pauseUntil">CURRENT_TIMESTAMP)) AS "automationPauseReason"`,
           [tenantId],
         ),
         tx.query<ActionRow>(
@@ -288,27 +319,47 @@ export class DashboardService {
       ]);
 
       const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...delivery.rows, ...renewals.rows, ...failures.rows]
-        .sort((a, b) => {
-          const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
-          return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);
-        })
-        .slice(0, 10);
+        .sort(compareActions)
+        .map((action) => ({ ...action, reason: actionReason(action) }));
+      const focusActions: Array<ActionRow & { reason: string }> = [];
+      for (const action of actions) {
+        if (!focusActions.some((selected) => selected.kind === action.kind)) focusActions.push(action);
+        if (focusActions.length === 3) break;
+      }
+      for (const action of actions) {
+        if (focusActions.length === 3) break;
+        if (!focusActions.some((selected) => selected.id === action.id && selected.kind === action.kind)) focusActions.push(action);
+      }
+      const actionSummary = {
+        total: actions.length,
+        urgent: actions.filter((action) => ["FAILED", "OVERDUE", "TODAY"].includes(action.urgency)).length,
+        review: actions.filter((action) => action.urgency === "REVIEW").length,
+        ready: actions.filter((action) => action.urgency === "READY").length,
+        upcoming: actions.filter((action) => action.urgency === "UPCOMING").length,
+      };
+      const metric = metrics.rows[0] ?? {
+        companiesDiscovered: 0,
+        companiesResearched: 0,
+        highPriority: 0,
+        contactsFound: 0,
+        outreachDraftsReady: 0,
+        replies: 0,
+        opportunities: 0,
+        pipelineValueMinor: 0,
+        overdueFollowUps: 0,
+        automationFailures: 0,
+        estimatedAutomationCostUsd: "0",
+        automationPaused: false,
+        automationPauseUntil: null,
+        automationPauseReason: null,
+      };
 
       return {
-        metrics: metrics.rows[0] ?? {
-          companiesDiscovered: 0,
-          companiesResearched: 0,
-          highPriority: 0,
-          contactsFound: 0,
-          outreachDraftsReady: 0,
-          replies: 0,
-          opportunities: 0,
-          pipelineValueMinor: 0,
-          overdueFollowUps: 0,
-          automationFailures: 0,
-          estimatedAutomationCostUsd: "0",
-        },
-        actions,
+        metrics: metric,
+        actions: actions.slice(0, 40),
+        focusActions,
+        actionSummary,
+        automationState: { paused: metric.automationPaused, pauseUntil: metric.automationPauseUntil, pauseReason: metric.automationPauseReason },
         upcomingMeetings: meetings.rows,
         opportunityStages: opportunityStages.rows,
         recentActivity: activity.rows,

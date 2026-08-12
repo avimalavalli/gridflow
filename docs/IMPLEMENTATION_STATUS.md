@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 7C Renewals
+# GridFlow implementation status — Phase 7D Product Refinement
 
 ## Built and verified
 
@@ -32,14 +32,20 @@
 - **Renewal OS** with deterministic delivery-health snapshots, human-recorded sponsor sentiment, explicit commercial intent and freshness-checked approval.
 - Idempotent handoff of approved renewals into exactly one existing Opportunity OS record and one internal next action, with no automated external contact or invented win probability.
 - Renewal outcome synchronisation when the linked opportunity is won, lost or reopened, backed by tenant-safe audit history.
+- **Daily Focus Desk** with deterministic cross-workflow ranking, plain-English priority reasons, a diversified top three and urgency filters that prevent one noisy queue from hiding higher-value work.
+- **Universal commercial search** across companies, contacts, opportunities, outreach, proposals, contracts, delivery and renewals, with exact destinations and tenant isolation.
+- **Race and travel away mode** with administrator reason, timed automatic return, preserved backlog and a hard hold that even forced reconciliation cannot bypass.
+- Persistent per-user setup dismissal and exact Orbit meeting deep links for lower-friction daily operation.
 
 ## Validation result
 
-- 121 automated tests passed across 49 files.
+- 126 automated tests passed across 51 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 71 models and 20 registered migrations.
+- Database schema check passed: 71 models and 21 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
-- Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
+- Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
+- Production dependency audit reported 0 vulnerabilities.
+- The ten-case, five-profile browser specification now covers Phase 7D search, away/resume, Focus Desk, persistent dismissal, responsive overflow and WCAG checks. Local execution remains pending because this workspace could not download the pinned browser binaries; CI must provide the acceptance evidence before Phase 7D is published.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
@@ -53,4 +59,4 @@ The Phase 6 release workflow completed the dependency audit, browser, responsive
 6. Completion of every required Launch Control check.
 7. Owner approval, deployment and selected-athlete acceptance.
 
-GridFlow is a controlled release candidate. The application code is not the remaining blocker; real service ownership and acceptance are.
+The authenticated V1 application is now functionally closed for the agreed core scope. Live service integration, commercial launch surfaces, acceptance, security, privacy/legal and controlled beta remain before public launch.

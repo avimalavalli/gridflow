@@ -130,4 +130,25 @@ describe("AutomationControlEngine", () => {
     expect(decision.rows[0]?.explanation).toMatch(/budget has been reached/i);
     expect((await database!.query<{ status: string }>(`SELECT "status"::text AS "status" FROM "AgentRun" WHERE "id"=$1::uuid`, [run.rows[0]!.id])).rows[0]?.status).toBe("FAILED");
   });
+
+  it("never lets a forced check bypass away mode and resumes automatically at the configured time", async () => {
+    const { tenantId } = await seed("ASSISTED");
+    await database!.query(
+      `UPDATE "AutomationControlPolicy" SET "pausedAt"='2026-08-10T06:00:00Z',"pauseUntil"='2026-08-10T10:00:00Z',"pauseReason"='Race weekend' WHERE "tenantId"=$1::uuid`,
+      [tenantId],
+    );
+    const engine = new AutomationControlEngine(database!);
+    const held = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    expect(held).toMatchObject({ quiet: 1, tasksCreated: 0, decisionsCreated: 0 });
+
+    const resumed = await engine.reconcileTenant(tenantId, { now: new Date("2026-08-10T10:01:00Z") });
+    expect(resumed).toMatchObject({ evaluated: 1, tasksCreated: 2 });
+    const policy = await database!.query<{ pausedAt: Date | null; pauseUntil: Date | null }>(
+      `SELECT "pausedAt","pauseUntil" FROM "AutomationControlPolicy" WHERE "tenantId"=$1::uuid`,
+      [tenantId],
+    );
+    expect(policy.rows[0]).toEqual({ pausedAt: null, pauseUntil: null });
+    expect((await database!.query(`SELECT 1 FROM "AuditLog" WHERE "tenantId"=$1::uuid AND "metadata"->>'reason'='AWAY_MODE_AUTO_RESUME'`, [tenantId])).rows).toHaveLength(1);
+    expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+  });
 });

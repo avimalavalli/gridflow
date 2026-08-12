@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Ban, CheckCircle2, ClipboardCheck, RefreshCcw, Rocket, Save, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -106,7 +106,9 @@ function split(value: string): string[] {
 
 export function OrbitCockpit({ meetings }: { meetings: OrbitMeeting[] }) {
   const router = useRouter();
-  const [filter, setFilter] = useState<"ACTION" | "UPCOMING" | "HISTORY" | "ALL">("ACTION");
+  const search = useSearchParams();
+  const focusedMeetingId = search.get("meeting");
+  const [filter, setFilter] = useState<"ACTION" | "UPCOMING" | "HISTORY" | "ALL">(focusedMeetingId ? "ALL" : "ACTION");
   const [prepDrafts, setPrepDrafts] = useState<Record<string, OrbitPrep>>({});
   const [debriefDrafts, setDebriefDrafts] = useState<Record<string, OrbitDebrief>>({});
   const [humanNotes, setHumanNotes] = useState<Record<string, string>>({});
@@ -124,13 +126,14 @@ export function OrbitCockpit({ meetings }: { meetings: OrbitMeeting[] }) {
   }, [meetings, router]);
 
   const visible = useMemo(() => meetings.filter((meeting) => {
+    if (focusedMeetingId) return meeting.id === focusedMeetingId;
     const future = new Date(meeting.startsAt).getTime() > now;
     const needsAction = ["READY", "FAILED"].includes(meeting.prepStatus) || ["READY", "FAILED"].includes(meeting.debriefStatus) || (!future && meeting.debriefStatus === "NOT_STARTED");
     if (filter === "ACTION") return needsAction;
     if (filter === "UPCOMING") return future;
     if (filter === "HISTORY") return !future && ["REVIEWED", "REJECTED"].includes(meeting.debriefStatus);
     return true;
-  }), [filter, meetings, now]);
+  }), [filter, focusedMeetingId, meetings, now]);
 
   function prepFor(meeting: OrbitMeeting): OrbitPrep {
     return prepDrafts[meeting.id] ?? meeting.prepDraft!;
@@ -182,7 +185,7 @@ export function OrbitCockpit({ meetings }: { meetings: OrbitMeeting[] }) {
         const future = new Date(meeting.startsAt).getTime() > now;
         const prep = meeting.prepStatus === "READY" ? prepFor(meeting) : meeting.approvedPrep;
         const debrief = meeting.debriefStatus === "READY" ? debriefFor(meeting) : meeting.approvedDebrief;
-        return <article className="card orbit-card" key={meeting.id}>
+        return <article className="card orbit-card" id={`meeting-${meeting.id}`} key={meeting.id}>
           <div className="section-header"><div><div className="eyebrow">{future ? "Upcoming meeting" : "Meeting follow-through"}</div><h2>{meeting.title}</h2><p>{dt(meeting.startsAt)} · {[meeting.companyName, meeting.contactName, meeting.opportunityName].filter(Boolean).join(" · ") || "Unlinked meeting"}</p></div>
             <div className="sentinel-badges"><span className={`badge ${tone(meeting.prepStatus)}`}>Prep · {label(meeting.prepStatus)}</span><span className={`badge ${tone(meeting.debriefStatus)}`}>Debrief · {label(meeting.debriefStatus)}</span></div>
           </div>

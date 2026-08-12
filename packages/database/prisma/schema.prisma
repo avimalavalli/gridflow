@@ -1094,6 +1094,7 @@ model ProductExperienceProgress {
   onboardingStep        Int          @default(0)
   onboardingDraft       Json?
   onboardingSavedAt     DateTime?    @db.Timestamptz(3)
+  setupDismissedAt      DateTime?    @db.Timestamptz(3)
   createdAt             DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime     @updatedAt @db.Timestamptz(3)
   tenant                Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1131,6 +1132,7 @@ model AutomationControlPolicy {
   discoveryDay                 Int                     @default(1)
   discoveryHour                Int                     @default(9)
   pausedAt                     DateTime?               @db.Timestamptz(3)
+  pauseUntil                   DateTime?               @db.Timestamptz(3)
   pauseReason                  String?
   lastEvaluatedAt              DateTime?               @db.Timestamptz(3)
   updatedByUserId              String?                 @db.Uuid

@@ -8,7 +8,7 @@ import { apiConfig } from "./config.js";
 import { logOperationalEvent, OperationalExceptionFilter } from "./observability.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableShutdownHooks();
   const express = app.getHttpAdapter().getInstance();
   express.disable("x-powered-by");

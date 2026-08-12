@@ -27,12 +27,12 @@ describe("GridFlow database", () => {
        FROM information_schema.tables
        WHERE table_schema = 'public'`,
     );
-    expect(tableCount.rows[0]?.count).toBeGreaterThanOrEqual(43);
+    expect(tableCount.rows[0]?.count).toBeGreaterThanOrEqual(45);
 
     const migrations = await database.query<{ count: number }>(
       `SELECT COUNT(*)::int AS "count" FROM "_GridFlowMigration"`,
     );
-    expect(migrations.rows[0]?.count).toBe(22);
+    expect(migrations.rows[0]?.count).toBe(23);
   });
 
   it("enforces tenant-scoped company keys at database level", async () => {

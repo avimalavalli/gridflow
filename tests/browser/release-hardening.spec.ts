@@ -8,6 +8,28 @@ async function expectNoWcagViolations(page: Parameters<typeof AxeBuilder>[0]["pa
   expect(result.violations.map((violation) => ({ id: violation.id, impact: violation.impact, targets: violation.nodes.map((node) => node.target) }))).toEqual([]);
 }
 
+test("public product, configured pricing, support and private receipt states are responsive and accessible", async ({ page }, testInfo) => {
+  for (const route of ["/product", "/pricing", "/support"]) {
+    await page.goto(route);
+    await expect(page.getByRole("navigation", { name: "Public navigation" })).toBeVisible();
+    await expectNoWcagViolations(page);
+    const viewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(viewport.scrollWidth, `${testInfo.project.name} ${route} has horizontal overflow`).toBeLessThanOrEqual(viewport.width + 1);
+  }
+
+  await page.goto("/pricing");
+  await expect(page.getByText("£125.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("£290.00", { exact: true })).toBeVisible();
+  await page.route("**/backend/commerce/orders", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ checkoutUrl: "http://localhost:3000/support?checkout=GF-BROWSER" }) }));
+  await page.getByLabel("Activation email").fill("buyer@example.test");
+  await page.getByRole("button", { name: "Choose GridFlow Core" }).click();
+  await page.waitForURL(/\/support\?checkout=GF-BROWSER$/);
+
+  await page.goto("/receipt");
+  await expect(page.getByText("This receipt link is incomplete.")).toBeVisible();
+  await expectNoWcagViolations(page);
+});
+
 test("public authentication surfaces are responsive, keyboard reachable and accessible", async ({ page }, testInfo) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
-import { apiConfig } from "../config.js";
+import { apiConfig, commercialLaunchConfigured } from "../config.js";
 import { currentReleaseCommit, currentReleaseVersion, releaseMetadataConfigured } from "../release-metadata.js";
 
 interface MetricsRow extends Record<string, unknown> {
@@ -153,6 +153,7 @@ export class OperationsService {
         productionSecurity: apiConfig.nodeEnv !== "production" || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
         productAccess: apiConfig.nodeEnv !== "production" || (apiConfig.signupMode === "ACTIVATION" && apiConfig.platformAdminEmails.length > 0 && Boolean(process.env.INTEGRATION_ENCRYPTION_KEY)),
         passwordRecovery: apiConfig.nodeEnv !== "production" || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
+        commercialLaunch: apiConfig.nodeEnv !== "production" || commercialLaunchConfigured(),
         liveAgents: Boolean(process.env.OPENAI_API_KEY),
         gmailOAuth: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET && process.env.GOOGLE_OAUTH_REDIRECT_URI && process.env.INTEGRATION_ENCRYPTION_KEY),
         releaseMetadata: releaseMetadataConfigured(),

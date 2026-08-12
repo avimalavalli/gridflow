@@ -3,10 +3,12 @@ import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
 import { AddResearchCreditsDto, CreateActivationGrantDto, OrganisationAccessDecisionDto, RenewUltraDto } from "./platform.dto.js";
 import { PlatformService } from "./platform.service.js";
+import { CommerceService } from "../commerce/commerce.service.js";
+import { ConfirmManualPurchaseDto, ResolveCommercialPurchaseDto } from "../commerce/commerce.dto.js";
 
 @Controller("platform")
 export class PlatformController {
-  constructor(private readonly platform: PlatformService, private readonly context: TenantContextService) {}
+  constructor(private readonly platform: PlatformService, private readonly context: TenantContextService, private readonly commerce: CommerceService) {}
 
   private async admin(request: Request) {
     const identity = await this.context.resolveAnyAccess(request);
@@ -17,7 +19,7 @@ export class PlatformController {
   @Get()
   async overview(@Req() request: Request) {
     await this.admin(request);
-    return this.platform.overview();
+    return { ...(await this.platform.overview()), commerce: this.commerce.catalogue() };
   }
 
   @Post("activation-grants")
@@ -28,6 +30,16 @@ export class PlatformController {
   @Post("activation-grants/:id/revoke")
   async revokeGrant(@Req() request: Request, @Param("id") id: string) {
     return this.platform.revokeGrant(await this.admin(request), id, request);
+  }
+
+  @Post("purchases/manual-confirm")
+  async confirmManualPurchase(@Req() request: Request, @Body() input: ConfirmManualPurchaseDto) {
+    return this.commerce.confirmManualPurchase(await this.admin(request), input, request);
+  }
+
+  @Post("purchases/:id/resolve")
+  async resolvePurchase(@Req() request: Request, @Param("id") id: string, @Body() input: ResolveCommercialPurchaseDto) {
+    return this.commerce.resolvePurchase(await this.admin(request), id, input, request);
   }
 
   @Post("organisations/:id/access")

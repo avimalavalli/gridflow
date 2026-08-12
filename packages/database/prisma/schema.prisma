@@ -47,6 +47,15 @@ enum ActivationGrantStatus {
   EXPIRED
 }
 
+enum CommercialPurchaseStatus {
+  PENDING_PAYMENT
+  PAYMENT_CONFIRMED
+  MANUAL_REVIEW
+  FAILED
+  FULFILLED
+  REFUNDED
+}
+
 enum AgentCredentialProvider {
   GEMINI
 }
@@ -721,6 +730,8 @@ model User {
   activationGrantsRedeemed ActivationGrant[] @relation("ActivationGrantRedeemedBy")
   entitlementsApproved ProductEntitlement[] @relation("ProductEntitlementApprovedBy")
   platformAuditEvents PlatformAuditEvent[]
+  commercialPurchasesCreated CommercialPurchase[] @relation("CommercialPurchaseCreatedBy")
+  commercialPurchasesReviewed CommercialPurchase[] @relation("CommercialPurchaseReviewedBy")
   productExperienceProgress ProductExperienceProgress[]
   automationPoliciesUpdated AutomationControlPolicy[] @relation("AutomationPolicyUpdatedBy")
   automationDecisionsMade AutomationDecision[] @relation("AutomationDecisionDecidedBy")
@@ -817,16 +828,68 @@ model ActivationGrant {
   redeemedAt             DateTime?             @db.Timestamptz(3)
   activatedAt            DateTime?             @db.Timestamptz(3)
   organisationId         String?               @unique @db.Uuid
-  createdByUserId        String                @db.Uuid
+  createdByUserId        String?               @db.Uuid
   redeemedByUserId       String?               @db.Uuid
   createdAt              DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
   organisation           Organisation?         @relation(fields: [organisationId], references: [id], onDelete: SetNull)
-  createdBy              User                  @relation("ActivationGrantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdBy              User?                 @relation("ActivationGrantCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   redeemedBy             User?                 @relation("ActivationGrantRedeemedBy", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+  commercialPurchase     CommercialPurchase?
 
   @@index([email, status])
   @@index([status, expiresAt])
+}
+
+model CommercialPurchase {
+  id                       String                   @id @default(uuid()) @db.Uuid
+  reference                String                   @unique
+  email                    String
+  plan                     ProductPlan
+  status                   CommercialPurchaseStatus @default(PENDING_PAYMENT)
+  amountMinor              Int
+  currency                 String
+  paymentProvider          String
+  providerPaymentReference String?
+  researchCreditsGranted   Int                      @default(0)
+  seatLimit                Int                      @default(1)
+  activationExpiresInDays  Int                      @default(7)
+  failureReason            String?
+  paymentConfirmedAt       DateTime?                @db.Timestamptz(3)
+  fulfilledAt              DateTime?                @db.Timestamptz(3)
+  activationGrantId        String?                  @unique @db.Uuid
+  receiptNumber            String?                  @unique
+  receiptTokenHash         String?                  @unique
+  receiptIssuedAt          DateTime?                @db.Timestamptz(3)
+  fulfilmentEmailId        String?                  @unique @db.Uuid
+  createdByUserId          String?                  @db.Uuid
+  reviewedByUserId         String?                  @db.Uuid
+  reviewNotes              String?
+  createdAt                DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                 @updatedAt @db.Timestamptz(3)
+  activationGrant          ActivationGrant?         @relation(fields: [activationGrantId], references: [id], onDelete: SetNull)
+  createdBy                User?                    @relation("CommercialPurchaseCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reviewedBy               User?                    @relation("CommercialPurchaseReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  fulfilmentEmail          AuthEmailOutbox?          @relation(fields: [fulfilmentEmailId], references: [id], onDelete: SetNull)
+  paymentEvents            CommercialPaymentEvent[]
+
+  @@unique([paymentProvider, providerPaymentReference])
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+}
+
+model CommercialPaymentEvent {
+  id            String              @id @default(uuid()) @db.Uuid
+  eventId       String              @unique
+  eventType     String
+  payloadSha256 String
+  outcome       String
+  purchaseId    String?             @db.Uuid
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  purchase      CommercialPurchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseId, createdAt])
+  @@index([outcome, createdAt])
 }
 
 model ProductEntitlement {
@@ -1026,6 +1089,7 @@ model AuthEmailOutbox {
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
   user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  commercialPurchase CommercialPurchase?
 
   @@index([status, scheduledFor])
 }

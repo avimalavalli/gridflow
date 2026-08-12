@@ -17,16 +17,21 @@ export class PlatformService {
         `UPDATE "ActivationGrant" SET "status"='EXPIRED',"updatedAt"=CURRENT_TIMESTAMP
          WHERE "status"='ISSUED' AND "expiresAt"<=CURRENT_TIMESTAMP`,
       );
-      const [summary, organisations, grants, audit] = await Promise.all([
+      const [summary, organisations, grants, audit, purchases] = await Promise.all([
         tx.query<{
           pending: number; active: number; suspended: number; core: number; ultra: number;
+          purchasesPending: number; purchasesReview: number; purchasesFailed: number; purchasesFulfilled: number;
         }>(
           `SELECT
              COUNT(*) FILTER (WHERE o."accessStatus"='PENDING_APPROVAL')::int AS "pending",
              COUNT(*) FILTER (WHERE o."accessStatus"='ACTIVE')::int AS "active",
              COUNT(*) FILTER (WHERE o."accessStatus"='SUSPENDED')::int AS "suspended",
              COUNT(*) FILTER (WHERE pe."plan"='CORE')::int AS "core",
-             COUNT(*) FILTER (WHERE pe."plan"='ULTRA')::int AS "ultra"
+             COUNT(*) FILTER (WHERE pe."plan"='ULTRA')::int AS "ultra",
+             (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='PENDING_PAYMENT') AS "purchasesPending",
+             (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='MANUAL_REVIEW') AS "purchasesReview",
+             (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='FAILED') AS "purchasesFailed",
+             (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='FULFILLED') AS "purchasesFulfilled"
            FROM "Organisation" o LEFT JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"`,
         ),
         tx.query(
@@ -54,8 +59,16 @@ export class PlatformService {
            FROM "PlatformAuditEvent" p LEFT JOIN "User" u ON u."id"=p."userId"
            ORDER BY p."createdAt" DESC LIMIT 50`,
         ),
+        tx.query(
+          `SELECT p."id",p."reference",p."email",p."plan"::text AS "plan",p."status"::text AS "status",
+                  p."amountMinor",p."currency",p."paymentProvider",p."providerPaymentReference",p."failureReason",
+                  p."researchCreditsGranted",p."seatLimit",p."paymentConfirmedAt",p."fulfilledAt",p."receiptNumber",
+                  p."createdAt",a."status" AS "emailStatus",a."errorDetails" AS "emailError"
+           FROM "CommercialPurchase" p LEFT JOIN "AuthEmailOutbox" a ON a."id"=p."fulfilmentEmailId"
+           ORDER BY CASE p."status" WHEN 'MANUAL_REVIEW' THEN 0 WHEN 'FAILED' THEN 1 WHEN 'PAYMENT_CONFIRMED' THEN 2 ELSE 3 END,p."createdAt" DESC LIMIT 100`,
+        ),
       ]);
-      return { summary: summary.rows[0] ?? { pending: 0, active: 0, suspended: 0, core: 0, ultra: 0 }, organisations: organisations.rows, grants: grants.rows, audit: audit.rows };
+      return { summary: summary.rows[0] ?? { pending: 0, active: 0, suspended: 0, core: 0, ultra: 0, purchasesPending: 0, purchasesReview: 0, purchasesFailed: 0, purchasesFulfilled: 0 }, organisations: organisations.rows, grants: grants.rows, audit: audit.rows, purchases: purchases.rows };
     });
   }
 

@@ -42,6 +42,24 @@ function newDeviceContent(payload: Record<string, unknown>) {
   return { subject, text, html };
 }
 
+function purchaseFulfilmentContent(payload: Record<string, unknown>) {
+  const activationUrl = typeof payload.activationUrl === "string" ? payload.activationUrl : "";
+  const receiptUrl = typeof payload.receiptUrl === "string" ? payload.receiptUrl : "";
+  const plan = payload.plan === "ULTRA" ? "GridFlow Ultra" : "GridFlow Core";
+  const amountMinor = Number(payload.amountMinor);
+  const currency = typeof payload.currency === "string" ? payload.currency : "";
+  const receiptNumber = typeof payload.receiptNumber === "string" ? payload.receiptNumber : "";
+  const activationExpiresAt = typeof payload.activationExpiresAt === "string" ? payload.activationExpiresAt : "";
+  if (!activationUrl.startsWith("https://") && !activationUrl.startsWith("http://")) throw new Error("Purchase email is missing a valid activation URL.");
+  if (!receiptUrl.startsWith("https://") && !receiptUrl.startsWith("http://")) throw new Error("Purchase email is missing a valid receipt URL.");
+  if (!Number.isInteger(amountMinor) || amountMinor < 1 || !/^[A-Z]{3}$/.test(currency) || !receiptNumber) throw new Error("Purchase email is missing valid receipt details.");
+  const amount = new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amountMinor / 100);
+  const subject = `Your ${plan} activation and receipt`;
+  const text = `Payment recorded for ${plan} (${amount}).\nReceipt: ${receiptNumber}\n\nActivate your email-bound GridFlow workspace:\n${activationUrl}\n\nThe activation link expires at ${activationExpiresAt}. After registration, your workspace remains locked while GridFlow verifies and approves access.\n\nView your payment receipt:\n${receiptUrl}\n\nKeep these private links secure.`;
+  const html = `<p>Payment recorded for <strong>${escapeHtml(plan)}</strong> (${escapeHtml(amount)}).</p><p>Receipt: <strong>${escapeHtml(receiptNumber)}</strong></p><p><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#064ebc;color:#fff;text-decoration:none;font-weight:700">Activate GridFlow</a></p><p>The email-bound activation link expires at ${escapeHtml(activationExpiresAt)}. After registration, the workspace remains locked while GridFlow verifies and approves access.</p><p><a href="${escapeHtml(receiptUrl)}">View payment receipt</a></p><p>Keep these private links secure.</p>`;
+  return { subject, text, html };
+}
+
 export class AuthEmailProcessor {
   constructor(private readonly database: GridFlowDatabase) {}
 
@@ -62,6 +80,8 @@ export class AuthEmailProcessor {
         ? passwordResetContent(row.payload)
         : row.template === "NEW_DEVICE"
           ? newDeviceContent(row.payload)
+          : row.template === "PURCHASE_FULFILMENT"
+            ? purchaseFulfilmentContent(row.payload)
           : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
       await this.deliver(row.id, row.recipient, content);
       await this.database.query(

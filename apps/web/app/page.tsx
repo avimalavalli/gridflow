@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { apiGet, ApiError } from "../lib/server-api";
+import { PublicHome } from "../components/public-home";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,8 @@ export default async function Home() {
     onboardingStatus = data.profile?.onboardingStatus;
     welcomeCompleted = Boolean(experience.progress.welcomeCompletedAt);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) redirect("/login");
-    redirect("/login?error=unavailable");
+    if (error instanceof ApiError && error.status === 401) return <PublicHome/>;
+    return <PublicHome/>;
   }
 
   if (!welcomeCompleted) redirect("/welcome");

@@ -19,9 +19,9 @@ interface Policy {
   approvalBatchSize: number; staleOpportunityDays: number; missingDataChecksEnabled: boolean; automaticTaskCreationEnabled: boolean;
   automaticRetryEnabled: boolean; integrationMonitoringEnabled: boolean; weeklyBriefEnabled: boolean; weeklyBriefDay: number;
   weeklyBriefHour: number; discoveryScheduleEnabled: boolean; discoveryCadence: "MANUAL" | "DAILY" | "WEEKLY"; discoveryDay: number;
-  discoveryHour: number; pausedAt: string | null; pauseReason: string | null; lastEvaluatedAt: string | null;
+  discoveryHour: number; pausedAt: string | null; pauseUntil: string | null; pauseReason: string | null; lastEvaluatedAt: string | null;
 }
-type PolicyUpdate = Partial<Omit<Policy, "id" | "pausedAt" | "pauseReason" | "lastEvaluatedAt">> & { paused?: boolean; pauseReason?: string };
+type PolicyUpdate = Partial<Omit<Policy, "id" | "pausedAt" | "pauseUntil" | "pauseReason" | "lastEvaluatedAt">> & { paused?: boolean; pauseUntil?: string; pauseReason?: string };
 interface Approval {
   id: string; kind: string; title: string; summary: string; explanation: string; risk: string; createdAt: string;
   approvalType: "AUTOMATION" | "HUMAN_REVIEW"; href: string | null; actionLabel: string; batchEligible: boolean;
@@ -32,7 +32,7 @@ interface AutomationEvent { id: string; triggerKey: string; outcome: string; mod
 export interface AutomationOverview {
   permissions: { canManage: boolean; canReview: boolean };
   policy: Policy;
-  status: { enabled: boolean; paused: boolean; lastEvaluatedAt: string | null };
+  status: { enabled: boolean; paused: boolean; pauseUntil: string | null; lastEvaluatedAt: string | null };
   metrics: { actionsToday: number; activeRuns: number; failures: number; overdueTasks: number; staleOpportunities: number; estimatedCostUsd: string; agentRunsToday: number; researchRunsToday: number; pipelineValueMinor: number; approvalsPending: number; minutesSavedToday: number };
   dailyFocus: Focus[];
   approvals: Approval[];
@@ -57,8 +57,13 @@ function dateTime(value: string | null): string {
 function label(value: string): string { return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase()); }
 function money(minor: number): string { return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(minor / 100); }
 function editablePolicy(value: Policy): PolicyUpdate {
-  const { id: _id, pausedAt: _pausedAt, pauseReason: _pauseReason, lastEvaluatedAt: _lastEvaluatedAt, ...policy } = value;
+  const { id: _id, pausedAt: _pausedAt, pauseUntil: _pauseUntil, pauseReason: _pauseReason, lastEvaluatedAt: _lastEvaluatedAt, ...policy } = value;
   return policy;
+}
+
+function localInputAfter(hours: number): string {
+  const date = new Date(Date.now() + hours * 60 * 60 * 1000);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
 export function AutomationCockpit({ initial }: { initial: AutomationOverview }) {
@@ -69,6 +74,8 @@ export function AutomationCockpit({ initial }: { initial: AutomationOverview }) 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [awayOpen, setAwayOpen] = useState(false);
+  const [away, setAway] = useState({ pauseUntil: localInputAfter(24), pauseReason: "Race, travel or protected focus block." });
 
   const safeApprovals = useMemo(() => data.approvals.filter((item) => item.batchEligible), [data.approvals]);
   const selectedCount = [...selected].filter((id) => safeApprovals.some((item) => item.id === id)).length;
@@ -94,6 +101,7 @@ export function AutomationCockpit({ initial }: { initial: AutomationOverview }) 
   const savePolicy = (patch: PolicyUpdate, success = "Automation policy saved.") => request("/policy", { method: "PATCH", body: JSON.stringify(patch) }, success);
   const decide = (id: string, decision: "APPROVE" | "REJECT") => request(`/approvals/${id}/decision`, { method: "POST", body: JSON.stringify({ decision }) }, decision === "APPROVE" ? "Decision approved and executed safely." : "Decision rejected.");
   const batch = (decision: "APPROVE" | "REJECT") => request("/approvals/batch", { method: "POST", body: JSON.stringify({ ids: [...selected], decision }) }, `${selectedCount} low-risk decisions ${decision === "APPROVE" ? "approved" : "rejected"}.`);
+  const startAwayMode = () => request("/policy", { method: "PATCH", body: JSON.stringify({ paused: true, pauseUntil: new Date(away.pauseUntil).toISOString(), pauseReason: away.pauseReason }) }, "Away mode is active and will resume automatically.").then(() => setAwayOpen(false));
 
   function toggleSelected(id: string): void {
     setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -106,9 +114,17 @@ export function AutomationCockpit({ initial }: { initial: AutomationOverview }) 
     {message ? <div className="notice notice-success" role="status"><CheckCircle2 size={16}/>{message}</div> : null}
 
     <section className={`automation-hero ${data.status.paused || !data.status.enabled ? "paused" : "live"}`}>
-      <div className="automation-hero-copy"><span className="automation-orb"><Workflow size={23}/></span><div><div className="eyebrow">Autopilot state</div><h2>{data.status.paused ? "Paused safely" : data.status.enabled ? `${label(data.policy.mode)} mode is active` : "Automation is ready to configure"}</h2><p>{data.status.paused ? data.policy.pauseReason || "New automatic actions are held. Existing approvals remain available." : "Internal preparation can run quietly. Relationship, sending, booking, money and legal decisions stay with you."}</p></div></div>
-      <div className="automation-hero-actions"><span className={`badge ${data.status.enabled && !data.status.paused ? "green" : "amber"}`}>{data.status.enabled && !data.status.paused ? "Monitoring live" : "Automation held"}</span>{data.permissions.canManage ? <button className="button button-secondary" type="button" disabled={Boolean(busy)} onClick={() => void savePolicy(data.status.paused || !data.status.enabled ? { enabled: true, paused: false } : { paused: true, pauseReason: "Paused from the Automation Cockpit." }, data.status.paused || !data.status.enabled ? "Automation resumed." : "Automation paused safely.")}>{data.status.paused || !data.status.enabled ? <Play size={14}/> : <Pause size={14}/>} {data.status.paused || !data.status.enabled ? "Resume" : "Pause"}</button> : null}<small>Last checked {dateTime(data.status.lastEvaluatedAt)}</small></div>
+      <div className="automation-hero-copy"><span className="automation-orb"><Workflow size={23}/></span><div><div className="eyebrow">Autopilot state</div><h2>{data.status.paused ? "Away mode is protecting the queue" : data.status.enabled ? `${label(data.policy.mode)} mode is active` : "Automation is ready to configure"}</h2><p>{data.status.paused ? `${data.policy.pauseReason || "New automatic actions are held."}${data.status.pauseUntil ? ` GridFlow resumes automatically ${dateTime(data.status.pauseUntil)}.` : " Resume manually when ready."}` : "Internal preparation can run quietly. Relationship, sending, booking, money and legal decisions stay with you."}</p></div></div>
+      <div className="automation-hero-actions"><span className={`badge ${data.status.enabled && !data.status.paused ? "green" : "amber"}`}>{data.status.enabled && !data.status.paused ? "Monitoring live" : "Automation held"}</span>{data.permissions.canManage ? <button className="button button-secondary" type="button" disabled={Boolean(busy)} onClick={() => data.status.paused || !data.status.enabled ? void savePolicy({ enabled: true, paused: false }, "Automation resumed.") : setAwayOpen((open) => !open)}>{data.status.paused || !data.status.enabled ? <Play size={14}/> : <Pause size={14}/>} {data.status.paused || !data.status.enabled ? "Resume now" : "Set away mode"}</button> : null}<small>Last checked {dateTime(data.status.lastEvaluatedAt)}</small></div>
     </section>
+
+    {awayOpen && data.permissions.canManage ? <section className="card away-mode-panel">
+      <div className="section-header"><div><div className="eyebrow">Race & travel continuity</div><h2>Pause safe internal automation, then return automatically</h2><p>GridFlow keeps every existing task, approval and inbound record intact. It will not start scheduled discovery, retries or automatic internal tasks while you are away.</p></div><ShieldCheck size={20}/></div>
+      <div className="away-presets" aria-label="Away mode presets">{[{ label: "24 hours", hours: 24 }, { label: "Race weekend", hours: 72 }, { label: "One week", hours: 168 }].map((preset) => <button className="button button-secondary" type="button" key={preset.label} onClick={() => setAway((value) => ({ ...value, pauseUntil: localInputAfter(preset.hours) }))}>{preset.label}</button>)}</div>
+      <div className="form-grid section-gap"><label className="field"><span>Resume automatically</span><input type="datetime-local" min={localInputAfter(1)} value={away.pauseUntil} onChange={(event) => setAway((value) => ({ ...value, pauseUntil: event.target.value }))}/></label><label className="field"><span>Reason shown to the team</span><input maxLength={500} value={away.pauseReason} onChange={(event) => setAway((value) => ({ ...value, pauseReason: event.target.value }))}/></label></div>
+      <div className="away-guard"><ShieldCheck size={15}/><span>Inbound records and existing approvals remain visible. LinkedIn, sending, bookings, money and legal actions were already human-controlled and remain so.</span></div>
+      <div className="form-actions"><button className="button button-ghost" type="button" onClick={() => setAwayOpen(false)}>Cancel</button><button className="button button-primary" type="button" disabled={Boolean(busy) || !away.pauseUntil || !away.pauseReason.trim()} onClick={() => void startAwayMode()}><Pause size={14}/>Start away mode</button></div>
+    </section> : null}
 
     <div className="automation-tabs" role="tablist" aria-label="Automation Cockpit views">
       {(["TODAY", "APPROVALS", "POLICY"] as View[]).map((item) => <button role="tab" aria-selected={view === item} className={view === item ? "active" : ""} type="button" onClick={() => setView(item)} key={item}>{item === "TODAY" ? "Today" : item === "APPROVALS" ? `Approval Inbox · ${data.metrics.approvalsPending}` : "Policies & triggers"}</button>)}

@@ -5,6 +5,7 @@ export type AutomationOperatingMode = "GUIDED" | "ASSISTED" | "CONTROLLED";
 export type AutomationCadence = "MANUAL" | "DAILY" | "WEEKLY";
 
 interface PolicyRow extends Record<string, unknown> {
+  id: string;
   tenantId: string;
   mode: AutomationOperatingMode;
   enabled: boolean;
@@ -29,6 +30,8 @@ interface PolicyRow extends Record<string, unknown> {
   discoveryDay: number;
   discoveryHour: number;
   pausedAt: Date | null;
+  pauseUntil: Date | null;
+  pauseReason: string | null;
 }
 
 interface OwnerRow extends Record<string, unknown> { userId: string }
@@ -123,7 +126,9 @@ export class AutomationControlEngine {
     const policies = await this.database.query<{ tenantId: string }>(
       `SELECT p."tenantId" FROM "AutomationControlPolicy" p
        JOIN "Organisation" o ON o."id"=p."tenantId" JOIN "ProductEntitlement" e ON e."tenantId"=p."tenantId"
-       WHERE p."enabled"=true AND p."pausedAt" IS NULL AND o."accessStatus"='ACTIVE' AND e."status"='ACTIVE'`,
+       WHERE p."enabled"=true AND (p."pausedAt" IS NULL OR p."pauseUntil"<=$1::timestamptz)
+         AND o."accessStatus"='ACTIVE' AND e."status"='ACTIVE'`,
+      [now.toISOString()],
     );
     const total = emptyResult(policies.rows.length);
     for (const row of policies.rows) {
@@ -142,15 +147,30 @@ export class AutomationControlEngine {
       const policyResult = await tx.query<PolicyRow>(
         `INSERT INTO "AutomationControlPolicy" ("tenantId","updatedAt") VALUES ($1::uuid,CURRENT_TIMESTAMP)
          ON CONFLICT ("tenantId") DO UPDATE SET "tenantId"=EXCLUDED."tenantId"
-         RETURNING "tenantId","mode"::text AS "mode","enabled","timezone","quietHoursStart","quietHoursEnd","workingDays",
+         RETURNING "id","tenantId","mode"::text AS "mode","enabled","timezone","quietHoursStart","quietHoursEnd","workingDays",
                    "dailyAgentRunLimit","dailyResearchCreditLimit","dailyEstimatedCostLimitUsd"::text AS "dailyEstimatedCostLimitUsd",
                    "maxConcurrentRuns","staleOpportunityDays","missingDataChecksEnabled","automaticTaskCreationEnabled",
                    "automaticRetryEnabled","integrationMonitoringEnabled","weeklyBriefEnabled","weeklyBriefDay","weeklyBriefHour",
-                   "discoveryScheduleEnabled","discoveryCadence"::text AS "discoveryCadence","discoveryDay","discoveryHour","pausedAt"`, [tenantId],
+                   "discoveryScheduleEnabled","discoveryCadence"::text AS "discoveryCadence","discoveryDay","discoveryHour","pausedAt","pauseUntil","pauseReason"`, [tenantId],
       );
       const policy = policyResult.rows[0]!;
       const clock = localClock(policy.timezone, now);
-      if ((!policy.enabled || policy.pausedAt || isQuiet(policy, clock)) && !force) {
+      if (policy.pausedAt && policy.pauseUntil && policy.pauseUntil <= now) {
+        const oldValues = { pausedAt: policy.pausedAt, pauseUntil: policy.pauseUntil, pauseReason: policy.pauseReason };
+        await tx.query(
+          `UPDATE "AutomationControlPolicy" SET "pausedAt"=NULL,"pauseUntil"=NULL,"pauseReason"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid`,
+          [tenantId],
+        );
+        await tx.query(
+          `INSERT INTO "AuditLog" ("tenantId","action","entityType","entityId","oldValues","newValues","metadata")
+           VALUES ($1::uuid,'UPDATE','AutomationControlPolicy',$2::text,$3::jsonb,$4::jsonb,$5::jsonb)`,
+          [tenantId, policy.id, JSON.stringify(oldValues), JSON.stringify({ pausedAt: null, pauseUntil: null, pauseReason: null }), JSON.stringify({ reason: "AWAY_MODE_AUTO_RESUME" })],
+        );
+        policy.pausedAt = null;
+        policy.pauseUntil = null;
+        policy.pauseReason = null;
+      }
+      if (!policy.enabled || policy.pausedAt || (isQuiet(policy, clock) && !force)) {
         return { policy, clock, quiet: true, retryIds: [] as string[], discovery: null as BriefRow | null, ownerId: null as string | null };
       }
       result.evaluated += 1;

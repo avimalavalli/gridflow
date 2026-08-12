@@ -11,7 +11,7 @@ interface PolicyRow extends Record<string, unknown> {
   approvalBatchSize: number; staleOpportunityDays: number; missingDataChecksEnabled: boolean; automaticTaskCreationEnabled: boolean;
   automaticRetryEnabled: boolean; integrationMonitoringEnabled: boolean; weeklyBriefEnabled: boolean; weeklyBriefDay: number;
   weeklyBriefHour: number; discoveryScheduleEnabled: boolean; discoveryCadence: string; discoveryDay: number; discoveryHour: number;
-  pausedAt: Date | null; pauseReason: string | null; lastEvaluatedAt: Date | null; updatedAt: Date;
+  pausedAt: Date | null; pauseUntil: Date | null; pauseReason: string | null; lastEvaluatedAt: Date | null; updatedAt: Date;
 }
 interface MetricRow extends Record<string, unknown> {
   actionsToday: number; activeRuns: number; failures: number; overdueTasks: number; staleOpportunities: number;
@@ -34,7 +34,7 @@ const policySelection = `"id","mode"::text AS "mode","enabled","timezone","quiet
   "dailyAgentRunLimit","dailyResearchCreditLimit","dailyEstimatedCostLimitUsd"::text AS "dailyEstimatedCostLimitUsd","maxConcurrentRuns",
   "approvalBatchSize","staleOpportunityDays","missingDataChecksEnabled","automaticTaskCreationEnabled","automaticRetryEnabled",
   "integrationMonitoringEnabled","weeklyBriefEnabled","weeklyBriefDay","weeklyBriefHour","discoveryScheduleEnabled",
-  "discoveryCadence"::text AS "discoveryCadence","discoveryDay","discoveryHour","pausedAt","pauseReason","lastEvaluatedAt","updatedAt"`;
+  "discoveryCadence"::text AS "discoveryCadence","discoveryDay","discoveryHour","pausedAt","pauseUntil","pauseReason","lastEvaluatedAt","updatedAt"`;
 
 @Injectable()
 export class AutomationService {
@@ -48,6 +48,22 @@ export class AutomationService {
 
   async overview(identity: RequestIdentity) {
     return this.database.tenantTransaction(identity.tenantId, async (tx) => {
+      const expiredPause = await tx.query<{ id: string; pausedAt: Date; pauseUntil: Date; pauseReason: string | null }>(
+        `SELECT "id","pausedAt","pauseUntil","pauseReason" FROM "AutomationControlPolicy"
+         WHERE "tenantId"=$1::uuid AND "pausedAt" IS NOT NULL AND "pauseUntil"<=CURRENT_TIMESTAMP FOR UPDATE`,
+        [identity.tenantId],
+      );
+      if (expiredPause.rows[0]) {
+        await tx.query(
+          `UPDATE "AutomationControlPolicy" SET "pausedAt"=NULL,"pauseUntil"=NULL,"pauseReason"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid`,
+          [identity.tenantId],
+        );
+        await tx.query(
+          `INSERT INTO "AuditLog" ("tenantId","action","entityType","entityId","oldValues","newValues","metadata")
+           VALUES ($1::uuid,'UPDATE','AutomationControlPolicy',$2::text,$3::jsonb,$4::jsonb,$5::jsonb)`,
+          [identity.tenantId, expiredPause.rows[0].id, JSON.stringify(expiredPause.rows[0]), JSON.stringify({ pausedAt: null, pauseUntil: null, pauseReason: null }), JSON.stringify({ reason: "AWAY_MODE_AUTO_RESUME" })],
+        );
+      }
       const policyResult = await tx.query<PolicyRow>(
         `INSERT INTO "AutomationControlPolicy" ("tenantId","updatedAt") VALUES ($1::uuid,CURRENT_TIMESTAMP)
          ON CONFLICT ("tenantId") DO UPDATE SET "tenantId"=EXCLUDED."tenantId" RETURNING ${policySelection}`,
@@ -125,7 +141,7 @@ export class AutomationService {
       return {
         permissions: { canManage: ["OWNER", "ADMIN"].includes(identity.role), canReview: ["OWNER", "ADMIN", "REVIEWER"].includes(identity.role) },
         policy,
-        status: { enabled: policy.enabled, paused: Boolean(policy.pausedAt), lastEvaluatedAt: policy.lastEvaluatedAt },
+        status: { enabled: policy.enabled, paused: Boolean(policy.pausedAt), pauseUntil: policy.pauseUntil, lastEvaluatedAt: policy.lastEvaluatedAt },
         metrics: { ...metric, approvalsPending: approvals.length, minutesSavedToday: metric.actionsToday * 12 },
         dailyFocus,
         approvals,
@@ -154,6 +170,13 @@ export class AutomationService {
       catch { throw new BadRequestException("Choose a valid IANA timezone such as Europe/London or Asia/Kolkata."); }
     }
     if (input.workingDays && new Set(input.workingDays).size !== input.workingDays.length) throw new BadRequestException("Working days cannot contain duplicates.");
+    if (input.pauseUntil && input.paused !== true) throw new BadRequestException("Choose Pause when setting an automatic resume time.");
+    if (input.pauseUntil) {
+      const pauseUntil = new Date(input.pauseUntil);
+      const maximum = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      if (pauseUntil <= new Date()) throw new BadRequestException("Automatic resume must be in the future.");
+      if (pauseUntil > maximum) throw new BadRequestException("Away mode can be scheduled for up to 90 days.");
+    }
     return this.database.tenantTransaction(identity.tenantId, async (tx) => {
       await tx.query(
         `INSERT INTO "AutomationControlPolicy" ("tenantId","updatedByUserId","updatedAt") VALUES ($1::uuid,$2::uuid,CURRENT_TIMESTAMP) ON CONFLICT ("tenantId") DO NOTHING`,
@@ -173,14 +196,15 @@ export class AutomationService {
            "discoveryScheduleEnabled"=COALESCE($22::boolean,"AutomationControlPolicy"."discoveryScheduleEnabled"),"discoveryCadence"=COALESCE($23::"AutomationCadence","AutomationControlPolicy"."discoveryCadence"),
            "discoveryDay"=COALESCE($24::int,"AutomationControlPolicy"."discoveryDay"),"discoveryHour"=COALESCE($25::int,"AutomationControlPolicy"."discoveryHour"),
            "pausedAt"=CASE WHEN $26::boolean=true THEN COALESCE("AutomationControlPolicy"."pausedAt",CURRENT_TIMESTAMP) WHEN $26::boolean=false THEN NULL ELSE "AutomationControlPolicy"."pausedAt" END,
-           "pauseReason"=CASE WHEN $26::boolean=true THEN COALESCE($27,'Paused by an administrator.') WHEN $26::boolean=false THEN NULL ELSE "AutomationControlPolicy"."pauseReason" END,
+           "pauseUntil"=CASE WHEN $26::boolean=true THEN $27::timestamptz WHEN $26::boolean=false THEN NULL ELSE "AutomationControlPolicy"."pauseUntil" END,
+           "pauseReason"=CASE WHEN $26::boolean=true THEN COALESCE($28,'Paused by an administrator.') WHEN $26::boolean=false THEN NULL ELSE "AutomationControlPolicy"."pauseReason" END,
            "updatedByUserId"=$2::uuid,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid RETURNING ${policySelection}`,
         [identity.tenantId, identity.userId, input.mode ?? null, input.enabled ?? null, input.timezone ?? null, input.quietHoursStart ?? null, input.quietHoursEnd ?? null,
           input.workingDays ? JSON.stringify(input.workingDays) : null, input.dailyAgentRunLimit ?? null, input.dailyResearchCreditLimit ?? null, input.dailyEstimatedCostLimitUsd ?? null,
           input.maxConcurrentRuns ?? null, input.approvalBatchSize ?? null, input.staleOpportunityDays ?? null, input.missingDataChecksEnabled ?? null,
           input.automaticTaskCreationEnabled ?? null, input.automaticRetryEnabled ?? null, input.integrationMonitoringEnabled ?? null, input.weeklyBriefEnabled ?? null,
           input.weeklyBriefDay ?? null, input.weeklyBriefHour ?? null, input.discoveryScheduleEnabled ?? null, input.discoveryCadence ?? null, input.discoveryDay ?? null,
-          input.discoveryHour ?? null, input.paused ?? null, input.pauseReason?.trim() || null],
+          input.discoveryHour ?? null, input.paused ?? null, input.pauseUntil ?? null, input.pauseReason?.trim() || null],
       );
       await tx.query(
         `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","newValues") VALUES ($1::uuid,$2::uuid,'UPDATE','AutomationControlPolicy',$3::uuid,$4::jsonb)`,

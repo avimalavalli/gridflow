@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Activity, ArrowUpRight, Bot, Building2, CalendarDays, ContactRound, Hammer, Handshake, Send } from "lucide-react";
+import { Activity, ArrowUpRight, Bot, Building2, CalendarDays, ContactRound, Handshake, Send } from "lucide-react";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 import { DataUnavailable } from "../../components/data-unavailable";
 import { EmptyState } from "../../components/empty-state";
-import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { SetupChecklist } from "../../components/setup-checklist";
+import { DashboardFocus, type DashboardAction } from "./dashboard-focus";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,10 @@ interface DashboardSnapshot {
     outreachDraftsReady: number; replies: number; opportunities: number; pipelineValueMinor: number;
     overdueFollowUps: number; automationFailures: number; estimatedAutomationCostUsd: string;
   };
-  actions: Array<{ id: string; kind: string; title: string; detail: string | null; dueAt: string | null; href: string; urgency: string }>;
+  actions: DashboardAction[];
+  focusActions: DashboardAction[];
+  actionSummary: { total: number; urgent: number; review: number; ready: number; upcoming: number };
+  automationState: { paused: boolean; pauseUntil: string | null; pauseReason: string | null };
   upcomingMeetings: Array<{ id: string; title: string; startsAt: string; companyName: string | null; contactName: string | null }>;
   opportunityStages: Array<{ stage: string; count: number; valueMinor: number }>;
   recentActivity: Array<{ id: string; summary: string; outcome: string | null; occurredAt: string; direction: string; channel: string | null; companyName: string | null; contactName: string | null }>;
@@ -33,7 +36,7 @@ export default async function DashboardPage() {
 
   return (
     <Shell title="Command Centre">
-      <PageHead eyebrow="Commercial OS" title="Turn sponsor work into a daily system" description="Prioritise the next commercial action, keep every conversation moving and see where the pipeline is creating value." action={<Link className="button button-primary" href="/discovery-briefs"><Building2 size={15}/>Discover companies</Link>} />
+      <PageHead eyebrow="Commercial OS" title="Turn sponsor work into a daily system" description="Prioritise the next commercial action, keep every conversation moving and see where the pipeline is creating value." action={<Link className="button button-primary" href={snapshot?.focusActions[0]?.href ?? "/discovery-briefs"}>{snapshot?.focusActions.length ? <ArrowUpRight size={15}/> : <Building2 size={15}/>} {snapshot?.focusActions.length ? "Open next action" : "Discover companies"}</Link>} />
       <SetupChecklist />
       {!snapshot ? <DataUnavailable message={error} /> : <>
         <section className="metrics metrics-six">
@@ -47,10 +50,7 @@ export default async function DashboardPage() {
 
         <div className="split-layout">
           <div className="stack">
-            <section className="card">
-              <div className="section-header"><div><div className="eyebrow">Action queue</div><h2>What needs your attention</h2><p>GridFlow combines Pulse follow-ups, Sentinel replies, Nova plans, Orbit meetings, Forge proposals, due tasks, outreach approvals and failed automation into one working list.</p></div><Link className="button button-secondary" href="/forge"><Hammer size={14}/> Open Forge</Link></div>
-              {snapshot.actions.length === 0 ? <EmptyState title="Your queue is clear" copy="New follow-ups, approvals and system issues will appear here." /> : <div className="queue">{snapshot.actions.map((action) => <Link href={action.href} className="queue-item" key={`${action.kind}-${action.id}`}><div className="queue-main"><div className="queue-title">{action.title}</div><div className="queue-copy">{action.detail || "Open the record for the full context."}{action.dueAt ? ` · ${dateTime(action.dueAt)}` : ""}</div></div><div className="queue-meta"><StatusBadge value={action.urgency}/><ArrowUpRight size={13}/></div></Link>)}</div>}
-            </section>
+            <DashboardFocus actions={snapshot.actions} focusActions={snapshot.focusActions} summary={snapshot.actionSummary} automationState={snapshot.automationState}/>
 
             <section className="card">
               <div className="section-header"><div><div className="eyebrow">Pipeline</div><h2>Commercial opportunities</h2><p>Value and deal count across each active stage.</p></div><Link className="button button-secondary" href="/opportunities">Open pipeline</Link></div>
@@ -61,7 +61,7 @@ export default async function DashboardPage() {
           <div className="stack">
             <section className="card">
               <div className="section-header"><div><div className="eyebrow">Calendar</div><h2>Upcoming meetings</h2></div><Link className="button button-ghost" href="/meetings">View all</Link></div>
-              {snapshot.upcomingMeetings.length === 0 ? <EmptyState title="No meetings scheduled" copy="Book a discovery call or sponsor meeting and it will appear here." /> : <div className="queue">{snapshot.upcomingMeetings.map((meeting) => <Link href="/orbit" className="queue-item" key={meeting.id}><span className="metric-icon"><CalendarDays size={15}/></span><div className="queue-main"><div className="queue-title">{meeting.title}</div><div className="queue-copy">{dateTime(meeting.startsAt)} · {meeting.companyName || meeting.contactName || "Commercial meeting"}</div></div></Link>)}</div>}
+              {snapshot.upcomingMeetings.length === 0 ? <EmptyState title="No meetings scheduled" copy="Book a discovery call or sponsor meeting and it will appear here." /> : <div className="queue">{snapshot.upcomingMeetings.map((meeting) => <Link href={`/orbit?meeting=${meeting.id}`} className="queue-item" key={meeting.id}><span className="metric-icon"><CalendarDays size={15}/></span><div className="queue-main"><div className="queue-title">{meeting.title}</div><div className="queue-copy">{dateTime(meeting.startsAt)} · {meeting.companyName || meeting.contactName || "Commercial meeting"}</div></div></Link>)}</div>}
             </section>
 
             <section className="card">

@@ -31,7 +31,7 @@ describe("guided product experience", () => {
     };
     const service = new ExperienceService(new TestDatabaseService(database) as never);
     const initial = await service.get(identity);
-    expect(initial.progress).toMatchObject({ welcomeCompletedAt: null, tutorialStep: 0, onboardingStep: 0, onboardingDraft: null });
+    expect(initial.progress).toMatchObject({ welcomeCompletedAt: null, tutorialStep: 0, onboardingStep: 0, onboardingDraft: null, setupDismissedAt: null });
     expect(initial.setup).toMatchObject({ completed: 1, total: 7, next: { key: "welcome" } });
     expect(initial.setup.steps.find((step) => step.key === "ai")?.completed).toBe(true);
 
@@ -45,6 +45,9 @@ describe("guided product experience", () => {
     const completed = await service.get(identity);
     expect(completed.progress.onboardingDraft).toBeNull();
     expect(completed.progress.tutorialCompletedAt).toBeTruthy();
+
+    await service.update(identity, { setupDismissed: true });
+    expect((await service.get(identity)).progress.setupDismissedAt).toBeTruthy();
   });
 
   it("rejects an oversized onboarding draft", async () => {

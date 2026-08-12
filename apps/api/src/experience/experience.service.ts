@@ -15,6 +15,7 @@ interface ProgressRow extends Record<string, unknown> {
   onboardingStep: number;
   onboardingDraft: Record<string, unknown> | null;
   onboardingSavedAt: Date | null;
+  setupDismissedAt: Date | null;
 }
 
 interface SetupRow extends Record<string, unknown> {
@@ -48,7 +49,7 @@ export class ExperienceService {
          ON CONFLICT ("tenantId","userId") DO UPDATE SET
            "experienceVersion"=GREATEST("ProductExperienceProgress"."experienceVersion",EXCLUDED."experienceVersion")
          RETURNING "experienceVersion","welcomeCompletedAt","tutorialStartedAt","tutorialStep",
-                   "tutorialCompletedAt","manualOpenedAt","onboardingStep","onboardingDraft","onboardingSavedAt"`,
+                   "tutorialCompletedAt","manualOpenedAt","onboardingStep","onboardingDraft","onboardingSavedAt","setupDismissedAt"`,
         [identity.tenantId, identity.userId, EXPERIENCE_VERSION],
       );
       const setup = await tx.query<SetupRow>(
@@ -90,7 +91,8 @@ export class ExperienceService {
            "onboardingStep"=COALESCE($7::int,"onboardingStep"),
            "onboardingDraft"=CASE WHEN $9::boolean=true THEN NULL WHEN $8::jsonb IS NOT NULL THEN $8::jsonb ELSE "onboardingDraft" END,
            "onboardingSavedAt"=CASE WHEN $9::boolean=true THEN NULL WHEN $8::jsonb IS NOT NULL THEN CURRENT_TIMESTAMP ELSE "onboardingSavedAt" END,
-           "experienceVersion"=GREATEST("experienceVersion",$10),
+           "setupDismissedAt"=CASE WHEN $10::boolean=true THEN COALESCE("setupDismissedAt",CURRENT_TIMESTAMP) WHEN $10::boolean=false THEN NULL ELSE "setupDismissedAt" END,
+           "experienceVersion"=GREATEST("experienceVersion",$11),
            "updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid AND "userId"=$2::uuid`,
         [
@@ -103,10 +105,11 @@ export class ExperienceService {
           input.onboardingStep ?? null,
           input.onboardingDraft ? JSON.stringify(input.onboardingDraft) : null,
           input.clearOnboardingDraft ?? false,
+          input.setupDismissed ?? null,
           EXPERIENCE_VERSION,
         ],
       );
-      if (input.welcomeCompleted || input.tutorialStep !== undefined || input.tutorialCompleted !== undefined || input.clearOnboardingDraft) {
+      if (input.welcomeCompleted || input.tutorialStep !== undefined || input.tutorialCompleted !== undefined || input.clearOnboardingDraft || input.setupDismissed !== undefined) {
         await tx.query(
           `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","metadata")
            VALUES ($1::uuid,$2::uuid,'UPDATE','ProductExperienceProgress',$2::text,$3::jsonb)`,

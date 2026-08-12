@@ -34,6 +34,7 @@ import { AutomationModule } from "./automation/automation.module.js";
 import { SealModule } from "./seal/seal.module.js";
 import { DeliveryModule } from "./delivery/delivery.module.js";
 import { RenewalsModule } from "./renewals/renewals.module.js";
+import { SearchModule } from "./search/search.module.js";
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { RenewalsModule } from "./renewals/renewals.module.js";
     SealModule,
     DeliveryModule,
     RenewalsModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

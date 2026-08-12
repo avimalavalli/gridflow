@@ -107,6 +107,20 @@ type AuthSummary = {
   platformAdmin?: boolean;
 };
 
+type SearchKind = "COMPANY" | "CONTACT" | "OPPORTUNITY" | "OUTREACH" | "PROPOSAL" | "CONTRACT" | "DELIVERY" | "RENEWAL";
+type RecordSearchResult = { id: string; kind: SearchKind; title: string; subtitle: string; status: string | null; href: string };
+
+const recordIcons: Record<SearchKind, LucideIcon> = {
+  COMPANY: Building2,
+  CONTACT: ContactRound,
+  OPPORTUNITY: Handshake,
+  OUTREACH: Send,
+  PROPOSAL: Hammer,
+  CONTRACT: FileSignature,
+  DELIVERY: ClipboardCheck,
+  RENEWAL: Repeat2,
+};
+
 function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -128,6 +142,8 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [auth, setAuth] = useState<AuthSummary | null>(null);
+  const [recordResults, setRecordResults] = useState<RecordSearchResult[]>([]);
+  const [searchingRecords, setSearchingRecords] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,6 +172,26 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
     return () => window.clearTimeout(timer);
   }, [searchOpen]);
 
+  useEffect(() => {
+    const needle = query.trim();
+    if (!searchOpen || needle.length < 2) {
+      setRecordResults([]);
+      setSearchingRecords(false);
+      return;
+    }
+    const controller = new AbortController();
+    setRecordResults([]);
+    setSearchingRecords(true);
+    const timer = window.setTimeout(() => {
+      fetch(`/backend/search?q=${encodeURIComponent(needle)}`, { credentials: "include", cache: "no-store", signal: controller.signal })
+        .then(async (response) => response.ok ? response.json() as Promise<{ results: RecordSearchResult[] }> : { results: [] })
+        .then((payload) => setRecordResults(payload.results))
+        .catch(() => { if (!controller.signal.aborted) setRecordResults([]); })
+        .finally(() => { if (!controller.signal.aborted) setSearchingRecords(false); });
+    }, 180);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [query, searchOpen]);
+
   const visibleNavigation = useMemo(() => {
     const role = auth?.activeOrganisation.role;
     return navigation
@@ -165,7 +201,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
       .filter((section) => section.items.length > 0);
   }, [auth?.activeOrganisation.role, auth?.platformAdmin]);
 
-  const searchResults = useMemo(() => {
+  const navigationResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const all = visibleNavigation.flatMap((section) => section.items.map((item) => ({ ...item, section: section.label })));
     if (!needle) return all;
@@ -175,6 +211,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
   function goTo(href: string): void {
     setSearchOpen(false);
     setQuery("");
+    setRecordResults([]);
     router.push(href);
   }
 
@@ -242,12 +279,17 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
       {searchOpen ? (
         <div className="command-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSearchOpen(false); }}>
           <section className="command-palette" role="dialog" aria-modal="true" aria-label="Search GridFlow">
-            <div className="command-input-row"><Search size={19} /><input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Go to a company, contact or workspace…" onKeyDown={(event) => { if (event.key === "Enter" && searchResults[0]) goTo(searchResults[0].href); }} /><button type="button" onClick={() => setSearchOpen(false)} aria-label="Close search"><X size={17} /></button></div>
+            <div className="command-input-row"><Search size={19} /><input ref={searchInput} maxLength={80} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find any sponsor record or workspace…" onKeyDown={(event) => { if (event.key === "Enter") { const first = recordResults[0]?.href ?? navigationResults[0]?.href; if (first) goTo(first); } }} /><button type="button" onClick={() => setSearchOpen(false)} aria-label="Close search"><X size={17} /></button></div>
             <div className="command-results">
-              {searchResults.length ? searchResults.map((item) => {
+              {query.trim().length >= 2 ? <><div className="command-section-label"><span>Commercial records</span>{searchingRecords ? <small role="status">Searching…</small> : <small>{recordResults.length} found</small>}</div>{recordResults.map((item) => {
+                const Icon = recordIcons[item.kind];
+                return <button className="command-result" type="button" key={`record:${item.kind}:${item.id}`} onClick={() => goTo(item.href)}><span className="command-icon"><Icon size={17} /></span><span><strong>{item.title}</strong><small>{item.kind.replaceAll("_", " ")} · {item.subtitle}</small></span><ChevronRight size={16} /></button>;
+              })}</> : null}
+              {navigationResults.length ? <><div className="command-section-label"><span>Workspaces</span><small>{query.trim() ? "Matching destinations" : "All destinations"}</small></div>{navigationResults.slice(0, query.trim() ? 8 : navigationResults.length).map((item) => {
                 const Icon = item.icon;
                 return <button className="command-result" type="button" key={item.href} onClick={() => goTo(item.href)}><span className="command-icon"><Icon size={17} /></span><span><strong>{item.label}</strong><small>{item.section}</small></span><ChevronRight size={16} /></button>;
-              }) : <div className="command-empty">No GridFlow workspace matches “{query}”.</div>}
+              })}</> : null}
+              {!searchingRecords && query.trim().length >= 2 && !recordResults.length && !navigationResults.length ? <div className="command-empty">No commercial record or workspace matches “{query}”.</div> : null}
             </div>
             <div className="command-footer"><span><kbd>Enter</kbd> open first result</span><span><kbd>Esc</kbd> close</span></div>
           </section>

@@ -145,12 +145,13 @@ try {
   const authenticatedEntry = await webRequest("/", { cookie: loginCookie });
   const authenticatedLocation = authenticatedEntry.response.headers.get("location");
   const authenticatedHtml = typeof authenticatedEntry.payload.raw === "string" ? authenticatedEntry.payload.raw : "";
-  const redirectedToOnboarding = authenticatedLocation
-    ? new URL(authenticatedLocation, webBase).pathname === "/onboarding"
-    : authenticatedHtml.includes("url=/onboarding") || authenticatedHtml.includes(";/onboarding;307;");
+  const authenticatedPath = authenticatedLocation ? new URL(authenticatedLocation, webBase).pathname : null;
+  const redirectedToGuidedStart = authenticatedPath
+    ? ["/welcome", "/onboarding"].includes(authenticatedPath)
+    : ["/welcome", "/onboarding"].some((path) => authenticatedHtml.includes(`url=${path}`) || authenticatedHtml.includes(`;${path};307;`));
   assert(
-    redirectedToOnboarding,
-    `A newly authenticated user was not sent to onboarding (status ${authenticatedEntry.response.status}, location ${authenticatedLocation ?? "(streamed response)"}).`,
+    redirectedToGuidedStart,
+    `A newly authenticated user was not sent to Guided Start (status ${authenticatedEntry.response.status}, location ${authenticatedLocation ?? "(streamed response)"}).`,
   );
   assert(
     !authenticatedHtml.includes("error=unavailable") && !authenticatedLocation?.includes("error=unavailable"),

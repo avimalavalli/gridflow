@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from "class-validator";
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from "class-validator";
 
 const modes = ["GUIDED", "ASSISTED", "CONTROLLED"] as const;
 const cadences = ["MANUAL", "DAILY", "WEEKLY"] as const;
@@ -29,6 +29,7 @@ export class UpdateAutomationPolicyDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(6) discoveryDay?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(23) discoveryHour?: number;
   @IsOptional() @IsBoolean() paused?: boolean;
+  @IsOptional() @IsDateString() pauseUntil?: string;
   @IsOptional() @IsString() @MaxLength(500) pauseReason?: string;
 }
 

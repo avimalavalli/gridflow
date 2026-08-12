@@ -35,4 +35,8 @@ export class UpdateExperienceDto {
   @IsOptional()
   @IsBoolean()
   clearOnboardingDraft?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  setupDismissed?: boolean;
 }

@@ -92,6 +92,10 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await page.goto("/launch");
     await expect(page.getByRole("heading", { name: "Evidence, not recollection" })).toBeVisible();
     await expect(page.getByText("Real provider events only")).toBeVisible();
+    const evidenceProgress = page.getByRole("progressbar", { name: "Live integration evidence completion" });
+    await expect(evidenceProgress).toHaveAttribute("aria-valuemin", "0");
+    await expect(evidenceProgress).toHaveAttribute("aria-valuemax", "7");
+    await expect(evidenceProgress).toHaveAttribute("aria-valuenow", "0");
     await expect(page.locator(".launch-check").filter({ hasText: "Atlas live acceptance" }).getByRole("button", { name: "Pass" })).toBeDisabled();
     const launchViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(launchViewport.scrollWidth, `${testInfo.project.name} live acceptance has horizontal overflow`).toBeLessThanOrEqual(launchViewport.width + 1);

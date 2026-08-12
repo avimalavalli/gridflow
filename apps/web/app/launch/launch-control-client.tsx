@@ -233,7 +233,15 @@ export function LaunchControlClient({ initial }: { initial: ReleaseAcceptanceOve
           </div>
           <button className="button button-secondary" type="button" disabled={Boolean(busy)} onClick={refreshEvidence}><RefreshCw size={14} />{busy === "refresh-evidence" ? "Refreshing…" : "Refresh evidence"}</button>
         </div>
-        <div className="launch-live-progress" aria-label={`${data.liveAcceptance.evidenceComplete} of ${data.liveAcceptance.evidenceBoundChecks} live evidence checks complete`}>
+        <div
+          className="launch-live-progress"
+          role="progressbar"
+          aria-label="Live integration evidence completion"
+          aria-valuemin={0}
+          aria-valuemax={data.liveAcceptance.evidenceBoundChecks}
+          aria-valuenow={data.liveAcceptance.evidenceComplete}
+          aria-valuetext={`${data.liveAcceptance.evidenceComplete} of ${data.liveAcceptance.evidenceBoundChecks} live evidence checks complete`}
+        >
           <span style={{ width: `${data.liveAcceptance.evidenceBoundChecks ? (data.liveAcceptance.evidenceComplete / data.liveAcceptance.evidenceBoundChecks) * 100 : 0}%` }} />
         </div>
         <div className="safety-strip">

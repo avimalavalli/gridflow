@@ -20,6 +20,7 @@ const MIGRATIONS = [
   "20260809190000_guided_product_experience",
   "20260809220000_automation_cockpit",
   "20260810010000_phase_7a_seal",
+  "20260812070000_phase_7b_delivery_os",
 ] as const;
 
 export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {

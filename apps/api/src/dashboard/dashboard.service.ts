@@ -64,7 +64,7 @@ export class DashboardService {
 
   async summary(tenantId: string): Promise<DashboardSnapshot> {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, forge, failures, meetings, opportunityStages, activity] = await Promise.all([
+      const [metrics, tasks, sentinel, outreach, pulse, nova, orbit, forge, delivery, failures, meetings, opportunityStages, activity] = await Promise.all([
         tx.query<DashboardMetricRow>(
           `SELECT
             (SELECT COUNT(*)::int FROM "Company" WHERE "tenantId"=$1::uuid) AS "companiesDiscovered",
@@ -234,6 +234,20 @@ export class DashboardService {
           [tenantId],
         ),
         tx.query<ActionRow>(
+          `SELECT p."id",'DELIVERY' AS "kind",
+                  CASE WHEN p."status"='SETUP' THEN 'Schedule delivery for '||co."companyName"
+                       WHEN p."renewalStatus"='DUE' THEN 'Review renewal with '||co."companyName"
+                       WHEN EXISTS (SELECT 1 FROM "DeliveryObligation" x WHERE x."programmeId"=p."id" AND x."tenantId"=p."tenantId" AND x."status"='DELIVERED') THEN 'Verify delivery evidence for '||co."companyName"
+                       ELSE 'Protect partnership delivery for '||co."companyName" END AS "title",
+                  c."title" AS "detail",COALESCE(p."renewalReviewDate"::timestamptz,p."updatedAt") AS "dueAt",'/delivery/'||p."id" AS "href",
+                  CASE WHEN EXISTS (SELECT 1 FROM "DeliveryObligation" x WHERE x."programmeId"=p."id" AND x."tenantId"=p."tenantId" AND x."status" IN ('OVERDUE','BLOCKED')) THEN 'OVERDUE'
+                       WHEN p."status"='SETUP' OR p."renewalStatus"='DUE' OR EXISTS (SELECT 1 FROM "DeliveryObligation" x WHERE x."programmeId"=p."id" AND x."tenantId"=p."tenantId" AND x."status"='DELIVERED') THEN 'REVIEW' ELSE 'UPCOMING' END AS "urgency"
+           FROM "DeliveryProgramme" p JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+           WHERE p."tenantId"=$1::uuid AND p."status" NOT IN ('COMPLETED','CLOSED') AND (p."status" IN ('SETUP','AT_RISK') OR p."renewalStatus"='DUE' OR EXISTS (SELECT 1 FROM "DeliveryObligation" x WHERE x."programmeId"=p."id" AND x."tenantId"=p."tenantId" AND x."status"='DELIVERED'))
+           ORDER BY CASE WHEN p."status"='AT_RISK' THEN 0 WHEN p."status"='SETUP' THEN 1 ELSE 2 END,p."updatedAt" LIMIT 8`,
+          [tenantId],
+        ),
+        tx.query<ActionRow>(
           `SELECT a."id", 'AGENT_FAILURE' AS "kind", a."agentName"::text || ' needs attention' AS "title",
                   COALESCE(a."errorCode", a."errorDetails", 'Agent run failed') AS "detail", a."updatedAt" AS "dueAt",
                   '/agent-runs' AS "href", 'FAILED' AS "urgency"
@@ -263,7 +277,7 @@ export class DashboardService {
         ),
       ]);
 
-      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...failures.rows]
+      const actions = [...tasks.rows, ...outreach.rows, ...pulse.rows, ...sentinel.rows, ...nova.rows, ...orbit.rows, ...forge.rows, ...delivery.rows, ...failures.rows]
         .sort((a, b) => {
           const order: Record<string, number> = { OVERDUE: 0, FAILED: 0, TODAY: 1, REVIEW: 1, READY: 2, UPCOMING: 3 };
           return (order[a.urgency] ?? 4) - (order[b.urgency] ?? 4);

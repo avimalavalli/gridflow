@@ -140,6 +140,7 @@ export class AutomationService {
           { key: "safe_retry", title: "Self-healing retries", enabled: policy.automaticRetryEnabled, effect: "Requeues eligible failed internal runs inside hard budgets.", guard: `${policy.dailyAgentRunLimit} runs / $${policy.dailyEstimatedCostLimitUsd} daily` },
           { key: "integration_health", title: "Integration monitoring", enabled: policy.integrationMonitoringEnabled, effect: "Surfaces expired and failed provider connections.", guard: "Reconnect requires a human session" },
           { key: "weekly_brief", title: "Weekly outcome brief", enabled: policy.weeklyBriefEnabled, effect: "Summarises pipeline movement, meetings, replies and failures.", guard: "Evidence from live workspace data" },
+          { key: "delivery_guard", title: "Delivery risk guard", enabled: true, effect: "Creates internal tasks for due obligations and renewal reviews.", guard: "Never claims fulfilment or contacts a sponsor" },
         ],
         safeguards: ["LinkedIn sending is always manual", "External messages remain approval-gated", "Bookings and deal-stage changes remain human decisions", "Money and legal content require individual review", "Every automated action is tenant-scoped and auditable"],
         generatedAt: new Date().toISOString(),
@@ -216,7 +217,7 @@ export class AutomationService {
     });
     if (!row) return { id, status: "REJECTED" };
     try {
-      if (["CREATE_STALE_OPPORTUNITY_TASK", "CREATE_MISSING_DATA_TASK", "CREATE_INTEGRATION_TASK"].includes(row.kind)) await this.executeTaskDecision(identity, row);
+      if (["CREATE_STALE_OPPORTUNITY_TASK", "CREATE_MISSING_DATA_TASK", "CREATE_INTEGRATION_TASK", "CREATE_OVERDUE_PAYMENT_TASK", "CREATE_SIGNATURE_FOLLOW_UP_TASK", "CREATE_DELIVERY_FOLLOW_UP_TASK", "CREATE_RENEWAL_REVIEW_TASK"].includes(row.kind)) await this.executeTaskDecision(identity, row);
       else if (row.kind === "RETRY_AGENT_RUN") await (await this.agents()).retryRun(identity.tenantId, identity.userId, String(row.payload.agentRunId));
       else if (row.kind === "START_DISCOVERY_PIPELINE") await (await this.agents()).startPipeline(identity.tenantId, identity.userId, String(row.payload.discoveryBriefId));
       else throw new BadRequestException("This decision type is not executable.");
@@ -283,6 +284,18 @@ export class AutomationService {
         SELECT c."id",'SEAL_ACTIVATION','Activate fully signed contract',c."title"||' · signed evidence required',
           'Activation requires the externally verified signed document and an explicit choice before any opportunity is marked won.','CRITICAL','/seal/'||c."id",c."updatedAt"
         FROM "Contract" c WHERE c."tenantId"=$1::uuid AND c."status"='SIGNED'
+        UNION ALL
+        SELECT ob."id",'DELIVERY_VERIFY','Verify delivered obligation',co."companyName"||' · '||ob."title",
+          'Open every evidence link before verification. GridFlow never treats an upload as proof by itself.','HIGH','/delivery/'||p."id",ob."updatedAt"
+        FROM "DeliveryObligation" ob JOIN "DeliveryProgramme" p ON p."id"=ob."programmeId" AND p."tenantId"=ob."tenantId"
+        JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+        WHERE ob."tenantId"=$1::uuid AND ob."status"='DELIVERED'
+        UNION ALL
+        SELECT r."id",'DELIVERY_REPORT','Approve delivery report',co."companyName"||' · report #'||r."reportNumber"::text,
+          'The report is an immutable snapshot of recorded evidence. Approval does not send it.','HIGH','/delivery/'||p."id",r."updatedAt"
+        FROM "DeliveryReport" r JOIN "DeliveryProgramme" p ON p."id"=r."programmeId" AND p."tenantId"=r."tenantId"
+        JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+        WHERE r."tenantId"=$1::uuid AND r."status"='DRAFT'
         UNION ALL
         SELECT ar."id",'AGENT_QUALITY','Accept or tune '||ar."agentName"::text,COALESCE(c."companyName",db."briefName",'Completed agent result'),
           'Review the evidence and automated quality report before trusting this output.','MEDIUM','/agent-runs/'||ar."id",ar."createdAt"

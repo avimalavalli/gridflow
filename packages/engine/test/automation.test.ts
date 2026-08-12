@@ -80,6 +80,27 @@ describe("AutomationControlEngine", () => {
     expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
   });
 
+  it("raises delivery and renewal risks as idempotent internal tasks without claiming fulfilment", async () => {
+    const { tenantId, userId } = await seed("ASSISTED");
+    const opportunity = await database!.query<{ id: string; companyId: string }>(`SELECT "id","companyId" FROM "Opportunity" WHERE "tenantId"=$1::uuid LIMIT 1`, [tenantId]);
+    const contract = await database!.query<{ id: string }>(`INSERT INTO "Contract" ("tenantId","companyId","opportunityId","contractNumber","title","status","valueMinor","currency","startDate","endDate","createdByUserId","updatedAt") VALUES ($1::uuid,$2::uuid,$3::uuid,'GF-DELIVERY-AUTO','Apex delivery agreement','ACTIVE',100000,'GBP','2026-01-01','2026-12-31',$4::uuid,CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, opportunity.rows[0]!.companyId, opportunity.rows[0]!.id, userId]);
+    const version = await database!.query<{ id: string }>(`INSERT INTO "ContractVersion" ("tenantId","contractId","versionNumber","terms","checksumSha256","createdByUserId") VALUES ($1::uuid,$2::uuid,1,'{}'::jsonb,$3,$4::uuid) RETURNING "id"`, [tenantId, contract.rows[0]!.id, "b".repeat(64), userId]);
+    await database!.query(`UPDATE "Contract" SET "currentVersionId"=$2::uuid WHERE "id"=$1::uuid`, [contract.rows[0]!.id, version.rows[0]!.id]);
+    const programme = await database!.query<{ id: string }>(`INSERT INTO "DeliveryProgramme" ("tenantId","contractId","contractVersionId","status","deliveryStartDate","deliveryEndDate","renewalReviewDate","activatedAt","updatedAt") VALUES ($1::uuid,$2::uuid,$3::uuid,'ACTIVE','2026-01-01','2026-12-31','2026-08-01',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, contract.rows[0]!.id, version.rows[0]!.id]);
+    const obligation = await database!.query<{ id: string }>(`INSERT INTO "DeliveryObligation" ("tenantId","programmeId","sequence","title","category","status","dueDate","updatedAt") VALUES ($1::uuid,$2::uuid,1,'Publish verified race report','REPORTING','IN_PROGRESS','2026-08-01',CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId, programme.rows[0]!.id]);
+    const engine = new AutomationControlEngine(database!);
+    await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-12T08:00:00Z") });
+    await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-12T08:05:00Z") });
+    const tasks = await database!.query<{ automationKey: string }>(`SELECT "automationKey" FROM "Task" WHERE "tenantId"=$1::uuid AND "automationKey" LIKE 'delivery-%' ORDER BY "automationKey"`, [tenantId]);
+    expect(tasks.rows).toHaveLength(2);
+    expect(tasks.rows.some((row) => row.automationKey.includes("delivery-obligation"))).toBe(true);
+    expect(tasks.rows.some((row) => row.automationKey.includes("delivery-renewal"))).toBe(true);
+    const state = await database!.query<{ status: string }>(`SELECT "status"::text AS "status" FROM "DeliveryObligation" WHERE "id"=$1::uuid`, [obligation.rows[0]!.id]);
+    expect(state.rows[0]?.status).toBe("OVERDUE");
+    expect((await database!.query(`SELECT 1 FROM "DeliveryEvidence" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+    expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+  });
+
   it("self-heals an eligible Controlled-mode failure inside every configured budget", async () => {
     const { tenantId } = await seed("CONTROLLED");
     const run = await database!.query<{ id: string }>(

@@ -479,6 +479,61 @@ enum PaymentMilestoneStatus {
   DISPUTED
 }
 
+enum DeliveryProgrammeStatus {
+  SETUP
+  ACTIVE
+  AT_RISK
+  COMPLETED
+  CLOSED
+}
+
+enum DeliveryObligationStatus {
+  PLANNED
+  READY
+  IN_PROGRESS
+  DELIVERED
+  VERIFIED
+  BLOCKED
+  WAIVED
+  OVERDUE
+}
+
+enum DeliveryObligationCategory {
+  BRANDING
+  CONTENT
+  SOCIAL_MEDIA
+  EVENT
+  HOSPITALITY
+  APPEARANCE
+  REPORTING
+  MEDIA_VALUE
+  OTHER
+}
+
+enum DeliveryEvidenceType {
+  URL
+  DOCUMENT
+  IMAGE
+  VIDEO
+  ANALYTICS
+  APPROVAL
+  OTHER
+}
+
+enum DeliveryReportStatus {
+  DRAFT
+  APPROVED
+  SHARED
+}
+
+enum DeliveryRenewalStatus {
+  NOT_STARTED
+  DUE
+  IN_PROGRESS
+  RENEWED
+  DECLINED
+}
+
 enum OpportunityStage {
   INTERESTED
   DISCOVERY_CALL
@@ -508,6 +563,7 @@ enum TaskType {
   PROPOSAL
   DATA_REVIEW
   AUTOMATION_RETRY
+  DELIVERY
 }
 
 enum MeetingStatus {
@@ -648,6 +704,11 @@ model User {
   contractVersionsCreated ContractVersion[] @relation("ContractVersionCreatedBy")
   contractSignaturesRecorded ContractSigner[] @relation("ContractSignerRecordedBy")
   contractPaymentsRecorded PaymentMilestone[] @relation("PaymentMilestoneRecordedBy")
+  deliveryEvidenceCreated DeliveryEvidence[] @relation("DeliveryEvidenceCreatedBy")
+  deliveryEvidenceVerified DeliveryEvidence[] @relation("DeliveryEvidenceVerifiedBy")
+  deliveryReportsGenerated DeliveryReport[] @relation("DeliveryReportGeneratedBy")
+  deliveryReportsApproved DeliveryReport[] @relation("DeliveryReportApprovedBy")
+  deliveryReportsShared DeliveryReport[] @relation("DeliveryReportSharedBy")
 }
 
 model Organisation {
@@ -710,6 +771,10 @@ model Organisation {
   contractVersions ContractVersion[]
   contractSigners ContractSigner[]
   paymentMilestones PaymentMilestone[]
+  deliveryProgrammes DeliveryProgramme[]
+  deliveryObligations DeliveryObligation[]
+  deliveryEvidence DeliveryEvidence[]
+  deliveryReports DeliveryReport[]
 }
 
 model ActivationGrant {
@@ -1805,6 +1870,7 @@ model Contract {
   versions              ContractVersion[] @relation("ContractVersions")
   signers               ContractSigner[]
   paymentMilestones     PaymentMilestone[]
+  deliveryProgramme     DeliveryProgramme?
 
   @@unique([tenantId, contractNumber])
   @@index([tenantId, status, updatedAt])
@@ -1823,6 +1889,7 @@ model ContractVersion {
   tenant                 Organisation @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contract               Contract     @relation("ContractVersions", fields: [contractId], references: [id], onDelete: Cascade)
   currentFor             Contract?    @relation("CurrentContractVersion")
+  deliveryProgrammes     DeliveryProgramme[]
   createdBy              User?        @relation("ContractVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([contractId, versionNumber])
@@ -1883,6 +1950,113 @@ model PaymentMilestone {
 
   @@unique([contractId, sequence])
   @@index([tenantId, status, dueDate])
+}
+
+model DeliveryProgramme {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  tenantId              String                    @db.Uuid
+  contractId            String                    @unique @db.Uuid
+  contractVersionId     String                    @db.Uuid
+  status                DeliveryProgrammeStatus   @default(SETUP)
+  internalOwner         String?
+  deliveryStartDate     DateTime                  @db.Date
+  deliveryEndDate       DateTime                  @db.Date
+  renewalReviewDate     DateTime?                 @db.Date
+  renewalStatus         DeliveryRenewalStatus     @default(NOT_STARTED)
+  activatedAt           DateTime?                 @db.Timestamptz(3)
+  completedAt           DateTime?                 @db.Timestamptz(3)
+  closedAt              DateTime?                 @db.Timestamptz(3)
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                  @updatedAt @db.Timestamptz(3)
+  tenant                Organisation              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contract              Contract                  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractVersion       ContractVersion           @relation(fields: [contractVersionId], references: [id], onDelete: Restrict)
+  obligations           DeliveryObligation[]
+  reports               DeliveryReport[]
+
+  @@index([tenantId, status, updatedAt])
+  @@index([tenantId, renewalStatus, renewalReviewDate])
+}
+
+model DeliveryObligation {
+  id                    String                     @id @default(uuid()) @db.Uuid
+  tenantId              String                     @db.Uuid
+  programmeId           String                     @db.Uuid
+  sequence              Int
+  title                 String
+  description           String?
+  category              DeliveryObligationCategory @default(OTHER)
+  sourceReference       String?
+  status                DeliveryObligationStatus    @default(PLANNED)
+  dueDate               DateTime?                   @db.Date
+  proofRequired         Boolean                     @default(true)
+  deliveredAt           DateTime?                   @db.Timestamptz(3)
+  verifiedAt            DateTime?                   @db.Timestamptz(3)
+  verifiedByUserId      String?                     @db.Uuid
+  blockedReason         String?
+  waivedReason          String?
+  completionNote        String?
+  createdAt             DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                    @updatedAt @db.Timestamptz(3)
+  tenant                Organisation                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme             DeliveryProgramme           @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  evidence              DeliveryEvidence[]
+
+  @@unique([programmeId, sequence])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, programmeId, sequence])
+}
+
+model DeliveryEvidence {
+  id                    String               @id @default(uuid()) @db.Uuid
+  tenantId              String               @db.Uuid
+  obligationId          String               @db.Uuid
+  type                  DeliveryEvidenceType @default(URL)
+  title                 String
+  evidenceUrl           String
+  occurredAt            DateTime             @db.Timestamptz(3)
+  notes                 String?
+  createdByUserId       String                @db.Uuid
+  verifiedAt            DateTime?             @db.Timestamptz(3)
+  verifiedByUserId      String?               @db.Uuid
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
+  tenant                Organisation          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  obligation            DeliveryObligation    @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  createdBy             User                  @relation("DeliveryEvidenceCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  verifiedBy            User?                 @relation("DeliveryEvidenceVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, obligationId, occurredAt])
+  @@index([tenantId, verifiedAt])
+}
+
+model DeliveryReport {
+  id                    String               @id @default(uuid()) @db.Uuid
+  tenantId              String               @db.Uuid
+  programmeId           String               @db.Uuid
+  reportNumber          Int
+  periodStart           DateTime             @db.Date
+  periodEnd             DateTime             @db.Date
+  status                DeliveryReportStatus @default(DRAFT)
+  snapshot              Json
+  checksumSha256        String
+  generatedByUserId     String               @db.Uuid
+  approvedAt            DateTime?            @db.Timestamptz(3)
+  approvedByUserId      String?              @db.Uuid
+  sharedAt              DateTime?            @db.Timestamptz(3)
+  sharedByUserId        String?               @db.Uuid
+  sharedUrl             String?
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+  tenant                Organisation         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme             DeliveryProgramme    @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  generatedBy           User                 @relation("DeliveryReportGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+  approvedBy            User?                @relation("DeliveryReportApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  sharedBy              User?                @relation("DeliveryReportSharedBy", fields: [sharedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([programmeId, reportNumber])
+  @@index([tenantId, programmeId, createdAt])
+  @@index([tenantId, status, updatedAt])
 }
 
 model ProposalVersion {

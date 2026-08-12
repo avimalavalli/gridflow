@@ -99,6 +99,10 @@ export class AutomationService {
              UNION ALL
              SELECT ia."id",'INTEGRATION',ia."provider"::text||' needs attention',ia."errorDetails",'/settings',ia."updatedAt"
              FROM "IntegrationAccount" ia WHERE ia."tenantId"=$1::uuid AND ia."status" IN ('ERROR','EXPIRED')
+             UNION ALL
+             SELECT pm."id",'PAYMENT','Payment milestone overdue',c."title"||' · '||pm."title",'/seal/'||c."id",pm."updatedAt"
+             FROM "PaymentMilestone" pm JOIN "Contract" c ON c."id"=pm."contractId" AND c."tenantId"=pm."tenantId"
+             WHERE pm."tenantId"=$1::uuid AND pm."status" NOT IN ('PAID','WAIVED','DISPUTED') AND pm."dueDate"<CURRENT_DATE
            ) issues ORDER BY "occurredAt" DESC LIMIT 30`, [identity.tenantId]),
         tx.query<EventRow>(
           `SELECT "id","triggerKey","outcome"::text AS "outcome","mode"::text AS "mode","explanation","createdAt"
@@ -271,6 +275,14 @@ export class AutomationService {
         SELECT p."id",'FORGE','Review proposal terms',p."title"||' · commercial approval',
           'Pricing, rights and legal wording require individual review. Approval never sends the proposal.','CRITICAL','/forge/'||p."id",p."updatedAt"
         FROM "Proposal" p WHERE p."tenantId"=$1::uuid AND p."status"='READY' AND p."reviewedAt" IS NULL
+        UNION ALL
+        SELECT c."id",'SEAL','Review contract terms',c."title"||' · legal and payment approval',
+          'Contract terms, signers and payment milestones require individual owner review. Approval never signs or sends the agreement.','CRITICAL','/seal/'||c."id",c."updatedAt"
+        FROM "Contract" c WHERE c."tenantId"=$1::uuid AND c."status"='IN_REVIEW'
+        UNION ALL
+        SELECT c."id",'SEAL_ACTIVATION','Activate fully signed contract',c."title"||' · signed evidence required',
+          'Activation requires the externally verified signed document and an explicit choice before any opportunity is marked won.','CRITICAL','/seal/'||c."id",c."updatedAt"
+        FROM "Contract" c WHERE c."tenantId"=$1::uuid AND c."status"='SIGNED'
         UNION ALL
         SELECT ar."id",'AGENT_QUALITY','Accept or tune '||ar."agentName"::text,COALESCE(c."companyName",db."briefName",'Completed agent result'),
           'Review the evidence and automated quality report before trusting this output.','MEDIUM','/agent-runs/'||ar."id",ar."createdAt"

@@ -54,7 +54,7 @@ export default function WelcomePage() {
         <div className="welcome-copy">
           <span className="welcome-kicker"><Sparkles size={14}/> Your commercial operating system</span>
           <h1>Welcome to GridFlow, {name}.</h1>
-          <p>GridFlow turns sponsor discovery, research, outreach, replies, meetings and proposals into one guided workflow. The repetitive work is automated; important commercial decisions stay yours.</p>
+          <p>GridFlow turns sponsor discovery, research, outreach, replies, meetings, proposals, contracts and payments into one guided workflow. The repetitive work is automated; important commercial decisions stay yours.</p>
           <div className="welcome-actions">
             <button className="button button-primary button-large" type="button" disabled={saving} onClick={begin}>{saving ? "Preparing your workspace…" : "Set up my GridFlow"}<ArrowRight size={16}/></button>
             <Link className="button button-secondary button-large" href="/help">Read the user manual</Link>
@@ -83,7 +83,7 @@ export default function WelcomePage() {
 
       <section className="welcome-grid">
         <article className="card welcome-detail"><span className="welcome-detail-icon auto"><Bot size={19}/></span><h3>GridFlow handles</h3><p>Research orchestration, scoring, contact discovery, first drafts, follow-up timing, reply classification, meeting preparation, proposal preparation and safe internal automation.</p></article>
-        <article className="card welcome-detail"><span className="welcome-detail-icon human"><Hand size={19}/></span><h3>You decide</h3><p>Which markets to pursue, which companies are worth contacting, whether a message is right, when a deal becomes real and what proposal leaves the business.</p></article>
+        <article className="card welcome-detail"><span className="welcome-detail-icon human"><Hand size={19}/></span><h3>You decide</h3><p>Which markets to pursue, which companies are worth contacting, what leaves the business, and every legal, signature, payment or deal-stage decision.</p></article>
       </section>
     </Shell>
   );

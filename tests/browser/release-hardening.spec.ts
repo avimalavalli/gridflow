@@ -79,5 +79,11 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     const cockpitViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(cockpitViewport.scrollWidth, `${testInfo.project.name} automation cockpit has horizontal overflow`).toBeLessThanOrEqual(cockpitViewport.width + 1);
     await expectNoWcagViolations(page);
+    await page.goto("/seal");
+    await expect(page.getByRole("heading", { name: "Turn a negotiated deal into signed, collectable revenue" })).toBeVisible();
+    await expect(page.getByText("No contracts in this view.")).toBeVisible();
+    const sealViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(sealViewport.scrollWidth, `${testInfo.project.name} Seal cockpit has horizontal overflow`).toBeLessThanOrEqual(sealViewport.width + 1);
+    await expectNoWcagViolations(page);
   }
 });

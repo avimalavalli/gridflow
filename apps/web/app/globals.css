@@ -801,7 +801,7 @@ tbody tr:last-child td { border-bottom: 0; }
 /* Phase 5: Forge proposal intelligence */
 .grid-6 { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
 .forge-principles { margin-top:-4px; }
-.forge-principles .system-chip { width:100%; min-height:54px; color:#dcecff; }
+.forge-principles .system-chip { width:100%; min-height:54px; color:#dcecff; background:linear-gradient(135deg,#102f55,#174d84); }\n.forge-principles .system-chip small { color:#e4edf7; }
 .forge-principles .forge-safe { background:linear-gradient(135deg,#153f36,#1d5d50); }
 .forge-metrics .metric-card { min-height:92px; }
 .forge-brief-card { border-color:#c9dcf4; background:linear-gradient(155deg,#f8fbff,#fff 38%); }
@@ -812,6 +812,11 @@ tbody tr:last-child td { border-bottom: 0; }
 .forge-row:hover { border-color:#a9cdf8; transform:translateY(-1px); box-shadow:0 11px 28px rgba(30,80,130,.09); }
 .forge-row .queue-meta { display:flex; align-items:center; gap:10px; }
 .forge-error { color:var(--red)!important; }
+.seal-fieldset { margin:0; padding:14px; border:1px solid var(--line); border-radius:12px; }
+.seal-fieldset legend { padding:0 7px; color:var(--muted); font-size:10px; font-weight:750; letter-spacing:.06em; text-transform:uppercase; }
+.seal-payment { padding:14px; box-shadow:none; }
+.seal-activate { border-color:color-mix(in srgb,var(--green) 40%,var(--line)); }
+.danger-zone { border-color:color-mix(in srgb,var(--red) 35%,var(--line)); }
 .forge-review-layout { grid-template-columns:minmax(0,1.6fr) minmax(270px,.4fr); align-items:start; }
 .forge-editor textarea { min-height:110px; }
 .forge-package-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }

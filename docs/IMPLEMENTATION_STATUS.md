@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 6.1
+# GridFlow implementation status — Phase 7A Seal
 
 ## Built and verified
 
@@ -23,12 +23,15 @@
 - **Meeting OS** with scheduled/completed/cancelled/no-show lifecycle, reasoned transitions, automatic Orbit preparation, visible debrief backlog and approved post-meeting updates.
 - **Unified calendar** combining meetings, open task deadlines and active expected-close dates in desktop month and mobile agenda views.
 - Tenant-safe relationship validation and mutation audits across opportunities, tasks and meetings.
+- **Seal contract control** with immutable checksummed versions, legal review gates, externally verified signer status, signed-document evidence, explicit activation and reasoned termination.
+- Currency-safe payment milestones with invoice/bank verification, overdue detection and cash-control reporting.
+- Automated internal signature and overdue-payment risk tasks that never contact a counterparty or alter legal/financial truth.
 
 ## Validation result
 
-- 99 automated tests passed across 42 files.
+- 114 automated tests passed across 47 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 55 models and 14 registered migrations.
+- Database schema check passed: 66 models and 18 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 

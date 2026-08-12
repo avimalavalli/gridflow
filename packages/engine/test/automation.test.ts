@@ -55,6 +55,31 @@ describe("AutomationControlEngine", () => {
     expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
   });
 
+  it("turns an overdue Seal milestone into one internal verification task without changing money or contacting anyone", async () => {
+    const { tenantId, userId } = await seed("ASSISTED");
+    const opportunity = await database!.query<{ id: string; companyId: string }>(`SELECT "id","companyId" FROM "Opportunity" WHERE "tenantId"=$1::uuid LIMIT 1`, [tenantId]);
+    const contract = await database!.query<{ id: string }>(
+      `INSERT INTO "Contract" ("tenantId","companyId","opportunityId","contractNumber","title","status","valueMinor","currency","startDate","endDate","createdByUserId","updatedAt")
+       VALUES ($1::uuid,$2::uuid,$3::uuid,'GF-SEAL-TEST','Apex verified agreement','ACTIVE',100000,'GBP','2026-01-01','2026-12-31',$4::uuid,CURRENT_TIMESTAMP) RETURNING "id"`,
+      [tenantId, opportunity.rows[0]!.companyId, opportunity.rows[0]!.id, userId],
+    );
+    const milestone = await database!.query<{ id: string }>(
+      `INSERT INTO "PaymentMilestone" ("tenantId","contractId","title","sequence","amountMinor","amountPaidMinor","currency","dueDate","status","updatedAt")
+       VALUES ($1::uuid,$2::uuid,'Launch instalment',1,100000,0,'GBP','2026-08-01','DUE',CURRENT_TIMESTAMP) RETURNING "id"`,
+      [tenantId, contract.rows[0]!.id],
+    );
+    const engine = new AutomationControlEngine(database!);
+    const first = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:00:00Z") });
+    const second = await engine.reconcileTenant(tenantId, { force: true, now: new Date("2026-08-10T08:05:00Z") });
+    expect(first.tasksCreated).toBe(3);
+    expect(second.tasksCreated).toBe(0);
+    const task = await database!.query<{ title: string }>(`SELECT "title" FROM "Task" WHERE "tenantId"=$1::uuid AND "automationKey" LIKE 'seal-payment:%'`, [tenantId]);
+    expect(task.rows[0]?.title).toBe("Verify overdue payment from Apex Sponsor");
+    const money = await database!.query<{ status: string; amountPaidMinor: number }>(`SELECT "status"::text AS "status","amountPaidMinor" FROM "PaymentMilestone" WHERE "id"=$1::uuid`, [milestone.rows[0]!.id]);
+    expect(money.rows[0]).toEqual({ status: "DUE", amountPaidMinor: 0 });
+    expect((await database!.query(`SELECT 1 FROM "ChannelAction" WHERE "tenantId"=$1::uuid`, [tenantId])).rows).toHaveLength(0);
+  });
+
   it("self-heals an eligible Controlled-mode failure inside every configured budget", async () => {
     const { tenantId } = await seed("CONTROLLED");
     const run = await database!.query<{ id: string }>(

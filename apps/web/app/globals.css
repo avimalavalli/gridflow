@@ -801,7 +801,7 @@ tbody tr:last-child td { border-bottom: 0; }
 /* Phase 5: Forge proposal intelligence */
 .grid-6 { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
 .forge-principles { margin-top:-4px; }
-.forge-principles .system-chip { width:100%; min-height:54px; color:#dcecff; }
+.forge-principles .system-chip { width:100%; min-height:54px; color:#dcecff; background:linear-gradient(135deg,#102f55,#174d84); }\n.forge-principles .system-chip small { color:#e4edf7; }
 .forge-principles .forge-safe { background:linear-gradient(135deg,#153f36,#1d5d50); }
 .forge-metrics .metric-card { min-height:92px; }
 .forge-brief-card { border-color:#c9dcf4; background:linear-gradient(155deg,#f8fbff,#fff 38%); }

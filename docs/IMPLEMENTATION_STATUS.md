@@ -1,6 +1,10 @@
-# GridFlow implementation status — Phase 8A Live Integration Acceptance
+# GridFlow implementation status — Phase 8B Commercial Launch Layer
 
 ## Built and verified
+
+- **Public commercial experience** with product, pricing, support and private receipt surfaces that remain useful when the API or checkout provider is unavailable.
+- **Owner-configured Core and Ultra catalogue** that refuses to publish incomplete prices, currencies or checkout destinations.
+- **Auditable purchase fulfilment** with signed replay-safe payment events, exact order matching, mismatch quarantine, token-bound receipts, email delivery and a provider-independent manual fallback.
 
 - Multi-athlete organisations, roles, invitations and isolated data.
 - Athlete onboarding, personalised markets, outreach policy and Discovery Briefs.
@@ -40,13 +44,13 @@
 
 ## Validation result
 
-- 128 automated tests passed across 51 files.
+- 134 automated tests passed across 52 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 71 models and 22 registered migrations.
+- Database schema check passed: 73 models and 23 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The ten-case, five-profile browser specification covers Phase 7D refinement plus Phase 8A evidence visibility, blocked-PASS behaviour, responsive overflow and WCAG checks. Local execution remains pending because this workspace does not have the pinned browser binaries; CI must provide the browser acceptance evidence before Phase 8A is published.
+- The eleven-case, five-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility and Phase 8B public product/pricing/support/receipt behaviour, plus responsive overflow and WCAG checks. Local execution remains pending because this workspace does not have the pinned browser binaries; CI must provide browser acceptance evidence before Phase 8B is published.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 

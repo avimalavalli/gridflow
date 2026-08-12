@@ -39,6 +39,14 @@ class FakeDatabase {
     this.row.template = "NEW_DEVICE";
     this.row.payload = { deviceName: "Chrome on Windows", ipAddress: "203.0.113.4", signedInAt: "2026-08-09T10:00:00.000Z" } as typeof this.row.payload;
   }
+  setPurchase() {
+    this.row.template = "PURCHASE_FULFILMENT";
+    this.row.payload = {
+      plan: "CORE", amountMinor: 12500, currency: "GBP", receiptNumber: "GFR-2026-ABC123",
+      activationUrl: "https://app.gridflow.test/signup#activation=secret", activationExpiresAt: "2026-08-19T10:00:00.000Z",
+      receiptUrl: "https://app.gridflow.test/receipt#number=GFR-2026-ABC123&token=secret",
+    } as typeof this.row.payload;
+  }
 }
 
 afterEach(() => {
@@ -84,5 +92,16 @@ describe("GridFlow auth email outbox", () => {
 
     expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
     expect(log).toHaveBeenCalledWith(expect.stringContaining("New device signed in to GridFlow"));
+  });
+
+  it("delivers the activation and payment receipt without exposing them to logs in production", async () => {
+    process.env.AUTH_MAIL_PROVIDER = "CONSOLE";
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const database = new FakeDatabase();
+    database.setPurchase();
+    const processor = new AuthEmailProcessor(database as never);
+
+    expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("Your GridFlow Core activation and receipt"));
   });
 });

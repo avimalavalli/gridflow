@@ -4,11 +4,23 @@ import { HealthController } from "../src/health/health.controller.js";
 import { PublicOperationalException } from "../src/observability.js";
 
 const originalConfig = { ...apiConfig };
-const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY"] as const;
+const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "COMMERCE_CORE_PRICE_MINOR", "COMMERCE_CORE_CURRENCY", "COMMERCE_CORE_PAYMENT_PROVIDER", "COMMERCE_CORE_CHECKOUT_URL", "COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_ULTRA_CURRENCY", "COMMERCE_ULTRA_PAYMENT_PROVIDER", "COMMERCE_ULTRA_CHECKOUT_URL", "COMMERCE_SUPPORT_EMAIL", "PAYMENT_CONFIRMATION_SECRET"] as const;
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 
 function proof(fresh: boolean) {
   return { fresh, recordedAt: fresh ? new Date() : null, sourceUrl: null, runId: null, commitSha: null, ageMinutes: fresh ? 0 : null, detail: fresh ? "fresh" : "missing" };
+}
+
+function configureProductionDependencies() {
+  for (const key of envKeys.slice(0, 6)) process.env[key] = key === "INTEGRATION_ENCRYPTION_KEY" ? "b".repeat(32) : "configured";
+  for (const plan of ["CORE", "ULTRA"]) {
+    process.env[`COMMERCE_${plan}_PRICE_MINOR`] = "10000";
+    process.env[`COMMERCE_${plan}_CURRENCY`] = "GBP";
+    process.env[`COMMERCE_${plan}_PAYMENT_PROVIDER`] = "test-provider";
+    process.env[`COMMERCE_${plan}_CHECKOUT_URL`] = "https://pay.test/checkout?reference={ORDER_REFERENCE}";
+  }
+  process.env.COMMERCE_SUPPORT_EMAIL = "support@gridflow.test";
+  process.env.PAYMENT_CONFIRMATION_SECRET = "p".repeat(32);
 }
 
 afterEach(() => {
@@ -22,7 +34,7 @@ afterEach(() => {
 describe("HealthController readiness", () => {
   it("returns a structured 503 naming a missing monitor proof", async () => {
     Object.assign(apiConfig, { nodeEnv: "production", devBootstrap: false, secureCookies: true, authEncryptionKey: "a".repeat(32), authMailProvider: "RESEND", resendApiKey: "resend", authFromEmail: "GridFlow <test@app.test>" });
-    for (const key of envKeys) process.env[key] = key === "INTEGRATION_ENCRYPTION_KEY" ? "b".repeat(32) : "configured";
+    configureProductionDependencies();
     const controller = new HealthController(
       { ping: async () => ({ database: "ok", kind: "pglite" }) } as never,
       { status: async () => ({ configured: true, monitor: proof(false), backup: proof(true) }) } as never,
@@ -41,7 +53,7 @@ describe("HealthController readiness", () => {
 
   it("reports ready only when every production dependency and proof is healthy", async () => {
     Object.assign(apiConfig, { nodeEnv: "production", devBootstrap: false, secureCookies: true, authEncryptionKey: "a".repeat(32), authMailProvider: "RESEND", resendApiKey: "resend", authFromEmail: "GridFlow <test@app.test>" });
-    for (const key of envKeys) process.env[key] = key === "INTEGRATION_ENCRYPTION_KEY" ? "b".repeat(32) : "configured";
+    configureProductionDependencies();
     const controller = new HealthController(
       { ping: async () => ({ database: "ok", kind: "postgres" }) } as never,
       { status: async () => ({ configured: true, monitor: proof(true), backup: proof(true) }) } as never,

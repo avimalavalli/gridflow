@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service.js";
-import { apiConfig } from "../config.js";
+import { apiConfig, commercialLaunchConfigured } from "../config.js";
 import { currentReleaseCommit, currentReleaseVersion } from "../release-metadata.js";
 import { OperationsProofsService } from "../operations-proofs/operations-proofs.service.js";
 import { PublicOperationalException } from "../observability.js";
@@ -41,6 +41,7 @@ export class HealthController {
       agentProvider: !production || Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_AGENT_MODEL?.trim()),
       gmailOAuth: !production || Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID?.trim() && process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim() && process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() && process.env.INTEGRATION_ENCRYPTION_KEY?.trim()),
       passwordRecovery: !production || (apiConfig.authMailProvider === "RESEND" && Boolean(apiConfig.resendApiKey) && Boolean(apiConfig.authFromEmail)),
+      commercialLaunch: !production || commercialLaunchConfigured(),
       productionMonitoring: !production || proofStatus?.monitor.fresh === true,
       backupRestore: !production || proofStatus?.backup.fresh === true,
     };

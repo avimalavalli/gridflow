@@ -2,9 +2,9 @@
 
 Phase 7D closes the main authenticated V1 product scope. The remaining path should increase real-world confidence and launchability, not restart feature expansion.
 
-## Phase 8A — Live integration acceptance
+## Phase 8A — Live integration acceptance — built
 
-Phase 8A is now the active phase. GridFlow binds each acceptance result to real records created after the deployed commit starts its evidence window.
+Phase 8A is built. GridFlow binds each acceptance result to real records created after the deployed commit starts its evidence window; release-owned provider acceptance remains an operational requirement before feature freeze.
 
 1. Create release-owned OpenAI, Google Cloud/Gmail and Resend accounts; never place their secrets in source control, chat, screenshots or acceptance notes.
 2. Configure production secrets through the hosting provider and confirm the automated configuration gates in Launch Control.
@@ -14,12 +14,14 @@ Phase 8A is now the active phase. GridFlow binds each acceptance result to real 
 6. Refresh Launch Control. Evidence-bound checks cannot record PASS until their complete internal evidence chains exist.
 7. Confirm signed monitoring and backup/restore proof remain fresh before Phase 8A closes.
 
-## Phase 8B — Commercial launch layer
+## Phase 8B — Commercial launch layer — built
 
 1. Build the public product, pricing and support surfaces around the finished app.
 2. Connect payment confirmation to the existing email-bound Core and renewable Ultra activation flow.
 3. Add receipts, failed-payment/manual-review handling and an auditable platform-owner fulfilment path.
 4. Keep the app usable through manual activation if the payment provider is unavailable.
+
+Implemented in `docs/PHASE_8B_COMMERCIAL_LAUNCH_LAYER.md`. Live prices, the selected provider account and its checkout/payment-adapter configuration remain release-owner acceptance inputs; the application does not invent them.
 
 ## Phase 8C — Acceptance and feature freeze
 

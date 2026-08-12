@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 7B Delivery OS
+# GridFlow implementation status — Phase 7C Renewals
 
 ## Built and verified
 
@@ -29,12 +29,15 @@
 - **Delivery OS** with automatic active-contract handover, immutable signed-version anchoring, real-deadline planning, category-aware obligation tracking and completion gates.
 - Secure fulfilment evidence with independent reviewer verification, checksummed sponsor-report snapshots, explicit external-sharing records and a controlled renewal runway.
 - Automated internal obligation and renewal risk tasks that never claim fulfilment, contact a sponsor or choose a commercial outcome.
+- **Renewal OS** with deterministic delivery-health snapshots, human-recorded sponsor sentiment, explicit commercial intent and freshness-checked approval.
+- Idempotent handoff of approved renewals into exactly one existing Opportunity OS record and one internal next action, with no automated external contact or invented win probability.
+- Renewal outcome synchronisation when the linked opportunity is won, lost or reopened, backed by tenant-safe audit history.
 
 ## Validation result
 
-- 118 automated tests passed across 48 files.
+- 121 automated tests passed across 49 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 70 models and 19 registered migrations.
+- Database schema check passed: 71 models and 20 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 

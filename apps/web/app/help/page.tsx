@@ -64,12 +64,19 @@ const chapters = [
     ["Payment milestones", "The schedule must equal the contract value. Record invoiced, partial, paid, disputed or waived states only against verified invoice or bank evidence. Overdue milestones appear in Automation."],
     ["Activation and deal wins", "A contract activates only after every required signer is verified and a secure signed-document URL is attached. Marking the opportunity won is a separate explicit choice."],
   ]},
-  { id: "delivery", title: "Delivery and renewals", summary: "Turn an active contract into fulfilled obligations, verified proof, sponsor reports and renewal action.", route: "/delivery", sections: [
+  { id: "delivery", title: "Delivery", summary: "Turn an active contract into fulfilled obligations, verified proof and sponsor reports.", route: "/delivery", sections: [
     ["Automatic contract handover", "When Seal activates a contract, Delivery creates one workspace anchored to that exact immutable contract version and imports its confirmed deliverables. It never invents deadlines."],
     ["Plan and ownership", "Add any missing obligations, assign the internal owner and enter a real due date for every promise. An owner or admin approves the plan before fulfilment begins."],
     ["Evidence and verification", "Record only secure HTTPS links to genuine documents, images, video, analytics or approvals. A reviewer must open and verify the evidence before the obligation can become verified."],
     ["Sponsor reports", "Choose a reporting period to create a checksummed snapshot of relevant obligations and evidence. Approval does not send it; record the secure link only after it was actually shared."],
-    ["Risk and renewal automation", "Automation creates internal tasks for blocked, due or overdue obligations and agreed renewal-review dates. It never claims delivery, contacts the sponsor or chooses a renewal outcome."],
+    ["Risk and renewal runway", "Automation creates internal tasks for blocked, due or overdue obligations and agreed renewal-review dates. It never claims delivery or contacts the sponsor."],
+  ]},
+  { id: "renewals", title: "Renewals", summary: "Convert verified partnership delivery into a controlled renewal or expansion opportunity.", route: "/renewals", sections: [
+    ["Prepare from facts", "Renewals snapshots the exact signed contract version, obligation outcomes, independently verified evidence and reports actually recorded as shared. It does not guess sponsor intent or a renewal probability."],
+    ["Add human context", "Record only sponsor feedback that was actually expressed, choose renew, expand, renew and expand, hold or exit, then enter the real commercial value, term and expected decision date."],
+    ["Freshness and approval", "If Delivery changes after preparation, the renewal brief becomes stale and must be refreshed. An owner or admin independently approves the evidence and commercial boundaries."],
+    ["Opportunity handoff", "Approved commercial cases create exactly one internal Opportunity OS record and one next action. Nothing is sent. Forge, Seal and the existing stage controls manage the deal from there."],
+    ["Final outcome", "Marking the linked opportunity won or lost synchronises the renewal outcome. Reopening the deal reopens the renewal case. Every transition is audited."],
   ]},
   { id: "ai", title: "AI Setup and keys", summary: "Connect AI safely and know which agents use which provider.", route: "/settings/ai", sections: [
     ["Where to put a key", "Open Settings → AI Setup. Paste the key only into that secure form. Never send an API key through chat, email, screenshots or support messages."],

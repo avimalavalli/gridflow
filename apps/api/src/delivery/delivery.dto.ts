@@ -52,13 +52,6 @@ export class ShareDeliveryReportDto {
   @IsUrl({ protocols: ["https"], require_protocol: true }) @MaxLength(2000) sharedUrl!: string;
 }
 
-export class UpdateDeliveryRenewalDto {
-  @IsIn(["NOT_STARTED","DUE","IN_PROGRESS","RENEWED","DECLINED"])
-  status!: "NOT_STARTED"|"DUE"|"IN_PROGRESS"|"RENEWED"|"DECLINED";
-  @IsOptional() @IsBoolean() confirmOutcome?: boolean;
-  @IsOptional() @IsString() @MaxLength(2000) notes?: string;
-}
-
 export class CompleteDeliveryProgrammeDto {
   @IsBoolean() confirmComplete!: boolean;
 }

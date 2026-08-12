@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
-import { ApproveDeliveryReportDto, CompleteDeliveryProgrammeDto, ConfigureDeliveryProgrammeDto, CreateDeliveryObligationDto, GenerateDeliveryReportDto, RecordDeliveryEvidenceDto, ShareDeliveryReportDto, TransitionDeliveryObligationDto, UpdateDeliveryObligationDto, UpdateDeliveryRenewalDto, VerifyDeliveryEvidenceDto } from "./delivery.dto.js";
+import { ApproveDeliveryReportDto, CompleteDeliveryProgrammeDto, ConfigureDeliveryProgrammeDto, CreateDeliveryObligationDto, GenerateDeliveryReportDto, RecordDeliveryEvidenceDto, ShareDeliveryReportDto, TransitionDeliveryObligationDto, UpdateDeliveryObligationDto, VerifyDeliveryEvidenceDto } from "./delivery.dto.js";
 import { DeliveryService } from "./delivery.service.js";
 
 @Controller("delivery")
@@ -51,10 +51,6 @@ export class DeliveryController {
   @Post(":programmeId/reports/:reportId/share") async shareReport(@Req() request: Request, @Param("programmeId") programmeId: string, @Param("reportId") reportId: string, @Body() input: ShareDeliveryReportDto) {
     const identity = await this.context.resolve(request); this.context.assertAdmin(identity);
     return this.delivery.shareReport(identity.tenantId, identity.userId, programmeId, reportId, input);
-  }
-  @Post(":programmeId/renewal") async renewal(@Req() request: Request, @Param("programmeId") programmeId: string, @Body() input: UpdateDeliveryRenewalDto) {
-    const identity = await this.context.resolve(request); this.context.assertAdmin(identity);
-    return this.delivery.updateRenewal(identity.tenantId, identity.userId, programmeId, input);
   }
   @Post(":programmeId/complete") async complete(@Req() request: Request, @Param("programmeId") programmeId: string, @Body() input: CompleteDeliveryProgrammeDto) {
     const identity = await this.context.resolve(request); this.context.assertAdmin(identity);

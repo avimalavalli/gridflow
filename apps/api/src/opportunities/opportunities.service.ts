@@ -181,6 +181,7 @@ export class OpportunitiesService {
       if (stageChanged) {
         const historyId = await this.recordStageHistory(tx, tenantId, userId, id, row.stage, stage, reason);
         await tx.query(`UPDATE "Company" SET "currentStage"=$3::"CommercialStage","updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId,row.companyId,closedStages.has(stage) ? stage : "OPPORTUNITY"]);
+        await this.syncRenewalOutcome(tx,tenantId,userId,id,row.stage,stage,reason);
         nextActionCreated = await this.ensureNextAction(tx, tenantId, userId, id, row.companyId, primaryContactId ?? null, stage, historyId, input.nextActionTitle, input.nextActionDueAt);
       }
       await this.audit(tx, tenantId, userId, stageChanged ? "STATUS_CHANGE" : "UPDATE", id, oldValues, { stage, probability, closeReason, reason: stageChanged ? reason : null, nextActionCreated });
@@ -230,6 +231,18 @@ export class OpportunitiesService {
       [tenantId,companyId,contactId,opportunityId,userId,`opportunity:${opportunityId}:stage:${historyId}`,title,`Next action created when this opportunity entered ${stage.replaceAll("_", " ").toLowerCase()}.`,dueAt,customTitle?.trim() ? "MANUAL" : "SYSTEM_GENERATED"],
     );
     return true;
+  }
+
+  private async syncRenewalOutcome(tx:SqlExecutor,tenantId:string,userId:string,opportunityId:string,oldStage:OpportunityStage,newStage:OpportunityStage,reason:string):Promise<void> {
+    const linked=await tx.query<{id:string;programmeId:string;status:string}>(`SELECT "id","programmeId","status"::text AS "status" FROM "RenewalCase" WHERE "tenantId"=$1::uuid AND "opportunityId"=$2::uuid FOR UPDATE`,[tenantId,opportunityId]);
+    const renewal=linked.rows[0];if(!renewal)return;
+    const reopened=closedStages.has(oldStage)&&!closedStages.has(newStage);
+    if(!reopened&&!closedStages.has(newStage))return;
+    const caseStatus=reopened?"HANDED_OFF":newStage==="WON"?"RENEWED":"DECLINED";
+    const programmeStatus=reopened?"IN_PROGRESS":newStage==="WON"?"RENEWED":"DECLINED";
+    await tx.query(`UPDATE "RenewalCase" SET "status"=$3::"RenewalCaseStatus","outcomeAt"=CASE WHEN $4 THEN NULL ELSE CURRENT_TIMESTAMP END,"outcomeReason"=CASE WHEN $4 THEN NULL ELSE $5 END,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,[tenantId,renewal.id,caseStatus,reopened,reason]);
+    await tx.query(`UPDATE "DeliveryProgramme" SET "renewalStatus"=$3::"DeliveryRenewalStatus","updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,[tenantId,renewal.programmeId,programmeStatus]);
+    await tx.query(`INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","metadata") VALUES ($1::uuid,$2::uuid,'STATUS_CHANGE','RenewalCase',$3::uuid,$4::jsonb)`,[tenantId,userId,renewal.id,JSON.stringify({event:reopened?"RENEWAL_REOPENED":"RENEWAL_OUTCOME_SYNC",opportunityId,oldStage,newStage,status:caseStatus,reason})]);
   }
 
   private async audit(tx: SqlExecutor, tenantId: string, userId: string, action: "CREATE" | "UPDATE" | "STATUS_CHANGE", opportunityId: string, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown>): Promise<void> {

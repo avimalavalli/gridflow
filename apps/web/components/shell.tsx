@@ -26,6 +26,7 @@ import {
   MessagesSquare,
   Radar,
   Rocket,
+  Repeat2,
   Search,
   Sparkles,
   Send,
@@ -60,6 +61,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Forge", href: "/forge", icon: Hammer, keywords: "proposal packages pricing activation commercial approval pdf" },
       { label: "Seal", href: "/seal", icon: FileSignature, keywords: "contracts signatures legal payments milestones invoices revenue" },
       { label: "Delivery", href: "/delivery", icon: ClipboardCheck, keywords: "contract obligations fulfilment evidence reporting sponsor value renewal" },
+      { label: "Renewals", href: "/renewals", icon: Repeat2, keywords: "retention renewal expansion sponsor sentiment evidence commercial handoff" },
     ],
   },
   {

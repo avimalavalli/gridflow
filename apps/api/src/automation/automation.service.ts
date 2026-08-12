@@ -140,7 +140,7 @@ export class AutomationService {
           { key: "safe_retry", title: "Self-healing retries", enabled: policy.automaticRetryEnabled, effect: "Requeues eligible failed internal runs inside hard budgets.", guard: `${policy.dailyAgentRunLimit} runs / $${policy.dailyEstimatedCostLimitUsd} daily` },
           { key: "integration_health", title: "Integration monitoring", enabled: policy.integrationMonitoringEnabled, effect: "Surfaces expired and failed provider connections.", guard: "Reconnect requires a human session" },
           { key: "weekly_brief", title: "Weekly outcome brief", enabled: policy.weeklyBriefEnabled, effect: "Summarises pipeline movement, meetings, replies and failures.", guard: "Evidence from live workspace data" },
-          { key: "delivery_guard", title: "Delivery risk guard", enabled: true, effect: "Creates internal tasks for due obligations and renewal reviews.", guard: "Never claims fulfilment or contacts a sponsor" },
+          { key: "delivery_guard", title: "Delivery and renewal guard", enabled: true, effect: "Creates internal tasks for due obligations and raises evidence-backed renewal reviews.", guard: "Never claims fulfilment, predicts renewal or contacts a sponsor" },
         ],
         safeguards: ["LinkedIn sending is always manual", "External messages remain approval-gated", "Bookings and deal-stage changes remain human decisions", "Money and legal content require individual review", "Every automated action is tenant-scoped and auditable"],
         generatedAt: new Date().toISOString(),
@@ -296,6 +296,14 @@ export class AutomationService {
         FROM "DeliveryReport" r JOIN "DeliveryProgramme" p ON p."id"=r."programmeId" AND p."tenantId"=r."tenantId"
         JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
         WHERE r."tenantId"=$1::uuid AND r."status"='DRAFT'
+        UNION ALL
+        SELECT r."id",CASE WHEN r."status"='REVIEW_READY' THEN 'RENEWAL_REVIEW' ELSE 'RENEWAL_HANDOFF' END,
+          CASE WHEN r."status"='REVIEW_READY' THEN 'Approve renewal decision' ELSE 'Hand approved renewal into Opportunity OS' END,
+          co."companyName"||' · '||COALESCE(r."intent"::text,'intent required'),
+          CASE WHEN r."status"='REVIEW_READY' THEN 'Review current delivery evidence, sponsor context and commercial boundaries. Approval sends nothing.' ELSE 'This creates one internal opportunity and task. It does not contact the sponsor.' END,
+          CASE WHEN r."status"='REVIEW_READY' THEN 'CRITICAL' ELSE 'HIGH' END,'/renewals/'||r."id",r."updatedAt"
+        FROM "RenewalCase" r JOIN "DeliveryProgramme" p ON p."id"=r."programmeId" AND p."tenantId"=r."tenantId" JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+        WHERE r."tenantId"=$1::uuid AND r."status" IN ('REVIEW_READY','APPROVED')
         UNION ALL
         SELECT ar."id",'AGENT_QUALITY','Accept or tune '||ar."agentName"::text,COALESCE(c."companyName",db."briefName",'Completed agent result'),
           'Review the evidence and automated quality report before trusting this output.','MEDIUM','/agent-runs/'||ar."id",ar."createdAt"

@@ -215,9 +215,9 @@ export class AutomationControlEngine {
              JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
              WHERE ob."tenantId"=$1::uuid AND p."status" IN ('ACTIVE','AT_RISK') AND (ob."status" IN ('OVERDUE','BLOCKED') OR (ob."status" NOT IN ('VERIFIED','WAIVED','DELIVERED') AND ob."dueDate"<=CURRENT_DATE+interval '7 days'))
              UNION ALL
-             SELECT p."id",c."opportunityId",co."companyName",c."title",p."id",'RENEWAL','Renewal review is due. The commercial outcome remains a human decision.',p."renewalReviewDate"::timestamptz
+             SELECT p."id",c."opportunityId",co."companyName",c."title",p."id",'RENEWAL',CASE WHEN p."renewalReviewDate"<=CURRENT_DATE THEN 'Renewal review is due.' ELSE 'Renewal review enters its 30-day preparation window.' END||' The commercial outcome remains a human decision.',p."renewalReviewDate"::timestamptz
              FROM "DeliveryProgramme" p JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
-             WHERE p."tenantId"=$1::uuid AND p."renewalStatus"='DUE'
+             WHERE p."tenantId"=$1::uuid AND p."renewalReviewDate" IS NOT NULL AND p."renewalReviewDate"<=CURRENT_DATE+interval '30 days' AND p."renewalStatus" NOT IN ('RENEWED','DECLINED')
            ) risks ORDER BY "dueAt" LIMIT 60`, [tenantId]),
       ]);
 
@@ -271,7 +271,7 @@ export class AutomationControlEngine {
             ? "GridFlow detected the agreed renewal-review date. It can create an internal task, but it cannot promise, decline or contact the sponsor."
             : "GridFlow detected a contractual delivery risk. It can create an internal action, but it cannot claim fulfilment or contact the sponsor.",
           taskType: "DELIVERY", taskDescription: renewal
-            ? `Open Delivery, review verified fulfilment and decide the authorised renewal action for ${item.companyName}.`
+            ? `Open Renewals, refresh the delivery evidence and prepare the authorised renewal decision for ${item.companyName}.`
             : `Open Delivery, resolve the obligation, attach genuine evidence and request verification. Programme: ${item.programmeId}.`, dueAt: new Date(item.dueAt),
         });
       }

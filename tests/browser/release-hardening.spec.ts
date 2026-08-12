@@ -91,5 +91,11 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     const deliveryViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(deliveryViewport.scrollWidth, `${testInfo.project.name} Delivery cockpit has horizontal overflow`).toBeLessThanOrEqual(deliveryViewport.width + 1);
     await expectNoWcagViolations(page);
+    await page.goto("/renewals");
+    await expect(page.getByRole("heading", { name: "Keep the partnership. Grow the value." })).toBeVisible();
+    await expect(page.getByText("No renewals in this view.")).toBeVisible();
+    const renewalViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(renewalViewport.scrollWidth, `${testInfo.project.name} Renewals cockpit has horizontal overflow`).toBeLessThanOrEqual(renewalViewport.width + 1);
+    await expectNoWcagViolations(page);
   }
 });

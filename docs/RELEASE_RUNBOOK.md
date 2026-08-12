@@ -10,7 +10,7 @@
 6. Complete a restore rehearsal against non-production infrastructure.
 7. Confirm OpenAI, Gmail, Resend, logging, alerting and backup ownership.
 8. Open **Launch Control** and confirm every automated check is green.
-9. Complete every manual live-acceptance check with notes and evidence links.
+9. Refresh Phase 8A live evidence in **Launch Control**. Atlas, Sage, Relay, Echo, Gmail, password recovery and MFA cannot record `PASS` until GridFlow finds their complete post-deployment evidence chains. Add useful human review notes and external evidence links only where they add information; never paste credentials, tokens or message bodies.
 10. The organisation owner approves the release only after Launch Control reaches `READY`.
 
 ## Deployment

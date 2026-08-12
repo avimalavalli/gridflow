@@ -16,6 +16,7 @@ type DefaultCheck = {
   description: string;
   required: boolean;
   automated: boolean;
+  evidenceRequired?: boolean;
 };
 
 const DEFAULT_CHECKS: readonly DefaultCheck[] = [
@@ -36,19 +37,19 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "outreach_failure_health", category: "OUTREACH", title: "Outreach failure health", description: "No unresolved failed email or LinkedIn channel action remains.", required: true, automated: true },
   { key: "quality_review_clear", category: "AGENTS", title: "AI review queue clear", description: "All pass/review agent results required for launch have a human decision.", required: true, automated: true },
   { key: "end_to_end_onboarding", category: "PRODUCT", title: "Athlete onboarding acceptance", description: "A fresh athlete can create an organisation, complete onboarding and receive a personalised strategy without manual database work.", required: true, automated: false },
-  { key: "atlas_live_acceptance", category: "AGENTS", title: "Atlas live acceptance", description: "Atlas discovers current, relevant and non-duplicate companies for a real athlete brief with usable evidence.", required: true, automated: false },
-  { key: "sage_live_acceptance", category: "AGENTS", title: "Sage live acceptance", description: "Sage produces defensible scoring, commercial rationale and cited evidence for accepted companies.", required: true, automated: false },
-  { key: "relay_live_acceptance", category: "AGENTS", title: "Relay live acceptance", description: "Relay finds current decision-makers without inventing identities, roles, profiles or email addresses.", required: true, automated: false },
-  { key: "echo_live_acceptance", category: "AGENTS", title: "Echo live acceptance", description: "Echo produces personalised, concise and claim-safe LinkedIn and email outreach for the athlete.", required: true, automated: false },
+  { key: "atlas_live_acceptance", category: "AGENTS", title: "Atlas live acceptance", description: "Atlas discovers current, relevant and non-duplicate companies for a real athlete brief with usable evidence.", required: true, automated: false, evidenceRequired: true },
+  { key: "sage_live_acceptance", category: "AGENTS", title: "Sage live acceptance", description: "Sage produces defensible scoring, commercial rationale and cited evidence for accepted companies.", required: true, automated: false, evidenceRequired: true },
+  { key: "relay_live_acceptance", category: "AGENTS", title: "Relay live acceptance", description: "Relay finds current decision-makers without inventing identities, roles, profiles or email addresses.", required: true, automated: false, evidenceRequired: true },
+  { key: "echo_live_acceptance", category: "AGENTS", title: "Echo live acceptance", description: "Echo produces personalised, concise and claim-safe LinkedIn and email outreach for the athlete.", required: true, automated: false, evidenceRequired: true },
   { key: "sentinel_live_acceptance", category: "AGENTS", title: "Sentinel live acceptance", description: "Sentinel correctly classifies real inbound replies, fails closed on ambiguity and enforces explicit opt-outs.", required: true, automated: false },
   { key: "nova_live_acceptance", category: "AGENTS", title: "Nova live acceptance", description: "Nova prepares a grounded response strategy without sending, booking or changing commercial records before approval.", required: true, automated: false },
   { key: "orbit_live_acceptance", category: "AGENTS", title: "Orbit live acceptance", description: "Orbit prepares a real meeting and turns human notes into a controlled debrief without inferring events or taking unapproved action.", required: true, automated: false },
   { key: "forge_live_acceptance", category: "AGENTS", title: "Forge live acceptance", description: "Forge creates a grounded, versioned proposal inside human pricing and rights boundaries and cannot send or advance the deal by itself.", required: true, automated: false },
   { key: "delivery_live_acceptance", category: "PRODUCT", title: "Delivery live acceptance", description: "An active contract becomes a deadline-controlled delivery plan; genuine evidence, report approval and renewal actions remain tenant-isolated and human verified.", required: true, automated: false },
   { key: "renewals_live_acceptance", category: "PRODUCT", title: "Renewals live acceptance", description: "A delivered partnership becomes a fresh evidence-backed renewal brief, receives independent approval and creates one unsent Opportunity OS record with a synchronised human outcome.", required: true, automated: false },
-  { key: "gmail_live_acceptance", category: "OUTREACH", title: "Gmail end-to-end acceptance", description: "Controlled mailboxes verify draft, send, reply, bounce, opt-out and sequence-stop behaviour.", required: true, automated: false },
-  { key: "password_reset_live_acceptance", category: "AUTH", title: "Password recovery acceptance", description: "A real password-reset email arrives, the token works once and existing sessions are revoked.", required: true, automated: false },
-  { key: "mfa_device_acceptance", category: "AUTH", title: "Authenticator-device acceptance", description: "MFA setup, login challenge and one-time recovery codes work on a real authenticator device.", required: true, automated: false },
+  { key: "gmail_live_acceptance", category: "OUTREACH", title: "Gmail end-to-end acceptance", description: "Controlled mailboxes verify draft, send, reply, bounce, opt-out and sequence-stop behaviour.", required: true, automated: false, evidenceRequired: true },
+  { key: "password_reset_live_acceptance", category: "AUTH", title: "Password recovery acceptance", description: "A real password-reset email arrives, the token works once and existing sessions are revoked.", required: true, automated: false, evidenceRequired: true },
+  { key: "mfa_device_acceptance", category: "AUTH", title: "Authenticator-device acceptance", description: "MFA setup, login challenge and one-time recovery codes work on a real authenticator device.", required: true, automated: false, evidenceRequired: true },
   { key: "permissions_review", category: "SECURITY", title: "Permission and tenant-isolation review", description: "Owner, admin, operator, reviewer and read-only permissions are verified across separate athlete organisations.", required: true, automated: false },
   { key: "backup_restore_rehearsal", category: "DATA", title: "Production restore rehearsal", description: "The latest encrypted production backup was restored into clean PostgreSQL and its GridFlow schema was verified.", required: true, automated: true },
   { key: "browser_qa", category: "QA", title: "Desktop browser QA", description: "Core journeys pass on current Chrome, Edge, Safari and Firefox releases.", required: true, automated: false },
@@ -70,6 +71,7 @@ interface ReleaseRow extends Record<string, unknown> {
   approvedByName: string | null;
   approvedAt: Date | null;
   releasedAt: Date | null;
+  acceptanceStartedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,10 +84,13 @@ interface CheckRow extends Record<string, unknown> {
   description: string;
   required: boolean;
   automated: boolean;
+  evidenceRequired: boolean;
   status: AcceptanceStatus;
   notes: string | null;
   evidenceUrl: string | null;
   automatedDetail: string | null;
+  evidenceSnapshot: unknown;
+  evidenceObservedAt: Date | null;
   lastEvaluatedAt: Date | null;
   testedAt: Date | null;
   testedByUserId: string | null;
@@ -104,6 +109,24 @@ interface HealthCounts extends Record<string, unknown> {
 
 type AutomatedResult = { status: "PASS" | "FAIL" | "BLOCKED"; detail: string; evidenceUrl?: string | null };
 type OperationsProofStatus = Awaited<ReturnType<OperationsProofsService["status"]>>;
+
+type EvidenceStep = {
+  key: string;
+  label: string;
+  complete: boolean;
+  detail: string;
+  observedAt?: string | null;
+  href?: string | null;
+};
+
+type LiveEvidence = {
+  required: true;
+  complete: boolean;
+  summary: string;
+  observedAt: string | null;
+  steps: EvidenceStep[];
+  nextAction: { label: string; href: string };
+};
 
 function clean(value?: string | null): string | null {
   const trimmed = value?.trim();
@@ -124,6 +147,7 @@ export class ReleaseAcceptanceService {
       const release = await this.ensureCurrentRelease(tx, tenantId);
       await this.ensureDefaultChecks(tx, tenantId, release.id);
       await this.evaluateAutomatedChecks(tx, tenantId, release.id, databaseHealth.database === "ok", proofStatus);
+      await this.revalidateEvidenceChecks(tx, tenantId, release);
       await this.refreshReleaseStatus(tx, tenantId, release.id);
       return this.loadOverview(tx, tenantId, release.id);
     });
@@ -140,8 +164,8 @@ export class ReleaseAcceptanceService {
       );
       if (existing.rows.length) throw new BadRequestException("A release acceptance cycle already exists for this version.");
       const result = await tx.query<{ id: string }>(
-        `INSERT INTO "ReleaseAcceptance" ("tenantId","releaseVersion","commitSha","environment","status","updatedAt")
-         VALUES ($1::uuid,$2,$3,$4,'DRAFT',CURRENT_TIMESTAMP) RETURNING "id"`,
+        `INSERT INTO "ReleaseAcceptance" ("tenantId","releaseVersion","commitSha","environment","status","acceptanceStartedAt","updatedAt")
+         VALUES ($1::uuid,$2,$3,$4,'DRAFT',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`,
         [tenantId, releaseVersion, commitSha, environment],
       );
       const releaseId = result.rows[0]?.id;
@@ -164,8 +188,8 @@ export class ReleaseAcceptanceService {
     }
 
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const existing = await tx.query<{ id: string; releaseAcceptanceId: string; automated: boolean; oldStatus: AcceptanceStatus }>(
-        `SELECT "id","releaseAcceptanceId","automated","status"::text AS "oldStatus"
+      const existing = await tx.query<{ id: string; releaseAcceptanceId: string; key: string; automated: boolean; evidenceRequired: boolean; oldStatus: AcceptanceStatus }>(
+        `SELECT "id","releaseAcceptanceId","key","automated","evidenceRequired","status"::text AS "oldStatus"
          FROM "ReleaseAcceptanceCheck" WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
         [tenantId, checkId],
       );
@@ -173,12 +197,33 @@ export class ReleaseAcceptanceService {
       if (!row) throw new NotFoundException("Release acceptance check was not found.");
       if (row.automated) throw new BadRequestException("Automated release checks cannot be manually overridden. Fix the underlying release condition instead.");
 
+      const release = await this.findRelease(tx, tenantId, row.releaseAcceptanceId);
+      if (!release) throw new NotFoundException("Release acceptance cycle was not found.");
+      const liveEvidence = row.evidenceRequired
+        ? await this.collectLiveEvidence(tx, tenantId, release, row.key)
+        : null;
+      if (input.status === "PASS" && row.evidenceRequired && !liveEvidence?.complete) {
+        const missing = liveEvidence?.steps.filter((step) => !step.complete).map((step) => step.label).join(", ") || "live evidence";
+        throw new BadRequestException(`GridFlow cannot record a pass yet. Complete the verified evidence steps: ${missing}.`);
+      }
+
       await tx.query(
         `UPDATE "ReleaseAcceptanceCheck" SET
            "status"=$3::"AcceptanceCheckStatus","notes"=$4,"evidenceUrl"=$5,
-           "testedAt"=CURRENT_TIMESTAMP,"testedByUserId"=$6::uuid,"updatedAt"=CURRENT_TIMESTAMP
+           "evidenceSnapshot"=$6::jsonb,"evidenceObservedAt"=$7::timestamptz,
+           "automatedDetail"=CASE WHEN "evidenceRequired" THEN NULL ELSE "automatedDetail" END,
+           "testedAt"=CURRENT_TIMESTAMP,"testedByUserId"=$8::uuid,"updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
-        [tenantId, checkId, input.status, notes, evidenceUrl, userId],
+        [
+          tenantId,
+          checkId,
+          input.status,
+          notes,
+          evidenceUrl,
+          input.status === "PASS" && liveEvidence ? JSON.stringify(liveEvidence) : null,
+          input.status === "PASS" ? liveEvidence?.observedAt ?? null : null,
+          userId,
+        ],
       );
       await tx.query(
         `INSERT INTO "AuditLog" ("tenantId","userId","action","entityType","entityId","oldValues","newValues")
@@ -189,7 +234,13 @@ export class ReleaseAcceptanceService {
           input.status === "PASS" ? "APPROVE" : input.status === "FAIL" ? "REJECT" : "UPDATE",
           checkId,
           JSON.stringify({ status: row.oldStatus }),
-          JSON.stringify({ status: input.status, notes, evidenceUrl }),
+          JSON.stringify({
+            status: input.status,
+            notes,
+            evidenceUrl,
+            evidenceBound: Boolean(input.status === "PASS" && liveEvidence),
+            evidenceObservedAt: input.status === "PASS" ? liveEvidence?.observedAt ?? null : null,
+          }),
         ],
       );
       await this.refreshReleaseStatus(tx, tenantId, row.releaseAcceptanceId);
@@ -255,12 +306,14 @@ export class ReleaseAcceptanceService {
       if (commit && existing.commitSha !== commit) {
         await tx.query(
           `UPDATE "ReleaseAcceptance" SET "commitSha"=$3,"status"='DRAFT',"readinessScore"=0,
-             "approvedByUserId"=NULL,"approvedAt"=NULL,"releasedAt"=NULL,"updatedAt"=CURRENT_TIMESTAMP
+             "approvedByUserId"=NULL,"approvedAt"=NULL,"releasedAt"=NULL,
+             "acceptanceStartedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
            WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
           [tenantId, existing.id, commit],
         );
         await tx.query(
           `UPDATE "ReleaseAcceptanceCheck" SET "status"='PENDING',"notes"=NULL,"evidenceUrl"=NULL,
+             "evidenceSnapshot"=NULL,"evidenceObservedAt"=NULL,
              "testedAt"=NULL,"testedByUserId"=NULL,"updatedAt"=CURRENT_TIMESTAMP
            WHERE "tenantId"=$1::uuid AND "releaseAcceptanceId"=$2::uuid AND "automated"=FALSE`,
           [tenantId, existing.id],
@@ -272,10 +325,10 @@ export class ReleaseAcceptanceService {
       return existing;
     }
     const inserted = await tx.query<ReleaseRow>(
-      `INSERT INTO "ReleaseAcceptance" ("tenantId","releaseVersion","commitSha","environment","status","updatedAt")
-       VALUES ($1::uuid,$2,$3,$4,'DRAFT',CURRENT_TIMESTAMP)
+      `INSERT INTO "ReleaseAcceptance" ("tenantId","releaseVersion","commitSha","environment","status","acceptanceStartedAt","updatedAt")
+       VALUES ($1::uuid,$2,$3,$4,'DRAFT',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
        RETURNING "id","tenantId","releaseVersion","commitSha","environment","status"::text AS "status","readinessScore","notes",
-                 "approvedByUserId",NULL::text AS "approvedByName","approvedAt","releasedAt","createdAt","updatedAt"`,
+                 "approvedByUserId",NULL::text AS "approvedByName","approvedAt","releasedAt","acceptanceStartedAt","createdAt","updatedAt"`,
       [tenantId, version, commit, apiConfig.nodeEnv],
     );
     const row = inserted.rows[0];
@@ -288,7 +341,7 @@ export class ReleaseAcceptanceService {
     if (byVersion) return byVersion;
     const latest = await tx.query<ReleaseRow>(
       `SELECT r."id",r."tenantId",r."releaseVersion",r."commitSha",r."environment",r."status"::text AS "status",r."readinessScore",r."notes",
-              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."createdAt",r."updatedAt"
+              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."acceptanceStartedAt",r."createdAt",r."updatedAt"
        FROM "ReleaseAcceptance" r LEFT JOIN "User" u ON u."id"=r."approvedByUserId"
        WHERE r."tenantId"=$1::uuid ORDER BY r."updatedAt" DESC LIMIT 1`,
       [tenantId],
@@ -299,7 +352,7 @@ export class ReleaseAcceptanceService {
   private async findReleaseByVersion(tx: SqlExecutor, tenantId: string, version: string): Promise<ReleaseRow | null> {
     const result = await tx.query<ReleaseRow>(
       `SELECT r."id",r."tenantId",r."releaseVersion",r."commitSha",r."environment",r."status"::text AS "status",r."readinessScore",r."notes",
-              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."createdAt",r."updatedAt"
+              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."acceptanceStartedAt",r."createdAt",r."updatedAt"
        FROM "ReleaseAcceptance" r LEFT JOIN "User" u ON u."id"=r."approvedByUserId"
        WHERE r."tenantId"=$1::uuid AND r."releaseVersion"=$2`,
       [tenantId, version],
@@ -310,7 +363,7 @@ export class ReleaseAcceptanceService {
   private async findRelease(tx: SqlExecutor, tenantId: string, releaseId: string): Promise<ReleaseRow | null> {
     const result = await tx.query<ReleaseRow>(
       `SELECT r."id",r."tenantId",r."releaseVersion",r."commitSha",r."environment",r."status"::text AS "status",r."readinessScore",r."notes",
-              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."createdAt",r."updatedAt"
+              r."approvedByUserId",u."name" AS "approvedByName",r."approvedAt",r."releasedAt",r."acceptanceStartedAt",r."createdAt",r."updatedAt"
        FROM "ReleaseAcceptance" r LEFT JOIN "User" u ON u."id"=r."approvedByUserId"
        WHERE r."tenantId"=$1::uuid AND r."id"=$2::uuid`,
       [tenantId, releaseId],
@@ -322,12 +375,210 @@ export class ReleaseAcceptanceService {
     for (const check of DEFAULT_CHECKS) {
       await tx.query(
         `INSERT INTO "ReleaseAcceptanceCheck" (
-           "tenantId","releaseAcceptanceId","key","category","title","description","required","automated","updatedAt"
-         ) VALUES ($1::uuid,$2::uuid,$3,$4::"AcceptanceCheckCategory",$5,$6,$7,$8,CURRENT_TIMESTAMP)
+           "tenantId","releaseAcceptanceId","key","category","title","description","required","automated","evidenceRequired","updatedAt"
+         ) VALUES ($1::uuid,$2::uuid,$3,$4::"AcceptanceCheckCategory",$5,$6,$7,$8,$9,CURRENT_TIMESTAMP)
          ON CONFLICT ("releaseAcceptanceId","key") DO UPDATE SET
            "category"=EXCLUDED."category","title"=EXCLUDED."title","description"=EXCLUDED."description",
-           "required"=EXCLUDED."required","automated"=EXCLUDED."automated","updatedAt"=CURRENT_TIMESTAMP`,
-        [tenantId, releaseId, check.key, check.category, check.title, check.description, check.required, check.automated],
+           "required"=EXCLUDED."required","automated"=EXCLUDED."automated","evidenceRequired"=EXCLUDED."evidenceRequired","updatedAt"=CURRENT_TIMESTAMP`,
+        [tenantId, releaseId, check.key, check.category, check.title, check.description, check.required, check.automated, check.evidenceRequired ?? false],
+      );
+    }
+  }
+
+  private evidenceResult(steps: EvidenceStep[], nextAction: LiveEvidence["nextAction"]): LiveEvidence {
+    const complete = steps.every((step) => step.complete);
+    const observedTimes = steps
+      .map((step) => step.observedAt ? new Date(step.observedAt).getTime() : Number.NaN)
+      .filter(Number.isFinite);
+    const observedAt = observedTimes.length ? new Date(Math.max(...observedTimes)).toISOString() : null;
+    const missing = steps.filter((step) => !step.complete).map((step) => step.label);
+    return {
+      required: true,
+      complete,
+      summary: complete ? `Verified ${steps.length} live evidence steps.` : `${missing.length} live evidence step${missing.length === 1 ? "" : "s"} missing: ${missing.join(", ")}.`,
+      observedAt,
+      steps,
+      nextAction,
+    };
+  }
+
+  private async collectAgentEvidence(
+    tx: SqlExecutor,
+    tenantId: string,
+    release: ReleaseRow,
+    agentName: "ATLAS" | "SAGE" | "RELAY" | "ECHO",
+  ): Promise<LiveEvidence> {
+    const result = await tx.query<{
+      id: string;
+      status: string;
+      modelUsed: string | null;
+      promptVersion: string | null;
+      qualityStatus: string | null;
+      humanReviewStatus: string;
+      completedAt: Date | null;
+      evidenceCount: number;
+    }>(
+      `SELECT ar."id",ar."status"::text AS "status",ar."modelUsed",ar."promptVersion",ar."qualityStatus",ar."humanReviewStatus",ar."completedAt",
+              COUNT(es."id")::int AS "evidenceCount"
+       FROM "AgentRun" ar LEFT JOIN "EvidenceSource" es ON es."agentRunId"=ar."id" AND es."tenantId"=ar."tenantId"
+       WHERE ar."tenantId"=$1::uuid AND ar."agentName"=$2::"AgentName" AND ar."createdAt">=$3::timestamptz
+       GROUP BY ar."id"
+       ORDER BY ar."createdAt" DESC LIMIT 1`,
+      [tenantId, agentName, release.acceptanceStartedAt.toISOString()],
+    );
+    const run = result.rows[0];
+    const href = run ? `/agent-runs/${run.id}` : "/discovery-briefs";
+    const completedAt = run?.completedAt?.toISOString() ?? null;
+    const liveModel = Boolean(run?.modelUsed && !/(^|[-_.])(fixture|mock|test)([-_.]|$)/i.test(run.modelUsed));
+    const researchAgent = agentName !== "ECHO";
+    const steps: EvidenceStep[] = [
+      { key: "completed", label: "live run completed", complete: run?.status === "SUCCEEDED", detail: run ? `${agentName} ${run.status.toLowerCase()}.` : `No ${agentName} run exists in this acceptance window.`, observedAt: completedAt, href },
+      { key: "provider", label: "production model recorded", complete: liveModel, detail: liveModel ? `Model ${run?.modelUsed} recorded${run?.promptVersion ? ` with prompt ${run.promptVersion}` : ""}.` : "No production model is recorded for the latest run.", observedAt: completedAt, href },
+      { key: "review", label: "human quality acceptance", complete: run?.humanReviewStatus === "ACCEPTED" && ["PASS", "REVIEW"].includes(run?.qualityStatus ?? ""), detail: run ? `Automated quality ${run.qualityStatus ?? "unscored"}; human review ${run.humanReviewStatus.toLowerCase()}.` : "A completed run must be reviewed and accepted.", observedAt: completedAt, href },
+    ];
+    if (researchAgent) {
+      steps.push({ key: "sources", label: "verifiable source evidence", complete: (run?.evidenceCount ?? 0) > 0, detail: `${run?.evidenceCount ?? 0} source record${run?.evidenceCount === 1 ? "" : "s"} attached.`, observedAt: completedAt, href });
+    }
+    return this.evidenceResult(steps, { label: run ? `Review ${agentName} evidence` : `Run the ${agentName} pipeline`, href });
+  }
+
+  private async collectGmailEvidence(tx: SqlExecutor, tenantId: string, release: ReleaseRow): Promise<LiveEvidence> {
+    const result = await tx.query<{
+      connectedAt: Date | null;
+      draftAt: Date | null;
+      sentAt: Date | null;
+      replyAt: Date | null;
+      replyStopAt: Date | null;
+      bounceAt: Date | null;
+      bounceSuppressedAt: Date | null;
+      optOutAt: Date | null;
+      optOutStopAt: Date | null;
+    }>(
+      `SELECT
+         (SELECT ia."updatedAt" FROM "IntegrationAccount" ia WHERE ia."tenantId"=$1::uuid AND ia."provider"='GMAIL' AND ia."status"='CONNECTED' LIMIT 1) AS "connectedAt",
+         (SELECT MAX(em."createdAt") FROM "EmailMessage" em WHERE em."tenantId"=$1::uuid
+            AND (em."status"='DRAFT_CREATED' OR NULLIF(em."headers"->>'draftId','') IS NOT NULL)
+            AND em."createdAt">=$2::timestamptz) AS "draftAt",
+         (SELECT MAX(COALESCE(em."sentAt",em."createdAt")) FROM "EmailMessage" em
+            WHERE em."tenantId"=$1::uuid AND em."status"='SENT' AND NULLIF(em."headers"->>'draftId','') IS NOT NULL
+              AND COALESCE(em."sentAt",em."createdAt")>=$2::timestamptz) AS "sentAt",
+         (SELECT MAX(COALESCE(em."receivedAt",em."createdAt")) FROM "EmailMessage" em
+            WHERE em."tenantId"=$1::uuid AND em."status"='REPLIED' AND COALESCE(em."receivedAt",em."createdAt")>=$2::timestamptz
+              AND EXISTS (SELECT 1 FROM "ChannelAction" ca WHERE ca."tenantId"=$1::uuid AND ca."outreachRecordId"=em."outreachRecordId"
+                AND ca."channel"='EMAIL' AND ca."status"='REPLIED' AND ca."updatedAt">=$2::timestamptz)) AS "replyAt",
+         (SELECT MAX(ca."updatedAt") FROM "ChannelAction" ca WHERE ca."tenantId"=$1::uuid AND ca."channel"='EMAIL' AND ca."status"='REPLIED'
+            AND ca."updatedAt">=$2::timestamptz AND EXISTS (SELECT 1 FROM "EmailMessage" em WHERE em."tenantId"=$1::uuid
+              AND em."outreachRecordId"=ca."outreachRecordId" AND em."status"='REPLIED' AND COALESCE(em."receivedAt",em."createdAt")>=$2::timestamptz)) AS "replyStopAt",
+         (SELECT MAX(COALESCE(em."receivedAt",em."createdAt")) FROM "EmailMessage" em JOIN "Contact" c ON c."id"=em."contactId"
+            WHERE em."tenantId"=$1::uuid AND em."status"='BOUNCED' AND COALESCE(em."receivedAt",em."createdAt")>=$2::timestamptz
+              AND EXISTS (SELECT 1 FROM "SuppressionEntry" se WHERE se."tenantId"=$1::uuid AND se."reason"='BOUNCED'
+                AND se."createdAt">=$2::timestamptz AND (LOWER(se."email")=LOWER(c."email") OR se."contactKey"=c."contactKey"))) AS "bounceAt",
+         (SELECT MAX(se."createdAt") FROM "SuppressionEntry" se JOIN "Contact" c ON
+            (LOWER(se."email")=LOWER(c."email") OR se."contactKey"=c."contactKey")
+            WHERE se."tenantId"=$1::uuid AND c."tenantId"=$1::uuid AND se."reason"='BOUNCED' AND se."createdAt">=$2::timestamptz
+              AND EXISTS (SELECT 1 FROM "EmailMessage" em WHERE em."tenantId"=$1::uuid AND em."contactId"=c."id"
+                AND em."status"='BOUNCED' AND COALESCE(em."receivedAt",em."createdAt")>=$2::timestamptz)) AS "bounceSuppressedAt",
+         (SELECT MAX(se."createdAt") FROM "SuppressionEntry" se JOIN "Contact" c ON
+            (LOWER(se."email")=LOWER(c."email") OR se."contactKey"=c."contactKey")
+            WHERE se."tenantId"=$1::uuid AND c."tenantId"=$1::uuid AND se."reason"='OPT_OUT' AND se."createdAt">=$2::timestamptz
+              AND EXISTS (SELECT 1 FROM "ChannelAction" ca WHERE ca."tenantId"=$1::uuid AND ca."contactId"=c."id"
+                AND ca."channel"='EMAIL' AND ca."status"='SUPPRESSED' AND ca."updatedAt">=$2::timestamptz)) AS "optOutAt",
+         (SELECT MAX(ca."updatedAt") FROM "ChannelAction" ca JOIN "Contact" c ON c."id"=ca."contactId"
+            WHERE ca."tenantId"=$1::uuid AND ca."channel"='EMAIL' AND ca."status"='SUPPRESSED' AND ca."updatedAt">=$2::timestamptz
+              AND EXISTS (SELECT 1 FROM "SuppressionEntry" se WHERE se."tenantId"=$1::uuid AND se."reason"='OPT_OUT'
+                AND se."createdAt">=$2::timestamptz AND (LOWER(se."email")=LOWER(c."email") OR se."contactKey"=c."contactKey"))) AS "optOutStopAt"`,
+      [tenantId, release.acceptanceStartedAt.toISOString()],
+    );
+    const row = result.rows[0] ?? { connectedAt: null, draftAt: null, sentAt: null, replyAt: null, replyStopAt: null, bounceAt: null, bounceSuppressedAt: null, optOutAt: null, optOutStopAt: null };
+    const step = (key: string, label: string, value: Date | null, detail: string, href = "/settings"): EvidenceStep => ({ key, label, complete: Boolean(value), detail, observedAt: value?.toISOString() ?? null, href });
+    const steps = [
+      step("connected", "Gmail account connected", row.connectedAt, row.connectedAt ? "A currently connected encrypted Gmail account is available." : "Connect the controlled Gmail mailbox."),
+      step("draft", "draft created", row.draftAt, row.draftAt ? "A provider-backed Gmail draft was recorded." : "Create one approved controlled draft.", "/outreach"),
+      step("sent", "controlled send reconciled", row.sentAt, row.sentAt ? "A provider-backed sent message was reconciled." : "Send the controlled acceptance message and sync Gmail.", "/outreach"),
+      step("reply", "reply ingested", row.replyAt, row.replyAt ? "A real inbound reply was ingested." : "Reply from the controlled recipient and sync Gmail."),
+      step("reply_stop", "reply stopped sequence", row.replyStopAt, row.replyStopAt ? "The pending email sequence moved to REPLIED." : "Verify pending actions stop after the reply."),
+      step("bounce", "bounce ingested", row.bounceAt, row.bounceAt ? "A real delivery failure was ingested." : "Run the controlled invalid-address test."),
+      step("bounce_suppression", "bounce suppression created", row.bounceSuppressedAt, row.bounceSuppressedAt ? "The failed address was automatically suppressed." : "Sync the bounce and verify suppression."),
+      step("opt_out", "explicit opt-out recorded", row.optOutAt, row.optOutAt ? "An explicit opt-out suppression exists." : "Record a controlled opt-out."),
+      step("opt_out_stop", "opt-out stopped sequence", row.optOutStopAt, row.optOutStopAt ? "Pending email actions moved to SUPPRESSED." : "Verify the opt-out blocks pending email actions."),
+    ];
+    const firstMissing = steps.find((item) => !item.complete);
+    return this.evidenceResult(steps, { label: firstMissing?.key === "connected" ? "Connect Gmail" : "Continue controlled mailbox test", href: firstMissing?.href ?? "/settings" });
+  }
+
+  private async collectPasswordResetEvidence(tx: SqlExecutor, tenantId: string, release: ReleaseRow): Promise<LiveEvidence> {
+    const result = await tx.query<{ tokenId: string; usedAt: Date; emailSentAt: Date | null; resetAuditAt: Date | null }>(
+      `SELECT pr."id" AS "tokenId",pr."usedAt",
+         (SELECT MAX(ae."sentAt") FROM "AuthEmailOutbox" ae WHERE ae."userId"=pr."userId" AND ae."template"='PASSWORD_RESET' AND ae."status"='SENT' AND ae."createdAt">=$2::timestamptz) AS "emailSentAt",
+         (SELECT MAX(al."createdAt") FROM "AuditLog" al WHERE al."tenantId"=$1::uuid AND al."userId"=pr."userId" AND al."entityType"='UserPassword' AND al."createdAt">=$2::timestamptz) AS "resetAuditAt"
+       FROM "PasswordResetToken" pr
+       WHERE pr."usedAt">=$2::timestamptz AND EXISTS (
+         SELECT 1 FROM "OrganisationMembership" om WHERE om."organisationId"=$1::uuid AND om."userId"=pr."userId"
+       ) ORDER BY pr."usedAt" DESC LIMIT 1`,
+      [tenantId, release.acceptanceStartedAt.toISOString()],
+    );
+    const row = result.rows[0];
+    const href = "/forgot-password";
+    return this.evidenceResult([
+      { key: "delivery", label: "reset email delivered", complete: Boolean(row?.emailSentAt), detail: row?.emailSentAt ? "The production mail worker recorded a sent password-reset email." : "Request a password reset for a controlled active account and confirm delivery.", observedAt: row?.emailSentAt?.toISOString() ?? null, href },
+      { key: "token", label: "single-use token consumed", complete: Boolean(row?.usedAt), detail: row?.usedAt ? "A password-reset token was consumed once." : "Open the delivered link and complete the reset.", observedAt: row?.usedAt?.toISOString() ?? null, href },
+      { key: "sessions", label: "sessions and devices revoked", complete: Boolean(row?.resetAuditAt), detail: row?.resetAuditAt ? "The password-reset audit confirms session and device revocation." : "Complete the reset so GridFlow can record the revocation audit.", observedAt: row?.resetAuditAt?.toISOString() ?? null, href },
+    ], { label: "Run controlled password recovery", href });
+  }
+
+  private async collectMfaEvidence(tx: SqlExecutor, tenantId: string, release: ReleaseRow): Promise<LiveEvidence> {
+    const result = await tx.query<{ userId: string; enabledAt: Date | null; mfaLoginAt: Date | null; recoveryLoginAt: Date | null }>(
+      `SELECT u."id" AS "userId",u."mfaEnabledAt" AS "enabledAt",
+         (SELECT MAX(al."createdAt") FROM "AuditLog" al WHERE al."tenantId"=$1::uuid AND al."userId"=u."id" AND al."action"='LOGIN' AND al."entityType"='AuthSession' AND al."metadata"->>'mfa'='true' AND al."createdAt">=$2::timestamptz) AS "mfaLoginAt",
+         (SELECT MAX(al."createdAt") FROM "AuditLog" al WHERE al."tenantId"=$1::uuid AND al."userId"=u."id" AND al."action"='LOGIN' AND al."entityType"='AuthSession' AND al."metadata"->>'recoveryCodeUsed'='true' AND al."createdAt">=$2::timestamptz) AS "recoveryLoginAt"
+       FROM "User" u JOIN "OrganisationMembership" om ON om."userId"=u."id"
+       WHERE om."organisationId"=$1::uuid AND u."mfaEnabled"=TRUE
+       ORDER BY u."mfaEnabledAt" DESC NULLS LAST LIMIT 1`,
+      [tenantId, release.acceptanceStartedAt.toISOString()],
+    );
+    const row = result.rows[0];
+    const href = "/settings";
+    return this.evidenceResult([
+      { key: "setup", label: "authenticator enabled", complete: Boolean(row?.enabledAt), detail: row?.enabledAt ? "MFA is currently enabled for an organisation member." : "Enable MFA with a real authenticator app.", observedAt: row?.enabledAt?.toISOString() ?? null, href },
+      { key: "challenge", label: "authenticator login completed", complete: Boolean(row?.mfaLoginAt), detail: row?.mfaLoginAt ? "A real MFA login challenge completed in this acceptance window." : "Sign out and complete one authenticator-code login.", observedAt: row?.mfaLoginAt?.toISOString() ?? null, href },
+      { key: "recovery", label: "one-time recovery code consumed", complete: Boolean(row?.recoveryLoginAt), detail: row?.recoveryLoginAt ? "A one-time recovery code completed a login and was consumed." : "Complete one controlled login with a saved recovery code.", observedAt: row?.recoveryLoginAt?.toISOString() ?? null, href },
+    ], { label: "Continue authenticator acceptance", href });
+  }
+
+  private async collectLiveEvidence(tx: SqlExecutor, tenantId: string, release: ReleaseRow, key: string): Promise<LiveEvidence | null> {
+    const agent = ({
+      atlas_live_acceptance: "ATLAS",
+      sage_live_acceptance: "SAGE",
+      relay_live_acceptance: "RELAY",
+      echo_live_acceptance: "ECHO",
+    } as const)[key as "atlas_live_acceptance" | "sage_live_acceptance" | "relay_live_acceptance" | "echo_live_acceptance"];
+    if (agent) return this.collectAgentEvidence(tx, tenantId, release, agent);
+    if (key === "gmail_live_acceptance") return this.collectGmailEvidence(tx, tenantId, release);
+    if (key === "password_reset_live_acceptance") return this.collectPasswordResetEvidence(tx, tenantId, release);
+    if (key === "mfa_device_acceptance") return this.collectMfaEvidence(tx, tenantId, release);
+    return null;
+  }
+
+  private async revalidateEvidenceChecks(tx: SqlExecutor, tenantId: string, release: ReleaseRow): Promise<void> {
+    const checks = await tx.query<{ id: string; key: string }>(
+      `SELECT "id","key" FROM "ReleaseAcceptanceCheck"
+       WHERE "tenantId"=$1::uuid AND "releaseAcceptanceId"=$2::uuid AND "evidenceRequired"=TRUE AND "status"='PASS'`,
+      [tenantId, release.id],
+    );
+    for (const check of checks.rows) {
+      const evidence = await this.collectLiveEvidence(tx, tenantId, release, check.key);
+      if (evidence?.complete) continue;
+      const detail = evidence?.summary ?? "The evidence rule for this check is unavailable.";
+      await tx.query(
+        `UPDATE "ReleaseAcceptanceCheck" SET "status"='BLOCKED',"automatedDetail"=$3,
+           "evidenceSnapshot"=$4::jsonb,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`,
+        [tenantId, check.id, `Previously accepted live evidence is no longer complete. ${detail}`, evidence ? JSON.stringify(evidence) : null],
+      );
+      await tx.query(
+        `INSERT INTO "AuditLog" ("tenantId","action","entityType","entityId","oldValues","newValues","metadata")
+         VALUES ($1::uuid,'UPDATE','ReleaseAcceptanceCheck',$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb)`,
+        [tenantId, check.id, JSON.stringify({ status: "PASS" }), JSON.stringify({ status: "BLOCKED" }), JSON.stringify({ reason: "live-evidence-invalidated", detail })],
       );
     }
   }
@@ -452,7 +703,8 @@ export class ReleaseAcceptanceService {
     if (!release) throw new NotFoundException("Release acceptance cycle was not found.");
     const checks = await tx.query<CheckRow>(
       `SELECT c."id",c."key",c."category"::text AS "category",c."title",c."description",c."required",c."automated",
-              c."status"::text AS "status",c."notes",c."evidenceUrl",c."automatedDetail",c."lastEvaluatedAt",c."testedAt",
+              c."evidenceRequired",c."status"::text AS "status",c."notes",c."evidenceUrl",c."automatedDetail",
+              c."evidenceSnapshot",c."evidenceObservedAt",c."lastEvaluatedAt",c."testedAt",
               c."testedByUserId",u."name" AS "testedByName",c."createdAt",c."updatedAt"
        FROM "ReleaseAcceptanceCheck" c LEFT JOIN "User" u ON u."id"=c."testedByUserId"
        WHERE c."tenantId"=$1::uuid AND c."releaseAcceptanceId"=$2::uuid
@@ -462,20 +714,33 @@ export class ReleaseAcceptanceService {
          c."automated" DESC,c."title" ASC`,
       [tenantId, releaseId],
     );
-    const required = checks.rows.filter((check) => check.required);
+    const enrichedChecks = [] as Array<CheckRow & { liveEvidence: LiveEvidence | null }>;
+    for (const check of checks.rows) {
+      enrichedChecks.push({
+        ...check,
+        liveEvidence: check.evidenceRequired ? await this.collectLiveEvidence(tx, tenantId, release, check.key) : null,
+      });
+    }
+    const required = enrichedChecks.filter((check) => check.required);
     const passed = required.filter((check) => check.status === "PASS").length;
     const waived = required.filter((check) => check.status === "WAIVED").length;
     const blocked = required.filter((check) => check.status === "BLOCKED").length;
     const failed = required.filter((check) => check.status === "FAIL").length;
     const pending = required.filter((check) => check.status === "PENDING").length;
-    const groups = Array.from(new Set(checks.rows.map((check) => check.category))).map((category) => ({
+    const groups = Array.from(new Set(enrichedChecks.map((check) => check.category))).map((category) => ({
       category,
-      checks: checks.rows.filter((check) => check.category === category),
+      checks: enrichedChecks.filter((check) => check.category === category),
     }));
     return {
       release,
       summary: { required: required.length, passed, waived, blocked, failed, pending, ready: release.status === "READY" || release.status === "APPROVED" || release.status === "RELEASED" },
       groups,
+      liveAcceptance: {
+        phase: "8A",
+        startedAt: release.acceptanceStartedAt,
+        evidenceBoundChecks: enrichedChecks.filter((check) => check.evidenceRequired).length,
+        evidenceComplete: enrichedChecks.filter((check) => check.evidenceRequired && check.liveEvidence?.complete).length,
+      },
       generatedAt: new Date().toISOString(),
     };
   }

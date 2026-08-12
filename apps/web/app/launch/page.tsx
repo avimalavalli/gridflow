@@ -20,7 +20,7 @@ export default async function LaunchPage() {
       <PageHead
         eyebrow="Release acceptance"
         title="Launch Control"
-        description="A hard release gate for live agents, outreach, account security, data recovery and real-device quality. GridFlow cannot be approved while required checks remain unresolved."
+        description="Evidence-bound acceptance for live agents, Gmail, account recovery, data resilience and real-device quality. GridFlow cannot be approved while required checks remain unresolved."
       />
       {data ? <LaunchControlClient initial={data} /> : <DataUnavailable message={error || "Launch Control is unavailable."} />}
     </Shell>

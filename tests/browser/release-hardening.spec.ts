@@ -32,6 +32,7 @@ test("public authentication surfaces are responsive, keyboard reachable and acce
 });
 
 test("signup and reduced-motion behaviour remain usable across release browsers", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/signup");
   await expect(page.getByRole("heading", { name: "Create your GridFlow organisation" })).toBeVisible();

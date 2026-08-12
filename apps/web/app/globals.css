@@ -25,6 +25,43 @@
   --radius-sm: 11px;
 }
 
+/* Phase 7B — contract delivery control */
+.delivery-start-card { border-color: #b9d8f2; background: linear-gradient(145deg, #f8fcff, #edf7ff); }
+.delivery-renewal-chip { display: inline-flex; align-items: center; gap: 5px; color: #174d84; font-size: 12px; font-weight: 700; }
+.delivery-contract-strip { display: flex; align-items: center; gap: 22px; padding: 18px 20px; border: 1px solid #c9d8e7; border-radius: 16px; background: linear-gradient(135deg, #102f55, #174d84); color: #fff; box-shadow: 0 14px 35px rgba(15, 47, 85, .16); }
+.delivery-contract-strip > div { display: grid; gap: 3px; min-width: 170px; }
+.delivery-contract-strip > div:first-child { margin-right: auto; }
+.delivery-contract-strip span, .delivery-contract-strip small { color: #e4edf7; font-size: 12px; }
+.delivery-contract-strip strong { color: #fff; }
+.delivery-contract-strip .status-badge { background: #fff; color: #123d6b; }
+.delivery-obligations { display: grid; gap: 14px; }
+.delivery-obligation { padding: 18px; }
+.delivery-obligation-risk { border-color: #e6b454; box-shadow: inset 4px 0 0 #d99920; }
+.delivery-obligation-head { display: flex; align-items: center; gap: 12px; }
+.delivery-sequence { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border-radius: 9px; background: #e8f3fc; color: #174d84; font-size: 12px; font-weight: 800; }
+.delivery-description { margin: 12px 0 0 42px; color: #52677f; line-height: 1.55; }
+.delivery-proof-line { display: flex; flex-wrap: wrap; gap: 7px; margin: 13px 0 0 42px; }
+.delivery-proof-line span { padding: 5px 8px; border-radius: 999px; background: #edf4fa; color: #38536f; font-size: 11px; font-weight: 700; }
+.delivery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.delivery-inline-form { margin-top: 15px; padding: 15px; border-radius: 13px; background: #f5f9fc; border: 1px solid #dbe7f1; }
+.delivery-add { margin-bottom: 15px; }
+.delivery-evidence-list { display: grid; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e1e9f0; }
+.delivery-evidence { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid #dbe7f1; border-radius: 11px; background: #fff; }
+.delivery-evidence a { color: #174d84; }
+.delivery-evidence small { display: block; margin-top: 2px; color: #60758c; }
+.delivery-report-list { display: grid; gap: 9px; margin-top: 16px; }
+.delivery-report { display: flex; align-items: center; gap: 9px; padding: 11px; border: 1px solid #dbe7f1; border-radius: 11px; background: #f8fbfe; }
+.delivery-report input { min-width: 170px; padding: 9px 10px; border: 1px solid #cbd9e5; border-radius: 9px; }
+.delivery-report small { display: block; margin-top: 3px; color: #60758c; }
+
+@media (max-width: 760px) {
+  .delivery-contract-strip { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .delivery-contract-strip > div:first-child { margin-right: 0; }
+  .delivery-obligation-head, .delivery-evidence, .delivery-report { align-items: flex-start; flex-wrap: wrap; }
+  .delivery-description, .delivery-proof-line { margin-left: 0; }
+  .delivery-report input { width: 100%; }
+}
+
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }

@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 7A Seal
+# GridFlow implementation status — Phase 7B Delivery OS
 
 ## Built and verified
 
@@ -26,12 +26,15 @@
 - **Seal contract control** with immutable checksummed versions, legal review gates, externally verified signer status, signed-document evidence, explicit activation and reasoned termination.
 - Currency-safe payment milestones with invoice/bank verification, overdue detection and cash-control reporting.
 - Automated internal signature and overdue-payment risk tasks that never contact a counterparty or alter legal/financial truth.
+- **Delivery OS** with automatic active-contract handover, immutable signed-version anchoring, real-deadline planning, category-aware obligation tracking and completion gates.
+- Secure fulfilment evidence with independent reviewer verification, checksummed sponsor-report snapshots, explicit external-sharing records and a controlled renewal runway.
+- Automated internal obligation and renewal risk tasks that never claim fulfilment, contact a sponsor or choose a commercial outcome.
 
 ## Validation result
 
-- 114 automated tests passed across 47 files.
+- 118 automated tests passed across 48 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 66 models and 18 registered migrations.
+- Database schema check passed: 70 models and 19 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM and multi-athlete authentication smoke suites are part of the release workflow.
 

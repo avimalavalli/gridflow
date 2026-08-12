@@ -341,6 +341,22 @@ export class SealService {
       if (Number(signatures.rows[0]?.missing ?? 1) > 0) throw new BadRequestException("Every required signer must be signed before activation.");
       await tx.query(`UPDATE "Contract" SET "status"='ACTIVE',"signedDocumentUrl"=$3,"activatedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid`, [tenantId, contractId, signedDocumentUrl]);
       await tx.query(`UPDATE "PaymentMilestone" SET "status"=CASE WHEN "dueDate"<CURRENT_DATE THEN 'OVERDUE'::"PaymentMilestoneStatus" ELSE 'DUE'::"PaymentMilestoneStatus" END,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "contractId"=$2::uuid AND "status"='DRAFT'`, [tenantId, contractId]);
+      const delivery = await tx.query<{ id: string }>(
+        `INSERT INTO "DeliveryProgramme" ("tenantId","contractId","contractVersionId","internalOwner","deliveryStartDate","deliveryEndDate","activatedAt","updatedAt")
+         SELECT "tenantId","id","currentVersionId","internalOwner","startDate","endDate",CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM "Contract"
+         WHERE "tenantId"=$1::uuid AND "id"=$2::uuid AND "currentVersionId" IS NOT NULL AND "startDate" IS NOT NULL AND "endDate" IS NOT NULL
+         ON CONFLICT ("contractId") DO NOTHING RETURNING "id"`, [tenantId, contractId],
+      );
+      if (delivery.rows[0]) {
+        await tx.query(
+          `INSERT INTO "DeliveryObligation" ("tenantId","programmeId","sequence","title","description","sourceReference","updatedAt")
+           SELECT $1::uuid,$2::uuid,item.ordinality::int,left(trim(item.value),240),trim(item.value),'contract.deliverables['||(item.ordinality-1)::text||']',CURRENT_TIMESTAMP
+           FROM "ContractVersion" v CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(v."terms"->'commercialTerms'->'deliverables','[]'::jsonb)) WITH ORDINALITY AS item(value,ordinality)
+           WHERE v."tenantId"=$1::uuid AND v."id"=$3::uuid AND trim(item.value)<>'' ON CONFLICT ("programmeId","sequence") DO NOTHING`,
+          [tenantId, delivery.rows[0].id, contract.currentVersionId],
+        );
+        await audit(tx, tenantId, userId, "CREATE", contractId, { event: "DELIVERY_PROGRAMME_BOOTSTRAPPED", deliveryProgrammeId: delivery.rows[0].id, contractVersionId: contract.currentVersionId });
+      }
       let opportunityUpdated = false;
       if (input.updateOpportunityToWon) {
         const result = await tx.query(`UPDATE "Opportunity" SET "stage"='WON',"stageEnteredAt"=CURRENT_TIMESTAMP,"probability"=100,"closedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "id"=$2::uuid AND "stage"='VERBAL_AGREEMENT'`, [tenantId, contract.opportunityId]);

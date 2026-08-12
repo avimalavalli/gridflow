@@ -17,6 +17,7 @@ import {
   Handshake,
   Hammer,
   FileSignature,
+  ClipboardCheck,
   LifeBuoy,
   LayoutDashboard,
   ListTodo,
@@ -58,6 +59,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Opportunities", href: "/opportunities", icon: Handshake, keywords: "pipeline deals sponsorship revenue" },
       { label: "Forge", href: "/forge", icon: Hammer, keywords: "proposal packages pricing activation commercial approval pdf" },
       { label: "Seal", href: "/seal", icon: FileSignature, keywords: "contracts signatures legal payments milestones invoices revenue" },
+      { label: "Delivery", href: "/delivery", icon: ClipboardCheck, keywords: "contract obligations fulfilment evidence reporting sponsor value renewal" },
     ],
   },
   {

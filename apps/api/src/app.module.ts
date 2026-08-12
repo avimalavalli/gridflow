@@ -32,6 +32,7 @@ import { OperationsProofsModule } from "./operations-proofs/operations-proofs.mo
 import { ExperienceModule } from "./experience/experience.module.js";
 import { AutomationModule } from "./automation/automation.module.js";
 import { SealModule } from "./seal/seal.module.js";
+import { DeliveryModule } from "./delivery/delivery.module.js";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { SealModule } from "./seal/seal.module.js";
     ExperienceModule,
     AutomationModule,
     SealModule,
+    DeliveryModule,
   ],
 })
 export class AppModule {}

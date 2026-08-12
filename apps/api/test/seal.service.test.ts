@@ -70,6 +70,8 @@ describe("SealService", () => {
     await database!.query(`UPDATE "Opportunity" SET "stage"='VERBAL_AGREEMENT',"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [data.opportunityId]);
     const active = await service.activate(data.tenantId, data.userId, created.contractId, { confirmFullyExecuted: true, signedDocumentUrl: "https://documents.test/seal-signed.pdf", updateOpportunityToWon: true });
     expect(active).toMatchObject({ status: "ACTIVE", opportunityUpdated: true });
+    const delivery = await database!.query<{ programmeId: string; obligations: number }>(`SELECT p."id" AS "programmeId",COUNT(o."id")::int AS "obligations" FROM "DeliveryProgramme" p LEFT JOIN "DeliveryObligation" o ON o."programmeId"=p."id" AND o."tenantId"=p."tenantId" WHERE p."tenantId"=$1::uuid AND p."contractId"=$2::uuid GROUP BY p."id"`, [data.tenantId, created.contractId]);
+    expect(delivery.rows[0]?.obligations).toBe(1);
 
     const activeDetail = await service.detail(data.tenantId, created.contractId);
     const milestone = activeDetail.milestones[0] as { id: string; amountMinor: number };

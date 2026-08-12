@@ -64,6 +64,13 @@ const chapters = [
     ["Payment milestones", "The schedule must equal the contract value. Record invoiced, partial, paid, disputed or waived states only against verified invoice or bank evidence. Overdue milestones appear in Automation."],
     ["Activation and deal wins", "A contract activates only after every required signer is verified and a secure signed-document URL is attached. Marking the opportunity won is a separate explicit choice."],
   ]},
+  { id: "delivery", title: "Delivery and renewals", summary: "Turn an active contract into fulfilled obligations, verified proof, sponsor reports and renewal action.", route: "/delivery", sections: [
+    ["Automatic contract handover", "When Seal activates a contract, Delivery creates one workspace anchored to that exact immutable contract version and imports its confirmed deliverables. It never invents deadlines."],
+    ["Plan and ownership", "Add any missing obligations, assign the internal owner and enter a real due date for every promise. An owner or admin approves the plan before fulfilment begins."],
+    ["Evidence and verification", "Record only secure HTTPS links to genuine documents, images, video, analytics or approvals. A reviewer must open and verify the evidence before the obligation can become verified."],
+    ["Sponsor reports", "Choose a reporting period to create a checksummed snapshot of relevant obligations and evidence. Approval does not send it; record the secure link only after it was actually shared."],
+    ["Risk and renewal automation", "Automation creates internal tasks for blocked, due or overdue obligations and agreed renewal-review dates. It never claims delivery, contacts the sponsor or chooses a renewal outcome."],
+  ]},
   { id: "ai", title: "AI Setup and keys", summary: "Connect AI safely and know which agents use which provider.", route: "/settings/ai", sections: [
     ["Where to put a key", "Open Settings → AI Setup. Paste the key only into that secure form. Never send an API key through chat, email, screenshots or support messages."],
     ["What the key powers", "Gemini powers non-web drafting and intelligence such as Echo, Sentinel, Nova, Orbit and Forge. Managed evidence research powers Atlas, Sage and Relay."],

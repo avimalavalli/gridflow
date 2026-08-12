@@ -46,6 +46,7 @@ interface IntegrationIssueRow extends Record<string, unknown> { id: string; prov
 interface FailedRunRow extends Record<string, unknown> { id: string; agentName: string; errorDetails: string | null; retryCount: number }
 interface BriefRow extends Record<string, unknown> { id: string; briefName: string }
 interface SealRiskRow extends Record<string, unknown> { id: string; opportunityId: string; companyName: string; contractTitle: string; kind: string; detail: string; dueAt: Date }
+interface DeliveryRiskRow extends Record<string, unknown> { id: string; opportunityId: string; companyName: string; contractTitle: string; programmeId: string; kind: string; detail: string; dueAt: Date }
 
 export interface AutomationReconcileResult extends Record<string, unknown> {
   tenants: number;
@@ -169,7 +170,11 @@ export class AutomationControlEngine {
       const withinBudget = usage.agentRuns < policy.dailyAgentRunLimit && usage.researchRuns < policy.dailyResearchCreditLimit
         && Number(usage.estimatedCostUsd) < Number(policy.dailyEstimatedCostLimitUsd) && usage.activeRuns < policy.maxConcurrentRuns;
 
-      const [stale, missing, integrations, failed, sealRisks] = await Promise.all([
+      await tx.query(`UPDATE "DeliveryObligation" SET "status"='OVERDUE',"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "status" IN ('PLANNED','READY','IN_PROGRESS') AND "dueDate"<CURRENT_DATE`, [tenantId]);
+      await tx.query(`UPDATE "DeliveryProgramme" p SET "status"=CASE WHEN EXISTS (SELECT 1 FROM "DeliveryObligation" o WHERE o."tenantId"=p."tenantId" AND o."programmeId"=p."id" AND o."status" IN ('OVERDUE','BLOCKED')) THEN 'AT_RISK'::"DeliveryProgrammeStatus" ELSE 'ACTIVE'::"DeliveryProgrammeStatus" END,"updatedAt"=CURRENT_TIMESTAMP WHERE p."tenantId"=$1::uuid AND p."status" IN ('ACTIVE','AT_RISK')`, [tenantId]);
+      await tx.query(`UPDATE "DeliveryProgramme" SET "renewalStatus"='DUE',"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "renewalStatus"='NOT_STARTED' AND "renewalReviewDate"<=CURRENT_DATE`, [tenantId]);
+
+      const [stale, missing, integrations, failed, sealRisks, deliveryRisks] = await Promise.all([
         tx.query<StaleOpportunityRow>(
           `SELECT o."id",o."opportunityName",c."companyName",o."stage"::text AS "stage",o."stageEnteredAt"
            FROM "Opportunity" o JOIN "Company" c ON c."id"=o."companyId"
@@ -202,6 +207,18 @@ export class AutomationControlEngine {
              JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
              WHERE pm."tenantId"=$1::uuid AND pm."status" NOT IN ('PAID','WAIVED','DISPUTED') AND pm."dueDate"<CURRENT_DATE
            ) risks ORDER BY "dueAt" LIMIT 40`, [tenantId]),
+        tx.query<DeliveryRiskRow>(
+          `SELECT * FROM (
+             SELECT ob."id",c."opportunityId",co."companyName",c."title" AS "contractTitle",p."id" AS "programmeId",'OBLIGATION' AS "kind",
+                    ob."title"||CASE WHEN ob."status"='BLOCKED' THEN ' is blocked.' ELSE ' is due or overdue.' END AS "detail",COALESCE(ob."dueDate",CURRENT_DATE)::timestamptz AS "dueAt"
+             FROM "DeliveryObligation" ob JOIN "DeliveryProgramme" p ON p."id"=ob."programmeId" AND p."tenantId"=ob."tenantId"
+             JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+             WHERE ob."tenantId"=$1::uuid AND p."status" IN ('ACTIVE','AT_RISK') AND (ob."status" IN ('OVERDUE','BLOCKED') OR (ob."status" NOT IN ('VERIFIED','WAIVED','DELIVERED') AND ob."dueDate"<=CURRENT_DATE+interval '7 days'))
+             UNION ALL
+             SELECT p."id",c."opportunityId",co."companyName",c."title",p."id",'RENEWAL','Renewal review is due. The commercial outcome remains a human decision.',p."renewalReviewDate"::timestamptz
+             FROM "DeliveryProgramme" p JOIN "Contract" c ON c."id"=p."contractId" AND c."tenantId"=p."tenantId" JOIN "Company" co ON co."id"=c."companyId" AND co."tenantId"=c."tenantId"
+             WHERE p."tenantId"=$1::uuid AND p."renewalStatus"='DUE'
+           ) risks ORDER BY "dueAt" LIMIT 60`, [tenantId]),
       ]);
 
       for (const item of stale.rows) {
@@ -241,6 +258,21 @@ export class AutomationControlEngine {
           taskType: "FOLLOW_UP", taskDescription: payment
             ? "Check the invoice and bank record, then record the verified status in Seal. Contact the sponsor only through an authorised human action."
             : "Open Seal, verify the external signature provider or document trail, and choose the authorised human follow-up.", dueAt: now,
+        });
+      }
+      for (const item of deliveryRisks.rows) {
+        const renewal = item.kind === "RENEWAL";
+        await this.suggestOrCreateTask(tx, policy, ownerId, result, {
+          key: `delivery-${item.kind.toLowerCase()}:${item.id}:${new Date(item.dueAt).toISOString().slice(0,10)}`,
+          kind: renewal ? "CREATE_RENEWAL_REVIEW_TASK" : "CREATE_DELIVERY_FOLLOW_UP_TASK", sourceType: "Opportunity", sourceId: item.opportunityId,
+          title: renewal ? `Review renewal with ${item.companyName}` : `Protect delivery for ${item.companyName}`,
+          summary: `${item.contractTitle} · ${item.detail}`,
+          explanation: renewal
+            ? "GridFlow detected the agreed renewal-review date. It can create an internal task, but it cannot promise, decline or contact the sponsor."
+            : "GridFlow detected a contractual delivery risk. It can create an internal action, but it cannot claim fulfilment or contact the sponsor.",
+          taskType: "DELIVERY", taskDescription: renewal
+            ? `Open Delivery, review verified fulfilment and decide the authorised renewal action for ${item.companyName}.`
+            : `Open Delivery, resolve the obligation, attach genuine evidence and request verification. Programme: ${item.programmeId}.`, dueAt: new Date(item.dueAt),
         });
       }
 
@@ -373,7 +405,10 @@ export class AutomationControlEngine {
          (SELECT COUNT(*)::int FROM "Task" WHERE "tenantId"=$1::uuid AND "status" IN ('OPEN','IN_PROGRESS') AND "dueAt"<CURRENT_TIMESTAMP) AS "overdueTasks",
          (SELECT COUNT(*)::int FROM "Contract" WHERE "tenantId"=$1::uuid AND "fullySignedAt">=$2::date AND "fullySignedAt"<$3::date+1) AS "contractsSigned",
          (SELECT COALESCE(SUM("amountPaidMinor"),0)::bigint FROM "PaymentMilestone" WHERE "tenantId"=$1::uuid AND "paidAt">=$2::date AND "paidAt"<$3::date+1) AS "cashCollectedMinor",
-         (SELECT COALESCE(SUM("amountMinor"-"amountPaidMinor"),0)::bigint FROM "PaymentMilestone" WHERE "tenantId"=$1::uuid AND "status" NOT IN ('PAID','WAIVED')) AS "contractedOutstandingMinor"`,
+         (SELECT COALESCE(SUM("amountMinor"-"amountPaidMinor"),0)::bigint FROM "PaymentMilestone" WHERE "tenantId"=$1::uuid AND "status" NOT IN ('PAID','WAIVED')) AS "contractedOutstandingMinor",
+         (SELECT COUNT(*)::int FROM "DeliveryObligation" WHERE "tenantId"=$1::uuid AND "verifiedAt">=$2::date AND "verifiedAt"<$3::date+1) AS "obligationsVerified",
+         (SELECT COUNT(*)::int FROM "DeliveryObligation" WHERE "tenantId"=$1::uuid AND "status" IN ('OVERDUE','BLOCKED')) AS "deliveryRisks",
+         (SELECT COUNT(*)::int FROM "DeliveryProgramme" WHERE "tenantId"=$1::uuid AND "renewalStatus"='DUE') AS "renewalsDue"`,
       [tenantId, range.start, range.end],
     );
     const inserted = await tx.query(

@@ -32,19 +32,24 @@ export interface ApiConfig {
 export function commercialLaunchConfigured(): boolean {
   const supportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) return false;
-  if ((process.env.PAYMENT_CONFIRMATION_SECRET ?? "").trim().length < 32) return false;
-  return (["CORE", "ULTRA"] as const).every((plan) => {
-    const amount = Number(process.env[`COMMERCE_${plan}_PRICE_MINOR`] ?? "");
-    const currency = (process.env[`COMMERCE_${plan}_CURRENCY`] ?? "").trim().toUpperCase();
-    const provider = (process.env[`COMMERCE_${plan}_PAYMENT_PROVIDER`] ?? "").trim();
-    const template = (process.env[`COMMERCE_${plan}_CHECKOUT_URL`] ?? "").trim();
-    if (!Number.isInteger(amount) || amount < 1 || !/^[A-Z]{3}$/.test(currency) || !provider || !template.includes("{ORDER_REFERENCE}")) return false;
-    try {
-      return new URL(template.replaceAll("{ORDER_REFERENCE}", "GF-ORDER").replaceAll("{EMAIL}", "buyer@example.test")).protocol === "https:";
-    } catch {
-      return false;
-    }
-  });
+  const ultraAmount = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
+  if (!Number.isInteger(ultraAmount) || ultraAmount < 1) return false;
+  try {
+    const packs = JSON.parse(process.env.COMMERCE_RESEARCH_PACKS_JSON ?? "") as unknown;
+    const codes = new Set<string>();
+    return Array.isArray(packs) && packs.length > 0 && packs.every((value) => {
+      if (!value || typeof value !== "object") return false;
+      const item = value as Record<string, unknown>;
+      const code = String(item.code ?? "").trim().toUpperCase();
+      if (codes.has(code)) return false;
+      codes.add(code);
+      return /^[A-Z0-9_]{2,40}$/.test(code)
+        && Number.isInteger(Number(item.credits)) && Number(item.credits) > 0
+        && Number.isInteger(Number(item.amountMinor)) && Number(item.amountMinor) > 0;
+    });
+  } catch {
+    return false;
+  }
 }
 
 function readBoolean(value: string | undefined, fallback: boolean): boolean {

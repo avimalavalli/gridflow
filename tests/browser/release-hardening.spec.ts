@@ -18,12 +18,12 @@ test("public product, configured pricing, support and private receipt states are
   }
 
   await page.goto("/pricing");
-  await expect(page.getByText("£125.00", { exact: true })).toBeVisible();
-  await expect(page.getByText("£290.00", { exact: true })).toBeVisible();
-  await page.route("**/backend/commerce/orders", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ checkoutUrl: "http://localhost:3000/support?checkout=GF-BROWSER" }) }));
-  await page.getByLabel("Activation email").fill("buyer@example.test");
-  await page.getByRole("button", { name: "Choose GridFlow Core" }).click();
-  await page.waitForURL(/\/support\?checkout=GF-BROWSER$/);
+  await expect(page.getByText("Individually quoted", { exact: true })).toBeVisible();
+  await expect(page.getByText("£39.99", { exact: true })).toBeVisible();
+  await expect(page.getByText("£11.99 once. Purchased credits do not expire.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request a Core quote" })).toHaveAttribute("href", /^mailto:support@gridflow\.test/);
+  await expect(page.getByText(/no online checkout and no automatic renewal/i)).toBeVisible();
+  await expect(page.getByLabel("Activation email")).toHaveCount(0);
 
   await page.goto("/receipt");
   await expect(page.getByText("This receipt link is incomplete.")).toBeVisible();

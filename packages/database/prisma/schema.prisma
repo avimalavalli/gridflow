@@ -56,6 +56,31 @@ enum CommercialPurchaseStatus {
   REFUNDED
 }
 
+enum CommercialProductType {
+  CORE_ONBOARDING
+  ULTRA_PERIOD
+  RESEARCH_PACK
+}
+
+enum ResearchCreditBucketType {
+  CORE_STARTER
+  ULTRA_INCLUDED
+  PURCHASED
+}
+
+enum UltraLifecycleStatus {
+  ACTIVE
+  RENEWAL_DUE
+  PAYMENT_PENDING
+  EXPIRED
+}
+
+enum UltraReminderStage {
+  SEVEN_DAYS
+  THREE_DAYS
+  EXPIRED
+}
+
 enum AgentCredentialProvider {
   GEMINI
 }
@@ -800,6 +825,9 @@ model Organisation {
   productEntitlement  ProductEntitlement?
   agentCredentials    AgentProviderCredential[]
   researchCreditReservations ResearchCreditReservation[]
+  researchCreditBuckets ResearchCreditBucket[]
+  commercialPurchases CommercialPurchase[]
+  ultraRenewalReminders UltraRenewalReminder[]
   productExperienceProgress ProductExperienceProgress[]
   automationControlPolicy AutomationControlPolicy?
   automationDecisions AutomationDecision[]
@@ -846,7 +874,10 @@ model CommercialPurchase {
   reference                String                   @unique
   email                    String
   plan                     ProductPlan
+  productType              CommercialProductType      @default(CORE_ONBOARDING)
   status                   CommercialPurchaseStatus @default(PENDING_PAYMENT)
+  tenantId                 String?                  @db.Uuid
+  packCode                 String?
   amountMinor              Int
   currency                 String
   paymentProvider          String
@@ -872,10 +903,14 @@ model CommercialPurchase {
   reviewedBy               User?                    @relation("CommercialPurchaseReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   fulfilmentEmail          AuthEmailOutbox?          @relation(fields: [fulfilmentEmailId], references: [id], onDelete: SetNull)
   paymentEvents            CommercialPaymentEvent[]
+  tenant                   Organisation?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  creditBucket             ResearchCreditBucket?
 
   @@unique([paymentProvider, providerPaymentReference])
   @@index([status, createdAt])
   @@index([email, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([productType, status, createdAt])
 }
 
 model CommercialPaymentEvent {
@@ -904,6 +939,10 @@ model ProductEntitlement {
   seatLimit                Int                @default(1)
   startsAt                 DateTime?           @db.Timestamptz(3)
   expiresAt                DateTime?           @db.Timestamptz(3)
+  ultraStatus              UltraLifecycleStatus?
+  ultraStartsAt            DateTime?           @db.Timestamptz(3)
+  ultraExpiresAt           DateTime?           @db.Timestamptz(3)
+  ultraPaymentPendingAt    DateTime?           @db.Timestamptz(3)
   approvedAt               DateTime?           @db.Timestamptz(3)
   approvedByUserId         String?             @db.Uuid
   suspensionReason         String?
@@ -911,6 +950,8 @@ model ProductEntitlement {
   updatedAt                DateTime            @updatedAt @db.Timestamptz(3)
   tenant                   Organisation        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   approvedBy               User?               @relation("ProductEntitlementApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  creditBuckets            ResearchCreditBucket[]
+  ultraRenewalReminders    UltraRenewalReminder[]
 
   @@index([status, plan])
 }
@@ -1090,6 +1131,8 @@ model AuthEmailOutbox {
   updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
   user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   commercialPurchase CommercialPurchase?
+  customerUltraRenewalReminders UltraRenewalReminder[] @relation("UltraRenewalCustomerEmail")
+  adminUltraRenewalReminders    UltraRenewalReminder[] @relation("UltraRenewalAdminEmail")
 
   @@index([status, scheduledFor])
 }
@@ -1179,7 +1222,7 @@ model AutomationControlPolicy {
   quietHoursEnd                String                  @default("08:00")
   workingDays                  Json                    @default("[1,2,3,4,5]")
   dailyAgentRunLimit           Int                     @default(40)
-  dailyResearchCreditLimit     Int                     @default(10)
+  dailyResearchCreditLimit     Int                     @default(30)
   dailyEstimatedCostLimitUsd   Decimal                 @default(10) @db.Decimal(12, 2)
   maxConcurrentRuns            Int                     @default(4)
   approvalBatchSize            Int                     @default(10)
@@ -2289,8 +2332,65 @@ model ResearchCreditReservation {
   refundedAt DateTime?                       @db.Timestamptz(3)
   tenant     Organisation                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   agentRun   AgentRun                        @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  allocations ResearchCreditReservationAllocation[]
 
   @@index([tenantId, status, reservedAt])
+}
+
+model ResearchCreditBucket {
+  id            String                   @id @default(uuid()) @db.Uuid
+  tenantId      String                   @db.Uuid
+  entitlementId String                   @db.Uuid
+  purchaseId    String?                  @unique @db.Uuid
+  type          ResearchCreditBucketType
+  label         String
+  granted       Int
+  reserved      Int                      @default(0)
+  used          Int                      @default(0)
+  availableFrom DateTime                 @default(now()) @db.Timestamptz(3)
+  expiresAt     DateTime?                @db.Timestamptz(3)
+  createdAt     DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                 @updatedAt @db.Timestamptz(3)
+  tenant        Organisation             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entitlement   ProductEntitlement       @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  purchase      CommercialPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  allocations   ResearchCreditReservationAllocation[]
+
+  @@index([tenantId, type, availableFrom, expiresAt])
+  @@index([entitlementId, createdAt])
+}
+
+model ResearchCreditReservationAllocation {
+  id            String                          @id @default(uuid()) @db.Uuid
+  reservationId String                          @db.Uuid
+  bucketId      String                          @db.Uuid
+  amount        Int                             @default(1)
+  status        ResearchCreditReservationStatus @default(RESERVED)
+  createdAt     DateTime                        @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                        @updatedAt @db.Timestamptz(3)
+  reservation   ResearchCreditReservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  bucket        ResearchCreditBucket            @relation(fields: [bucketId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, bucketId])
+  @@index([bucketId, status])
+}
+
+model UltraRenewalReminder {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String             @db.Uuid
+  entitlementId   String             @db.Uuid
+  ultraExpiresAt  DateTime           @db.Timestamptz(3)
+  stage           UltraReminderStage
+  customerEmailId String?            @db.Uuid
+  adminEmailId    String?            @db.Uuid
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  tenant          Organisation       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entitlement     ProductEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  customerEmail   AuthEmailOutbox?    @relation("UltraRenewalCustomerEmail", fields: [customerEmailId], references: [id], onDelete: SetNull)
+  adminEmail      AuthEmailOutbox?    @relation("UltraRenewalAdminEmail", fields: [adminEmailId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, ultraExpiresAt, stage])
+  @@index([stage, createdAt])
 }
 
 model PipelineRun {

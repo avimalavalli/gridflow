@@ -70,7 +70,8 @@ export class TenantAgentProviderResolver implements AgentModelProviderResolver {
       await setTenantContext(tx, request.tenantId);
       const result = await tx.query<RoutingRow>(
         `SELECT o."accessStatus"::text AS "accessStatus",pe."status"::text AS "entitlementStatus",
-                pe."plan"::text AS "plan",pe."agentExecutionMode"::text AS "agentExecutionMode",pe."expiresAt",
+                CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA' ELSE 'CORE' END AS "plan",
+                CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'MANAGED' ELSE 'BYO_GEMINI' END AS "agentExecutionMode",NULL::timestamptz AS "expiresAt",
                 c."id" AS "credentialId",c."status"::text AS "credentialStatus",c."encryptedApiKey",c."model"
          FROM "Organisation" o JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
          LEFT JOIN "AgentProviderCredential" c ON c."tenantId"=o."id" AND c."provider"='GEMINI'
@@ -81,9 +82,6 @@ export class TenantAgentProviderResolver implements AgentModelProviderResolver {
     });
     if (!row || row.accessStatus !== "ACTIVE" || row.entitlementStatus !== "ACTIVE") {
       throw new Error("This GridFlow organisation is not approved for agent execution.");
-    }
-    if (row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now()) {
-      throw new Error("This GridFlow entitlement has expired.");
     }
     if (request.webSearchRequired) {
       if (!this.managedProvider) throw new Error("GridFlow managed research is not configured for Atlas, Sage or Relay.");

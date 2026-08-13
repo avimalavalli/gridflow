@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
-import { AddResearchCreditsDto, CreateActivationGrantDto, OrganisationAccessDecisionDto, RenewUltraDto } from "./platform.dto.js";
+import { CreateActivationGrantDto, MarkUltraPaymentPendingDto, OrganisationAccessDecisionDto } from "./platform.dto.js";
 import { PlatformService } from "./platform.service.js";
 import { CommerceService } from "../commerce/commerce.service.js";
 import { ConfirmManualPurchaseDto, ResolveCommercialPurchaseDto } from "../commerce/commerce.dto.js";
@@ -47,13 +47,8 @@ export class PlatformController {
     return this.platform.decide(await this.admin(request), id, input, request);
   }
 
-  @Post("organisations/:id/research-credits")
-  async addCredits(@Req() request: Request, @Param("id") id: string, @Body() input: AddResearchCreditsDto) {
-    return this.platform.addCredits(await this.admin(request), id, input, request);
-  }
-
-  @Post("organisations/:id/renew-ultra")
-  async renewUltra(@Req() request: Request, @Param("id") id: string, @Body() input: RenewUltraDto) {
-    return this.platform.renewUltra(await this.admin(request), id, input, request);
+  @Post("organisations/:id/ultra-payment-pending")
+  async markUltraPaymentPending(@Req() request: Request, @Param("id") id: string, @Body() input: MarkUltraPaymentPendingDto) {
+    return this.platform.markUltraPaymentPending(await this.admin(request), id, input, request);
   }
 }

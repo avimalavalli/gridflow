@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import type { Request } from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabase, migrateDatabase, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
@@ -15,27 +14,48 @@ function request(): Request {
   return { ip: "127.0.0.1", header: () => "gridflow-commerce-test" } as unknown as Request;
 }
 
-const envKeys = [
-  "COMMERCE_CORE_PRICE_MINOR", "COMMERCE_CORE_CURRENCY", "COMMERCE_CORE_PAYMENT_PROVIDER", "COMMERCE_CORE_CHECKOUT_URL",
-  "COMMERCE_CORE_RESEARCH_CREDITS", "COMMERCE_CORE_SEAT_LIMIT", "PAYMENT_CONFIRMATION_SECRET",
-] as const;
+const envKeys = ["COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_RESEARCH_PACKS_JSON", "COMMERCE_SUPPORT_EMAIL"] as const;
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 const originalWebOrigin = apiConfig.webOrigin;
 let database: GridFlowDatabase;
 let commerce: CommerceService;
+let identity: RequestIdentity;
+
+async function createCustomer(email = "driver@example.test") {
+  return database.transaction(async (tx) => {
+    const user = await tx.query<{ id: string }>(
+      `INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ($1,'x','Test Driver',CURRENT_TIMESTAMP) RETURNING "id"`, [email],
+    );
+    const organisation = await tx.query<{ id: string }>(
+      `INSERT INTO "Organisation" ("name","slug","type","accessStatus","updatedAt") VALUES ('Test Driver Motorsport',$1,'DRIVER','ACTIVE',CURRENT_TIMESTAMP) RETURNING "id"`,
+      [`test-driver-${Math.random().toString(16).slice(2)}`],
+    );
+    await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [organisation.rows[0]!.id, user.rows[0]!.id]);
+    const entitlement = await tx.query<{ id: string }>(
+      `INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsGranted","seatLimit","startsAt","approvedAt","updatedAt")
+       VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',500,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`, [organisation.rows[0]!.id],
+    );
+    await tx.query(
+      `INSERT INTO "ResearchCreditBucket" ("tenantId","entitlementId","type","label","granted","updatedAt") VALUES ($1::uuid,$2::uuid,'CORE_STARTER','Core starter credits',500,CURRENT_TIMESTAMP)`,
+      [organisation.rows[0]!.id, entitlement.rows[0]!.id],
+    );
+    return { tenantId: organisation.rows[0]!.id, entitlementId: entitlement.rows[0]!.id };
+  });
+}
 
 beforeEach(async () => {
   database = await createDatabase("pglite://memory");
   await migrateDatabase(database);
   commerce = new CommerceService(new TestDatabaseService(database) as never);
   apiConfig.webOrigin = "https://app.gridflow.test";
-  process.env.COMMERCE_CORE_PRICE_MINOR = "12500";
-  process.env.COMMERCE_CORE_CURRENCY = "GBP";
-  process.env.COMMERCE_CORE_PAYMENT_PROVIDER = "test-payments";
-  process.env.COMMERCE_CORE_CHECKOUT_URL = "https://pay.gridflow.test/checkout?reference={ORDER_REFERENCE}&email={EMAIL}";
-  process.env.COMMERCE_CORE_RESEARCH_CREDITS = "3";
-  process.env.COMMERCE_CORE_SEAT_LIMIT = "2";
-  process.env.PAYMENT_CONFIRMATION_SECRET = "payment-confirmation-test-secret-1234567890";
+  process.env.COMMERCE_ULTRA_PRICE_MINOR = "3999";
+  process.env.COMMERCE_RESEARCH_PACKS_JSON = JSON.stringify([
+    { code: "PACK_100", credits: 100, amountMinor: 1199 },
+    { code: "PACK_250", credits: 250, amountMinor: 2499 },
+  ]);
+  process.env.COMMERCE_SUPPORT_EMAIL = "support@example.test";
+  const admin = await database.query<{ id: string }>(`INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ('owner@example.test','x','Owner',CURRENT_TIMESTAMP) RETURNING "id"`);
+  identity = { userId: admin.rows[0]!.id, platformAdmin: true } as RequestIdentity;
 });
 
 afterEach(async () => {
@@ -47,91 +67,86 @@ afterEach(async () => {
   }
 });
 
-describe("GridFlow commercial fulfilment", () => {
-  it("creates an exact order, verifies a signed event, fulfils once, and returns a token-bound receipt", async () => {
-    const order = await commerce.createOrder({ email: "racer@example.test", plan: "CORE" });
-    expect(order).toMatchObject({ amountMinor: 12500, currency: "GBP" });
-    expect(order.checkoutUrl).toContain(encodeURIComponent(order.orderReference));
-
-    const event = {
-      eventId: "evt-paid-1", type: "PAYMENT_CONFIRMED" as const, orderReference: order.orderReference,
-      email: "racer@example.test", plan: "CORE" as const, amountMinor: 12500, currency: "GBP",
-      provider: "test-payments", paymentReference: "pay-verified-1",
-    };
-    const raw = Buffer.from(JSON.stringify(event));
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = createHmac("sha256", process.env.PAYMENT_CONFIRMATION_SECRET!).update(timestamp).update(".").update(raw).digest("hex");
-    expect(() => commerce.verifyPaymentSignature(raw, timestamp, `sha256=${signature}`)).not.toThrow();
-    await expect(commerce.processPaymentEvent(event, raw, request())).resolves.toMatchObject({ outcome: "FULFILLED", duplicate: false });
-    await expect(commerce.processPaymentEvent(event, raw, request())).resolves.toMatchObject({ outcome: "ALREADY_FULFILLED", duplicate: true });
-    const altered={...event,email:"altered@example.test"};
-    await expect(commerce.processPaymentEvent(altered,Buffer.from(JSON.stringify(altered)),request())).rejects.toThrow(/different payload/i);
-
-    const purchase = await database.query<{ status: string; receiptNumber: string }>(`SELECT "status"::text AS "status","receiptNumber" FROM "CommercialPurchase" WHERE "reference"=$1`, [order.orderReference]);
-    expect(purchase.rows[0]?.status).toBe("FULFILLED");
-    const email = await database.query<{ payload: { receiptUrl: string; activationUrl: string } }>(`SELECT "payload" FROM "AuthEmailOutbox" WHERE "template"='PURCHASE_FULFILMENT'`);
-    const receiptHash = new URL(email.rows[0]!.payload.receiptUrl).hash.replace(/^#/, "");
-    const receiptParams = new URLSearchParams(receiptHash);
-    await expect(commerce.receipt({ receiptNumber: receiptParams.get("number")!, token: receiptParams.get("token")! })).resolves.toMatchObject({
-      plan: "CORE", amountMinor: 12500, currency: "GBP", documentType: "PAYMENT_RECEIPT",
+describe("GridFlow Wise commercial fulfilment", () => {
+  it("keeps Core individually quoted and publishes only configured add-ons", () => {
+    expect(commerce.catalogue()).toMatchObject({
+      core: { quoteRequired: true, amountMinor: null, starterCredits: 500, seatLimit: 1 },
+      ultra: { amountMinor: 3999, includedCredits: 500, periodDays: 30, published: true },
+      researchPacks: [
+        { code: "PACK_100", credits: 100, amountMinor: 1199 },
+        { code: "PACK_250", credits: 250, amountMinor: 2499 },
+      ],
+      payment: { provider: "Wise Business", currency: "GBP", automaticRenewal: false, onlineCheckout: false },
+      configurationComplete: true,
     });
-    expect(email.rows[0]!.payload.activationUrl).toContain("/signup#activation=");
-    const grants = await database.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "ActivationGrant"`);
-    expect(grants.rows[0]?.count).toBe(1);
   });
 
-  it("fails closed into manual review when confirmed payment fields do not match", async () => {
-    const order = await commerce.createOrder({ email: "racer@example.test", plan: "CORE" });
-    const event = {
-      eventId: "evt-mismatch-1", type: "PAYMENT_CONFIRMED" as const, orderReference: order.orderReference,
-      email: "other@example.test", plan: "CORE" as const, amountMinor: 12500, currency: "GBP",
-      provider: "test-payments", paymentReference: "pay-mismatch-1",
-    };
-    const raw = Buffer.from(JSON.stringify(event));
-    await expect(commerce.processPaymentEvent(event, raw, request())).resolves.toMatchObject({ outcome: "MANUAL_REVIEW_MISMATCH" });
-    const purchase = await database.query<{ status: string }>(`SELECT "status"::text AS "status" FROM "CommercialPurchase" WHERE "reference"=$1`, [order.orderReference]);
-    expect(purchase.rows[0]?.status).toBe("MANUAL_REVIEW");
-    const grants = await database.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "ActivationGrant"`);
-    expect(grants.rows[0]?.count).toBe(0);
-  });
-
-  it("quarantines a payment reference already used by another fulfilled order", async () => {
-    const first = await commerce.createOrder({ email: "first@example.test", plan: "CORE" });
-    const second = await commerce.createOrder({ email: "second@example.test", plan: "CORE" });
-    const firstEvent = { eventId:"evt-reference-first",type:"PAYMENT_CONFIRMED" as const,orderReference:first.orderReference,email:"first@example.test",plan:"CORE" as const,amountMinor:12500,currency:"GBP",provider:"test-payments",paymentReference:"pay-shared-reference" };
-    const secondEvent = { ...firstEvent,eventId:"evt-reference-second",orderReference:second.orderReference,email:"second@example.test" };
-    await expect(commerce.processPaymentEvent(firstEvent,Buffer.from(JSON.stringify(firstEvent)),request())).resolves.toMatchObject({outcome:"FULFILLED"});
-    await expect(commerce.processPaymentEvent(secondEvent,Buffer.from(JSON.stringify(secondEvent)),request())).resolves.toMatchObject({outcome:"MANUAL_REVIEW_DUPLICATE_PAYMENT_REFERENCE"});
-    const status=await database.query<{status:string}>(`SELECT "status"::text AS "status" FROM "CommercialPurchase" WHERE "reference"=$1`,[second.orderReference]);
-    expect(status.rows[0]?.status).toBe("MANUAL_REVIEW");
-  });
-
-  it("returns a post-fulfilment payment exception to review without issuing a second activation", async () => {
-    const order=await commerce.createOrder({email:"late-failure@example.test",plan:"CORE"});
-    const paid={eventId:"evt-late-paid",type:"PAYMENT_CONFIRMED" as const,orderReference:order.orderReference,email:"late-failure@example.test",plan:"CORE" as const,amountMinor:12500,currency:"GBP",provider:"test-payments",paymentReference:"pay-late-failure"};
-    await commerce.processPaymentEvent(paid,Buffer.from(JSON.stringify(paid)),request());
-    const failed={...paid,eventId:"evt-late-failed",type:"PAYMENT_FAILED" as const,reason:"Provider reported a late settlement exception"};
-    await expect(commerce.processPaymentEvent(failed,Buffer.from(JSON.stringify(failed)),request())).resolves.toMatchObject({outcome:"POST_FULFILMENT_REVIEW_REQUIRED"});
-    const purchase=await database.query<{id:string;status:string}>(`SELECT "id","status"::text AS "status" FROM "CommercialPurchase" WHERE "reference"=$1`,[order.orderReference]);
-    expect(purchase.rows[0]?.status).toBe("MANUAL_REVIEW");
-    const admin=await database.query<{id:string}>(`INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ('late-owner@gridflow.test','x','Owner',CURRENT_TIMESTAMP) RETURNING "id"`);
-    await expect(commerce.resolvePurchase({userId:admin.rows[0]!.id,platformAdmin:true} as RequestIdentity,purchase.rows[0]!.id,{action:"CONFIRM_PAYMENT",confirmPaymentRecord:true,reason:"Settlement rechecked",paymentReference:"pay-late-failure"},request())).resolves.toMatchObject({alreadyFulfilled:true});
-    const grants=await database.query<{count:number}>(`SELECT COUNT(*)::int AS "count" FROM "ActivationGrant" WHERE "email"='late-failure@example.test'`);
-    expect(grants.rows[0]?.count).toBe(1);
-  });
-
-  it("keeps owner-verified manual fulfilment available without online checkout", async () => {
-    const admin = await database.query<{ id: string }>(`INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ('owner@gridflow.test','x','Owner',CURRENT_TIMESTAMP) RETURNING "id"`);
-    const identity = { userId: admin.rows[0]!.id, platformAdmin: true } as RequestIdentity;
-    delete process.env.COMMERCE_CORE_CHECKOUT_URL;
-    expect(commerce.catalogue().offers[0]).toMatchObject({ checkoutAvailable: false, amountMinor: null });
-
+  it("verifies a Core Wise record, issues exactly one activation, and returns a token-bound receipt", async () => {
     const result = await commerce.confirmManualPurchase(identity, {
-      email: "manual@example.test", plan: "CORE", amountMinor: 9900, currency: "EUR", paymentProvider: "bank-transfer",
-      paymentReference: "bank-verified-1", researchCreditsGranted: 1, seatLimit: 1, activationExpiresInDays: 7,
-      confirmPaymentRecord: true, reason: "Verified against the settlement record",
+      productType: "CORE_ONBOARDING", email: "racer@example.test", amountMinor: 9876,
+      paymentReference: "wise-core-verified-1", confirmPaymentRecord: true, reason: "Matched the exact Wise Business transfer",
     }, request());
     expect(result).toMatchObject({ alreadyFulfilled: false, delivery: "EMAIL_OUTBOX_AND_COPY_LINK" });
-    expect(result.activationUrl).toContain("manual%40example.test");
+    expect(result.activationUrl).toContain("racer%40example.test");
+    const grants = await database.query<{ plan: string; credits: number; seats: number }>(
+      `SELECT "plan"::text AS "plan","researchCreditsGranted" AS "credits","seatLimit" AS "seats" FROM "ActivationGrant"`,
+    );
+    expect(grants.rows).toEqual([{ plan: "CORE", credits: 500, seats: 1 }]);
+    const email = await database.query<{ payload: { receiptUrl: string } }>(`SELECT "payload" FROM "AuthEmailOutbox" WHERE "template"='PURCHASE_FULFILMENT'`);
+    const params = new URLSearchParams(new URL(email.rows[0]!.payload.receiptUrl).hash.replace(/^#/, ""));
+    await expect(commerce.receipt({ receiptNumber: params.get("number")!, token: params.get("token")! })).resolves.toMatchObject({
+      productType: "CORE_ONBOARDING", amountMinor: 9876, currency: "GBP", seller: "AM Motorsports Ltd", paymentMethod: "Wise Business",
+    });
+    await expect(commerce.receipt({ receiptNumber: params.get("number")!, token: "not-the-private-receipt-token" })).rejects.toThrow(/not found/i);
+  });
+
+  it("rejects a Wise reference that was already used", async () => {
+    await commerce.confirmManualPurchase(identity, {
+      productType: "CORE_ONBOARDING", email: "first@example.test", amountMinor: 9100,
+      paymentReference: "wise-duplicate-1", confirmPaymentRecord: true, reason: "First verified Wise payment",
+    }, request());
+    await expect(commerce.confirmManualPurchase(identity, {
+      productType: "CORE_ONBOARDING", email: "second@example.test", amountMinor: 9200,
+      paymentReference: "wise-duplicate-1", confirmPaymentRecord: true, reason: "Second attempted record",
+    }, request())).rejects.toThrow(/already recorded/i);
+  });
+
+  it("adds Ultra in consecutive periods and schedules early-renewal credits for the extended period", async () => {
+    const customer = await createCustomer();
+    const first = await commerce.confirmManualPurchase(identity, {
+      productType: "ULTRA_PERIOD", organisationId: customer.tenantId, amountMinor: 3999,
+      paymentReference: "wise-ultra-1", confirmPaymentRecord: true, reason: "First Ultra period verified in Wise",
+    }, request());
+    const firstEnd = new Date((first.entitlement as { periodEnd: string }).periodEnd).getTime();
+    expect(firstEnd).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+    const second = await commerce.confirmManualPurchase(identity, {
+      productType: "ULTRA_PERIOD", organisationId: customer.tenantId, amountMinor: 3999,
+      paymentReference: "wise-ultra-2", confirmPaymentRecord: true, reason: "Early renewal verified in Wise",
+    }, request());
+    const secondEntitlement = second.entitlement as { periodStart: string; periodEnd: string };
+    expect(new Date(secondEntitlement.periodStart).getTime()).toBe(firstEnd);
+    expect(new Date(secondEntitlement.periodEnd).getTime()).toBeGreaterThan(firstEnd + 29 * 86_400_000);
+    const buckets = await database.query<{ granted: number; availableFrom: Date | string; expiresAt: Date | string }>(
+      `SELECT "granted","availableFrom","expiresAt" FROM "ResearchCreditBucket" WHERE "tenantId"=$1::uuid AND "type"='ULTRA_INCLUDED' ORDER BY "availableFrom"`, [customer.tenantId],
+    );
+    expect(buckets.rows).toHaveLength(2);
+    expect(buckets.rows.map((bucket) => bucket.granted)).toEqual([500, 500]);
+    expect(new Date(buckets.rows[1]!.availableFrom).getTime()).toBe(new Date(buckets.rows[0]!.expiresAt).getTime());
+  });
+
+  it("applies only the configured research pack and preserves purchased credits without expiry", async () => {
+    const customer = await createCustomer("pack-driver@example.test");
+    await expect(commerce.confirmManualPurchase(identity, {
+      productType: "RESEARCH_PACK", organisationId: customer.tenantId, packCode: "PACK_100", amountMinor: 1200,
+      paymentReference: "wise-pack-wrong", confirmPaymentRecord: true, reason: "Amount mismatch test",
+    }, request())).rejects.toThrow(/does not match/i);
+    await commerce.confirmManualPurchase(identity, {
+      productType: "RESEARCH_PACK", organisationId: customer.tenantId, packCode: "PACK_100", amountMinor: 1199,
+      paymentReference: "wise-pack-verified", confirmPaymentRecord: true, reason: "Exact pack payment verified in Wise",
+    }, request());
+    const bucket = await database.query<{ granted: number; expiresAt: Date | string | null }>(
+      `SELECT "granted","expiresAt" FROM "ResearchCreditBucket" WHERE "tenantId"=$1::uuid AND "type"='PURCHASED'`, [customer.tenantId],
+    );
+    expect(bucket.rows).toEqual([{ granted: 100, expiresAt: null }]);
   });
 });

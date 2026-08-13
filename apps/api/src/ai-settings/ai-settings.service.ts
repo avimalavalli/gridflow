@@ -11,7 +11,7 @@ export class AiSettingsService {
 
   async status(tenantId: string) {
     return this.database.tenantTransaction(tenantId, async (tx) => {
-      const [credential, entitlement] = await Promise.all([
+      const [credential, entitlement, credits] = await Promise.all([
         tx.query(
           `SELECT "provider"::text AS "provider","status"::text AS "status","keyFingerprint","model",
                   "capabilities","lastValidatedAt","lastUsedAt","errorDetails","updatedAt"
@@ -21,17 +21,34 @@ export class AiSettingsService {
         tx.query<{
           plan: string; status: string; agentExecutionMode: string; researchCreditsGranted: number;
           researchCreditsUsed: number; researchCreditsUnlimited: boolean; seatLimit: number;
+          ultraStatus: string | null; ultraStartsAt: Date | string | null; ultraExpiresAt: Date | string | null;
         }>(
-          `SELECT "plan"::text AS "plan","status"::text AS "status","agentExecutionMode"::text AS "agentExecutionMode",
-                  "researchCreditsGranted","researchCreditsUsed","researchCreditsUnlimited","seatLimit"
+          `SELECT CASE WHEN "ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA' ELSE 'CORE' END AS "plan",
+                  "status"::text AS "status",CASE WHEN "ultraExpiresAt">CURRENT_TIMESTAMP THEN 'MANAGED' ELSE 'BYO_GEMINI' END AS "agentExecutionMode",
+                  "researchCreditsGranted","researchCreditsUsed","researchCreditsUnlimited","seatLimit",
+                  "ultraStatus"::text AS "ultraStatus","ultraStartsAt","ultraExpiresAt"
            FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid`,
+          [tenantId],
+        ),
+        tx.query<{
+          includedRemaining: number; purchasedRemaining: number; scheduledIncludedCredits: number; usedThisPeriod: number; nextRefreshAt: Date | string | null;
+        }>(
+          `SELECT
+             COALESCE(SUM("granted"-"used"-"reserved") FILTER (WHERE "type" IN ('CORE_STARTER','ULTRA_INCLUDED') AND "availableFrom"<=CURRENT_TIMESTAMP AND ("expiresAt" IS NULL OR "expiresAt">CURRENT_TIMESTAMP)),0)::int AS "includedRemaining",
+             COALESCE(SUM("granted"-"used"-"reserved") FILTER (WHERE "type"='PURCHASED'),0)::int AS "purchasedRemaining",
+             COALESCE(SUM("granted") FILTER (WHERE "type"='ULTRA_INCLUDED' AND "availableFrom">CURRENT_TIMESTAMP),0)::int AS "scheduledIncludedCredits",
+             COALESCE(SUM("used") FILTER (WHERE "type"='ULTRA_INCLUDED' AND "availableFrom"<=CURRENT_TIMESTAMP AND "expiresAt">CURRENT_TIMESTAMP),0)::int AS "usedThisPeriod",
+             MIN("availableFrom") FILTER (WHERE "type"='ULTRA_INCLUDED' AND "availableFrom">CURRENT_TIMESTAMP) AS "nextRefreshAt"
+           FROM "ResearchCreditBucket" WHERE "tenantId"=$1::uuid`,
           [tenantId],
         ),
       ]);
       const product = entitlement.rows[0] ?? {
         plan: "CORE", status: "ACTIVE", agentExecutionMode: "MANAGED",
         researchCreditsGranted: 0, researchCreditsUsed: 0, researchCreditsUnlimited: true, seatLimit: 1,
+        ultraStatus: null, ultraStartsAt: null, ultraExpiresAt: null,
       };
+      const balance = credits.rows[0] ?? { includedRemaining: 0, purchasedRemaining: 0, scheduledIncludedCredits: 0, usedThisPeriod: 0, nextRefreshAt: null };
       return {
         gemini: {
           connected: credential.rows[0]?.status === "CONNECTED",
@@ -39,7 +56,11 @@ export class AiSettingsService {
         },
         entitlement: {
           ...product,
-          researchCreditsRemaining: product.researchCreditsUnlimited ? null : Math.max(0, product.researchCreditsGranted - product.researchCreditsUsed),
+          researchCreditsRemaining: product.researchCreditsUnlimited ? null : balance.includedRemaining + balance.purchasedRemaining,
+          creditBalance: {
+            ...balance,
+            totalRemaining: product.researchCreditsUnlimited ? null : balance.includedRemaining + balance.purchasedRemaining,
+          },
           requiresGemini: product.agentExecutionMode === "BYO_GEMINI",
         },
         routing: {

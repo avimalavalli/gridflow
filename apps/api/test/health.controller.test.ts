@@ -4,7 +4,7 @@ import { HealthController } from "../src/health/health.controller.js";
 import { PublicOperationalException } from "../src/observability.js";
 
 const originalConfig = { ...apiConfig };
-const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "COMMERCE_CORE_PRICE_MINOR", "COMMERCE_CORE_CURRENCY", "COMMERCE_CORE_PAYMENT_PROVIDER", "COMMERCE_CORE_CHECKOUT_URL", "COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_ULTRA_CURRENCY", "COMMERCE_ULTRA_PAYMENT_PROVIDER", "COMMERCE_ULTRA_CHECKOUT_URL", "COMMERCE_SUPPORT_EMAIL", "PAYMENT_CONFIRMATION_SECRET"] as const;
+const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_RESEARCH_PACKS_JSON", "COMMERCE_SUPPORT_EMAIL"] as const;
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 
 function proof(fresh: boolean) {
@@ -13,14 +13,9 @@ function proof(fresh: boolean) {
 
 function configureProductionDependencies() {
   for (const key of envKeys.slice(0, 6)) process.env[key] = key === "INTEGRATION_ENCRYPTION_KEY" ? "b".repeat(32) : "configured";
-  for (const plan of ["CORE", "ULTRA"]) {
-    process.env[`COMMERCE_${plan}_PRICE_MINOR`] = "10000";
-    process.env[`COMMERCE_${plan}_CURRENCY`] = "GBP";
-    process.env[`COMMERCE_${plan}_PAYMENT_PROVIDER`] = "test-provider";
-    process.env[`COMMERCE_${plan}_CHECKOUT_URL`] = "https://pay.test/checkout?reference={ORDER_REFERENCE}";
-  }
+  process.env.COMMERCE_ULTRA_PRICE_MINOR = "3999";
+  process.env.COMMERCE_RESEARCH_PACKS_JSON = JSON.stringify([{ code: "PACK_100", credits: 100, amountMinor: 1199 }]);
   process.env.COMMERCE_SUPPORT_EMAIL = "support@gridflow.test";
-  process.env.PAYMENT_CONFIRMATION_SECRET = "p".repeat(32);
 }
 
 afterEach(() => {

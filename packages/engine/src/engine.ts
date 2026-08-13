@@ -572,6 +572,20 @@ export class AgentEngine {
         const outreachRecordId = await this.applyOutput(tx, job.tenantId, job.agentRunId, job.jobName, run, result.output, result.model);
         if (this.isResearchAgent(job.jobName)) {
           await tx.query(
+            `UPDATE "ResearchCreditBucket" b SET "reserved"=GREATEST(0,b."reserved"-allocated.amount),"used"=b."used"+allocated.amount,"updatedAt"=CURRENT_TIMESTAMP
+             FROM (
+               SELECT a."bucketId",SUM(a."amount")::int AS amount FROM "ResearchCreditReservationAllocation" a
+               JOIN "ResearchCreditReservation" r ON r."id"=a."reservationId"
+               WHERE r."tenantId"=$1::uuid AND r."agentRunId"=$2::uuid AND a."status"='RESERVED' GROUP BY a."bucketId"
+             ) allocated WHERE b."id"=allocated."bucketId"`,
+            [job.tenantId, job.agentRunId],
+          );
+          await tx.query(
+            `UPDATE "ResearchCreditReservationAllocation" a SET "status"='CONSUMED',"updatedAt"=CURRENT_TIMESTAMP
+             FROM "ResearchCreditReservation" r WHERE r."id"=a."reservationId" AND r."tenantId"=$1::uuid AND r."agentRunId"=$2::uuid AND a."status"='RESERVED'`,
+            [job.tenantId, job.agentRunId],
+          );
+          await tx.query(
             `UPDATE "ResearchCreditReservation" SET "status"='CONSUMED',"consumedAt"=CURRENT_TIMESTAMP
              WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid AND "status"='RESERVED'`,
             [job.tenantId, job.agentRunId],
@@ -714,28 +728,68 @@ export class AgentEngine {
     );
     const current = reservation.rows[0]?.status;
     if (current === "RESERVED" || current === "CONSUMED") return;
-    const entitlement = await tx.query(
-      `UPDATE "ProductEntitlement" SET
-         "researchCreditsUsed"=CASE WHEN "researchCreditsUnlimited" THEN "researchCreditsUsed" ELSE "researchCreditsUsed"+1 END,
-         "updatedAt"=CURRENT_TIMESTAMP
-       WHERE "tenantId"=$1::uuid AND "status"='ACTIVE'
-         AND ("researchCreditsUnlimited" OR "researchCreditsUsed"<"researchCreditsGranted")`,
+    await tx.query(
+      `INSERT INTO "AutomationControlPolicy" ("tenantId","dailyResearchCreditLimit","updatedAt") VALUES ($1::uuid,30,CURRENT_TIMESTAMP)
+       ON CONFLICT ("tenantId") DO NOTHING`,
       [tenantId],
     );
-    if (entitlement.rowCount !== 1) {
-      throw new Error("No research credits remain. Add a one-off research credit pack before running Atlas, Sage or Relay.");
+    const daily = await tx.query<{ dailyResearchCreditLimit: number; usedToday: number }>(
+      `SELECT p."dailyResearchCreditLimit",
+              (SELECT COUNT(*)::int FROM "ResearchCreditReservation" r WHERE r."tenantId"=$1::uuid
+               AND r."status" IN ('RESERVED','CONSUMED') AND r."reservedAt">=CURRENT_TIMESTAMP-INTERVAL '24 hours') AS "usedToday"
+       FROM "AutomationControlPolicy" p WHERE p."tenantId"=$1::uuid FOR UPDATE`,
+      [tenantId],
+    );
+    if (daily.rows[0] && daily.rows[0].usedToday >= daily.rows[0].dailyResearchCreditLimit) {
+      throw new Error(`The daily research safety ceiling of ${daily.rows[0].dailyResearchCreditLimit} credits has been reached. An administrator can adjust it in Automation Cockpit.`);
     }
+    const entitlement = await tx.query<{ id: string; researchCreditsUnlimited: boolean }>(
+      `SELECT "id","researchCreditsUnlimited" FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid AND "status"='ACTIVE' FOR UPDATE`,
+      [tenantId],
+    );
+    const access = entitlement.rows[0];
+    if (!access) {
+      throw new Error("This GridFlow organisation is not approved for research execution.");
+    }
+    let bucketId: string | null = null;
+    if (!access.researchCreditsUnlimited) {
+      const bucket = await tx.query<{ id: string }>(
+        `SELECT "id" FROM "ResearchCreditBucket"
+         WHERE "tenantId"=$1::uuid AND "availableFrom"<=CURRENT_TIMESTAMP AND ("expiresAt" IS NULL OR "expiresAt">CURRENT_TIMESTAMP)
+           AND "granted">"used"+"reserved"
+         ORDER BY CASE "type" WHEN 'ULTRA_INCLUDED' THEN 0 WHEN 'CORE_STARTER' THEN 1 ELSE 2 END,
+                  "expiresAt" ASC NULLS LAST,"createdAt" ASC FOR UPDATE LIMIT 1`,
+        [tenantId],
+      );
+      bucketId = bucket.rows[0]?.id ?? null;
+      if (!bucketId) {
+        throw new Error("No research credits remain. Add a one-off research credit pack before running Atlas, Sage or Relay.");
+      }
+      await tx.query(`UPDATE "ResearchCreditBucket" SET "reserved"="reserved"+1,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [bucketId]);
+      await tx.query(`UPDATE "ProductEntitlement" SET "researchCreditsUsed"="researchCreditsUsed"+1,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`, [access.id]);
+    }
+    let reservationId: string;
     if (current === "REFUNDED") {
-      await tx.query(
+      const updated = await tx.query<{ id: string }>(
         `UPDATE "ResearchCreditReservation" SET "status"='RESERVED',"reservedAt"=CURRENT_TIMESTAMP,
-           "consumedAt"=NULL,"refundedAt"=NULL WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid`,
+           "consumedAt"=NULL,"refundedAt"=NULL WHERE "tenantId"=$1::uuid AND "agentRunId"=$2::uuid RETURNING "id"`,
         [tenantId, agentRunId],
       );
+      reservationId = updated.rows[0]!.id;
     } else {
-      await tx.query(
+      const inserted = await tx.query<{ id: string }>(
         `INSERT INTO "ResearchCreditReservation" ("tenantId","agentRunId","amount","status")
-         VALUES ($1::uuid,$2::uuid,1,'RESERVED')`,
+         VALUES ($1::uuid,$2::uuid,1,'RESERVED') RETURNING "id"`,
         [tenantId, agentRunId],
+      );
+      reservationId = inserted.rows[0]!.id;
+    }
+    if (bucketId) {
+      await tx.query(
+        `INSERT INTO "ResearchCreditReservationAllocation" ("reservationId","bucketId","amount","status","updatedAt")
+         VALUES ($1::uuid,$2::uuid,1,'RESERVED',CURRENT_TIMESTAMP)
+         ON CONFLICT ("reservationId","bucketId") DO UPDATE SET "amount"=1,"status"='RESERVED',"updatedAt"=CURRENT_TIMESTAMP`,
+        [reservationId, bucketId],
       );
     }
   }
@@ -748,6 +802,20 @@ export class AgentEngine {
     );
     const amount = reservation.rows[0]?.amount;
     if (!amount) return;
+    await tx.query(
+      `UPDATE "ResearchCreditBucket" b SET "reserved"=GREATEST(0,b."reserved"-allocated.amount),"updatedAt"=CURRENT_TIMESTAMP
+       FROM (
+         SELECT a."bucketId",SUM(a."amount")::int AS amount FROM "ResearchCreditReservationAllocation" a
+         JOIN "ResearchCreditReservation" r ON r."id"=a."reservationId"
+         WHERE r."tenantId"=$1::uuid AND r."agentRunId"=$2::uuid AND a."status"='RESERVED' GROUP BY a."bucketId"
+       ) allocated WHERE b."id"=allocated."bucketId"`,
+      [tenantId, agentRunId],
+    );
+    await tx.query(
+      `UPDATE "ResearchCreditReservationAllocation" a SET "status"='REFUNDED',"updatedAt"=CURRENT_TIMESTAMP
+       FROM "ResearchCreditReservation" r WHERE r."id"=a."reservationId" AND r."tenantId"=$1::uuid AND r."agentRunId"=$2::uuid AND a."status"='RESERVED'`,
+      [tenantId, agentRunId],
+    );
     await tx.query(
       `UPDATE "ProductEntitlement" SET
          "researchCreditsUsed"=CASE WHEN "researchCreditsUnlimited" THEN "researchCreditsUsed" ELSE GREATEST(0,"researchCreditsUsed"-$2) END,

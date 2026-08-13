@@ -42,9 +42,16 @@ class FakeDatabase {
   setPurchase() {
     this.row.template = "PURCHASE_FULFILMENT";
     this.row.payload = {
-      plan: "CORE", amountMinor: 12500, currency: "GBP", receiptNumber: "GFR-2026-ABC123",
+      productType: "CORE_ONBOARDING", productName: "GridFlow Core", amountMinor: 9876, currency: "GBP", receiptNumber: "GFR-2026-ABC123",
       activationUrl: "https://app.gridflow.test/signup#activation=secret", activationExpiresAt: "2026-08-19T10:00:00.000Z",
       receiptUrl: "https://app.gridflow.test/receipt#number=GFR-2026-ABC123&token=secret",
+    } as typeof this.row.payload;
+  }
+  setReminder() {
+    this.row.template = "ULTRA_RENEWAL_REMINDER";
+    this.row.payload = {
+      stage: "THREE_DAYS", recipientRole: "CUSTOMER", organisationName: "Test Motorsport", ownerName: "Test Driver",
+      ultraExpiresAt: "2026-08-16T10:00:00.000Z", automaticRenewal: false, coreAccessContinues: true, purchasedCreditsRemain: true,
     } as typeof this.row.payload;
   }
 }
@@ -103,5 +110,19 @@ describe("GridFlow auth email outbox", () => {
 
     expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Your GridFlow Core activation and receipt"));
+  });
+
+  it("delivers an Ultra reminder that states Core continues and renewal is not automatic", async () => {
+    process.env.AUTH_MAIL_PROVIDER = "CONSOLE";
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const database = new FakeDatabase();
+    database.setReminder();
+    const processor = new AuthEmailProcessor(database as never);
+
+    expect(await processor.processNext()).toMatchObject({ processed: true, result: "sent" });
+    const preview = String(log.mock.calls[0]?.[0]);
+    expect(preview).toContain("ends within 3 days");
+    expect(preview).toContain("does not renew or charge automatically");
+    expect(preview).toContain("Core remains available");
   });
 });

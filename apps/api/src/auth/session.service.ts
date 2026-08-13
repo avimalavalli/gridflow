@@ -107,9 +107,8 @@ export class SessionService {
            o."name" AS "organisationName",
            o."slug" AS "organisationSlug",
            o."accessStatus" AS "organisationAccessStatus",
-           pe."plan" AS "productPlan",
-           CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
-             THEN 'EXPIRED'::"EntitlementStatus" ELSE pe."status" END AS "entitlementStatus",
+           CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA'::"ProductPlan" ELSE 'CORE'::"ProductPlan" END AS "productPlan",
+           pe."status" AS "entitlementStatus",
            m."role"
          FROM "AuthSession" s
          JOIN "User" u ON u."id" = s."userId"
@@ -143,16 +142,14 @@ export class SessionService {
              o."name" AS "organisationName",
              o."slug" AS "organisationSlug",
              o."accessStatus" AS "organisationAccessStatus",
-             pe."plan" AS "productPlan",
-             CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
-               THEN 'EXPIRED'::"EntitlementStatus" ELSE pe."status" END AS "entitlementStatus",
+             CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA'::"ProductPlan" ELSE 'CORE'::"ProductPlan" END AS "productPlan",
+             pe."status" AS "entitlementStatus",
              m."role"
            FROM "OrganisationMembership" m
            JOIN "Organisation" o ON o."id" = m."organisationId"
            LEFT JOIN "ProductEntitlement" pe ON pe."tenantId" = m."organisationId"
            WHERE m."userId" = $1::uuid
-           ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
-                      AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP) THEN 0 ELSE 1 END,
+           ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE' THEN 0 ELSE 1 END,
                     m."createdAt" ASC
            LIMIT 1`,
           [row.userId],

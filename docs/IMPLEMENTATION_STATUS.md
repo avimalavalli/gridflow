@@ -1,10 +1,11 @@
-# GridFlow implementation status — Phase 8B Commercial Launch Layer
+# GridFlow implementation status — Phase 8B.1 Wise Commercial Model
 
 ## Built and verified
 
-- **Public commercial experience** with product, pricing, support and private receipt surfaces that remain useful when the API or checkout provider is unavailable.
-- **Owner-configured Core and Ultra catalogue** that refuses to publish incomplete prices, currencies or checkout destinations.
-- **Auditable purchase fulfilment** with signed replay-safe payment events, exact order matching, mismatch quarantine, token-bound receipts, email delivery and a provider-independent manual fallback.
+- **Public commercial experience** for individually quoted Core, configured Ultra periods, configurable credit packs, Wise-assisted purchase support and private receipts.
+- **Wise-only fulfilment** with exact GBP verification, unique payment references, system-controlled entitlements, exception review, token-bound receipts and immutable audits.
+- **Separated credit accounting** for Core starter, Ultra-included and purchased credits, including exact reservations, final-failure refunds, expiry-safe purchased balances and a default adjustable daily safety ceiling of 30.
+- **Ultra lifecycle automation** with early-renewal extension, scheduled included credits, ACTIVE/RENEWAL_DUE/PAYMENT_PENDING/EXPIRED states, Core fallback and idempotent customer/admin reminders.
 
 - Multi-athlete organisations, roles, invitations and isolated data.
 - Athlete onboarding, personalised markets, outreach policy and Discovery Briefs.
@@ -20,7 +21,7 @@
 - CI evidence, production preflight, schema checks and deterministic agent-quality regression fixtures.
 - Route loading, error recovery and not-found product states.
 - Paid, email-bound one-time activations with platform-owner approval and immediate access suspension/revocation.
-- Core one-time entitlements, renewable Ultra terms, seat limits and atomic managed-research credits.
+- Permanent Core entitlements, optional non-renewing Ultra periods, one named driver, two-device access and atomic managed-research credits.
 - Encrypted tenant Gemini keys, onboarding guidance and per-capability Gemini/managed-provider routing.
 - **Orbit meeting intelligence** with factual preparation, human-notes-only debriefs, editable review, idempotent approved tasks, explicit opportunity updates and unsent follow-up drafts.
 - **Forge proposal intelligence** with human-set commercial boundaries, evidence-bound packages, protected prices and terms, immutable versions, editable approval, print/PDF presentation and human-confirmed delivery recording.
@@ -44,13 +45,13 @@
 
 ## Validation result
 
-- 134 automated tests passed across 52 files.
+- 137 automated tests passed across 53 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 73 models and 23 registered migrations.
+- Database schema check passed: 76 models and 24 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The eleven-case, five-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility and Phase 8B public product/pricing/support/receipt behaviour, plus responsive overflow and WCAG checks. Local execution remains pending because this workspace does not have the pinned browser binaries; CI must provide browser acceptance evidence before Phase 8B is published.
+- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility and Phase 8B.1 public product/pricing/support/receipt behaviour, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
@@ -62,6 +63,6 @@ The Phase 6 release workflow completed the dependency audit, browser, responsive
 4. Browser, mobile, accessibility and performance QA on physical devices.
 5. Permission review and final security sign-off.
 6. Completion of every required Launch Control check.
-7. Owner approval, deployment and selected-athlete acceptance.
+7. Owner approval, closed production rehearsal and direct public deployment.
 
-The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application remains functionally closed for the agreed core scope. Live provider acceptance, commercial launch surfaces, feature-freeze acceptance, security, privacy/legal and controlled beta remain before public launch.
+The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application and Phase 8B.1 commercial model are functionally closed for the agreed scope. Live provider acceptance, internal feature-freeze acceptance, security, privacy/legal and production launch rehearsal remain before public launch.

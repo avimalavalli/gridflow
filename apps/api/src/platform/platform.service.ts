@@ -5,7 +5,7 @@ import { createOpaqueToken, hashOpaqueToken, normaliseEmail } from "../auth/auth
 import type { RequestIdentity } from "../context/tenant-context.service.js";
 import { apiConfig } from "../config.js";
 import { DatabaseService } from "../database/database.service.js";
-import type { AddResearchCreditsDto, CreateActivationGrantDto, OrganisationAccessDecisionDto, RenewUltraDto } from "./platform.dto.js";
+import type { CreateActivationGrantDto, MarkUltraPaymentPendingDto, OrganisationAccessDecisionDto } from "./platform.dto.js";
 
 @Injectable()
 export class PlatformService {
@@ -17,7 +17,17 @@ export class PlatformService {
         `UPDATE "ActivationGrant" SET "status"='EXPIRED',"updatedAt"=CURRENT_TIMESTAMP
          WHERE "status"='ISSUED' AND "expiresAt"<=CURRENT_TIMESTAMP`,
       );
-      const [summary, organisations, grants, audit, purchases] = await Promise.all([
+      await tx.query(
+        `UPDATE "ProductEntitlement" SET "plan"='CORE',"agentExecutionMode"='BYO_GEMINI',"ultraStatus"='EXPIRED',
+         "ultraPaymentPendingAt"=NULL,"expiresAt"=NULL,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "ultraExpiresAt" IS NOT NULL AND "ultraExpiresAt"<=CURRENT_TIMESTAMP AND "ultraStatus" IS DISTINCT FROM 'EXPIRED'`,
+      );
+      await tx.query(
+        `UPDATE "ProductEntitlement" SET "ultraStatus"='RENEWAL_DUE',"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "ultraExpiresAt">CURRENT_TIMESTAMP AND "ultraExpiresAt"<=CURRENT_TIMESTAMP+INTERVAL '7 days'
+           AND "ultraStatus"='ACTIVE'`,
+      );
+      const [summary, organisations, grants, audit, purchases, reminders] = await Promise.all([
         tx.query<{
           pending: number; active: number; suspended: number; core: number; ultra: number;
           purchasesPending: number; purchasesReview: number; purchasesFailed: number; purchasesFulfilled: number;
@@ -27,7 +37,7 @@ export class PlatformService {
              COUNT(*) FILTER (WHERE o."accessStatus"='ACTIVE')::int AS "active",
              COUNT(*) FILTER (WHERE o."accessStatus"='SUSPENDED')::int AS "suspended",
              COUNT(*) FILTER (WHERE pe."plan"='CORE')::int AS "core",
-             COUNT(*) FILTER (WHERE pe."plan"='ULTRA')::int AS "ultra",
+             COUNT(*) FILTER (WHERE pe."ultraExpiresAt">CURRENT_TIMESTAMP)::int AS "ultra",
              (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='PENDING_PAYMENT') AS "purchasesPending",
              (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='MANUAL_REVIEW') AS "purchasesReview",
              (SELECT COUNT(*)::int FROM "CommercialPurchase" WHERE "status"='FAILED') AS "purchasesFailed",
@@ -36,15 +46,27 @@ export class PlatformService {
         ),
         tx.query(
           `SELECT o."id",o."name",o."slug",o."type"::text AS "type",o."accessStatus"::text AS "accessStatus",
-                  o."accessStatusReason",o."createdAt",pe."plan"::text AS "plan",
-                  CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
-                    THEN 'EXPIRED' ELSE pe."status"::text END AS "entitlementStatus",
-                  pe."agentExecutionMode"::text AS "agentExecutionMode",pe."researchCreditsGranted",pe."researchCreditsUsed",
-                  pe."researchCreditsUnlimited",pe."seatLimit",pe."expiresAt",u."name" AS "ownerName",u."email" AS "ownerEmail"
+                  o."accessStatusReason",o."createdAt",
+                  CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA' ELSE 'CORE' END AS "plan",
+                  pe."status"::text AS "entitlementStatus",
+                  CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'MANAGED' ELSE 'BYO_GEMINI' END AS "agentExecutionMode",
+                  pe."researchCreditsGranted",pe."researchCreditsUsed",pe."researchCreditsUnlimited",pe."seatLimit",
+                  pe."ultraStatus"::text AS "ultraStatus",pe."ultraStartsAt",pe."ultraExpiresAt",pe."ultraPaymentPendingAt",
+                  COALESCE(credits."includedRemaining",0)::int AS "includedRemaining",
+                  COALESCE(credits."purchasedRemaining",0)::int AS "purchasedRemaining",
+                  COALESCE(credits."futureIncluded",0)::int AS "futureIncluded",
+                  u."name" AS "ownerName",u."email" AS "ownerEmail"
            FROM "Organisation" o
            LEFT JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
            LEFT JOIN "OrganisationMembership" m ON m."organisationId"=o."id" AND m."role"='OWNER'
            LEFT JOIN "User" u ON u."id"=m."userId"
+           LEFT JOIN LATERAL (
+             SELECT
+               COALESCE(SUM(b."granted"-b."used"-b."reserved") FILTER (WHERE b."type" IN ('CORE_STARTER','ULTRA_INCLUDED') AND b."availableFrom"<=CURRENT_TIMESTAMP AND (b."expiresAt" IS NULL OR b."expiresAt">CURRENT_TIMESTAMP)),0) AS "includedRemaining",
+               COALESCE(SUM(b."granted"-b."used"-b."reserved") FILTER (WHERE b."type"='PURCHASED'),0) AS "purchasedRemaining",
+               COALESCE(SUM(b."granted") FILTER (WHERE b."type"='ULTRA_INCLUDED' AND b."availableFrom">CURRENT_TIMESTAMP),0) AS "futureIncluded"
+             FROM "ResearchCreditBucket" b WHERE b."tenantId"=o."id"
+           ) credits ON true
            ORDER BY CASE o."accessStatus" WHEN 'PENDING_APPROVAL' THEN 0 WHEN 'SUSPENDED' THEN 1 ELSE 2 END,o."createdAt" DESC`,
         ),
         tx.query(
@@ -60,15 +82,24 @@ export class PlatformService {
            ORDER BY p."createdAt" DESC LIMIT 50`,
         ),
         tx.query(
-          `SELECT p."id",p."reference",p."email",p."plan"::text AS "plan",p."status"::text AS "status",
+          `SELECT p."id",p."reference",p."email",p."plan"::text AS "plan",p."productType"::text AS "productType",p."status"::text AS "status",
                   p."amountMinor",p."currency",p."paymentProvider",p."providerPaymentReference",p."failureReason",
-                  p."researchCreditsGranted",p."seatLimit",p."paymentConfirmedAt",p."fulfilledAt",p."receiptNumber",
+                  p."tenantId",p."packCode",o."name" AS "organisationName",p."researchCreditsGranted",p."seatLimit",p."paymentConfirmedAt",p."fulfilledAt",p."receiptNumber",
                   p."createdAt",a."status" AS "emailStatus",a."errorDetails" AS "emailError"
            FROM "CommercialPurchase" p LEFT JOIN "AuthEmailOutbox" a ON a."id"=p."fulfilmentEmailId"
+           LEFT JOIN "Organisation" o ON o."id"=p."tenantId"
            ORDER BY CASE p."status" WHEN 'MANUAL_REVIEW' THEN 0 WHEN 'FAILED' THEN 1 WHEN 'PAYMENT_CONFIRMED' THEN 2 ELSE 3 END,p."createdAt" DESC LIMIT 100`,
         ),
+        tx.query(
+          `SELECT r."id",r."tenantId",o."name" AS "organisationName",r."stage"::text AS "stage",r."ultraExpiresAt",r."createdAt",
+                  customer."status" AS "customerEmailStatus",admin."status" AS "adminEmailStatus"
+           FROM "UltraRenewalReminder" r JOIN "Organisation" o ON o."id"=r."tenantId"
+           LEFT JOIN "AuthEmailOutbox" customer ON customer."id"=r."customerEmailId"
+           LEFT JOIN "AuthEmailOutbox" admin ON admin."id"=r."adminEmailId"
+           ORDER BY r."createdAt" DESC LIMIT 100`,
+        ),
       ]);
-      return { summary: summary.rows[0] ?? { pending: 0, active: 0, suspended: 0, core: 0, ultra: 0, purchasesPending: 0, purchasesReview: 0, purchasesFailed: 0, purchasesFulfilled: 0 }, organisations: organisations.rows, grants: grants.rows, audit: audit.rows, purchases: purchases.rows };
+      return { summary: summary.rows[0] ?? { pending: 0, active: 0, suspended: 0, core: 0, ultra: 0, purchasesPending: 0, purchasesReview: 0, purchasesFailed: 0, purchasesFulfilled: 0 }, organisations: organisations.rows, grants: grants.rows, audit: audit.rows, purchases: purchases.rows, reminders: reminders.rows };
     });
   }
 
@@ -85,18 +116,18 @@ export class PlatformService {
       const result = await tx.query<{ id: string }>(
         `INSERT INTO "ActivationGrant" (
            "email","tokenHash","plan","status","researchCreditsGranted","seatLimit","expiresAt","createdByUserId","updatedAt"
-         ) VALUES ($1,$2,$3::"ProductPlan",'ISSUED',$4,$5,$6::timestamptz,$7::uuid,CURRENT_TIMESTAMP) RETURNING "id"`,
-        [email, hashOpaqueToken(rawToken), input.plan, input.researchCreditsGranted, input.seatLimit, expiresAt.toISOString(), identity.userId],
+         ) VALUES ($1,$2,'CORE','ISSUED',500,1,$3::timestamptz,$4::uuid,CURRENT_TIMESTAMP) RETURNING "id"`,
+        [email, hashOpaqueToken(rawToken), expiresAt.toISOString(), identity.userId],
       );
       const id = result.rows[0]?.id;
       if (!id) throw new Error("GridFlow could not create the activation grant.");
-      await this.audit(tx, identity, request, "CREATE_ACTIVATION_GRANT", "ActivationGrant", id, { email, plan: input.plan, researchCreditsGranted: input.researchCreditsGranted, seatLimit: input.seatLimit, expiresAt: expiresAt.toISOString() });
+      await this.audit(tx, identity, request, "CREATE_ACTIVATION_GRANT", "ActivationGrant", id, { email, plan: "CORE", researchCreditsGranted: 500, seatLimit: 1, expiresAt: expiresAt.toISOString(), emergencyGrant: true });
       return { id };
     });
     return {
       ...grant,
       email,
-      plan: input.plan,
+      plan: "CORE",
       expiresAt,
       activationUrl: `${apiConfig.webOrigin.replace(/\/$/, "")}/signup#activation=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(email)}`,
       delivery: "COPY_LINK",
@@ -144,12 +175,12 @@ export class PlatformService {
       );
       await tx.query(
         `UPDATE "ProductEntitlement" SET "status"=$2::"EntitlementStatus",
-           "agentExecutionMode"=CASE WHEN "plan"='ULTRA' THEN 'MANAGED'::"AgentExecutionMode" ELSE 'BYO_GEMINI'::"AgentExecutionMode" END,
+           "plan"=CASE WHEN "ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA'::"ProductPlan" ELSE 'CORE'::"ProductPlan" END,
+           "agentExecutionMode"=CASE WHEN "ultraExpiresAt">CURRENT_TIMESTAMP THEN 'MANAGED'::"AgentExecutionMode" ELSE 'BYO_GEMINI'::"AgentExecutionMode" END,
            "startsAt"=CASE WHEN $2='ACTIVE' AND "startsAt" IS NULL THEN CURRENT_TIMESTAMP ELSE "startsAt" END,
            "approvedAt"=CASE WHEN $2='ACTIVE' THEN CURRENT_TIMESTAMP ELSE "approvedAt" END,
            "approvedByUserId"=CASE WHEN $2='ACTIVE' THEN $3::uuid ELSE "approvedByUserId" END,
-           "expiresAt"=CASE WHEN $2='ACTIVE' AND "plan"='ULTRA' AND "expiresAt" IS NULL
-             THEN CURRENT_TIMESTAMP+INTERVAL '30 days' ELSE "expiresAt" END,
+           "expiresAt"=NULL,
            "suspensionReason"=CASE WHEN $2='ACTIVE' THEN NULL ELSE $4 END,"updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid`,
         [organisationId, entitlementStatus, identity.userId, input.reason?.trim() ?? null],
@@ -168,39 +199,21 @@ export class PlatformService {
     });
   }
 
-  async addCredits(identity: RequestIdentity, organisationId: string, input: AddResearchCreditsDto, request: Request) {
+  async markUltraPaymentPending(identity: RequestIdentity, organisationId: string, input: MarkUltraPaymentPendingDto, request: Request) {
     return this.database.transaction(async (tx) => {
-      const result = await tx.query<{ researchCreditsGranted: number; researchCreditsUsed: number }>(
-        `UPDATE "ProductEntitlement" SET "researchCreditsGranted"="researchCreditsGranted"+$2,"updatedAt"=CURRENT_TIMESTAMP
-         WHERE "tenantId"=$1::uuid AND "status" IN ('PENDING','ACTIVE','SUSPENDED')
-         RETURNING "researchCreditsGranted","researchCreditsUsed"`,
-        [organisationId, input.amount],
+      const result = await tx.query<{ ultraExpiresAt: Date | string }>(
+        `UPDATE "ProductEntitlement" SET "ultraStatus"='PAYMENT_PENDING',"ultraPaymentPendingAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "tenantId"=$1::uuid AND "status"='ACTIVE' AND "ultraExpiresAt">CURRENT_TIMESTAMP
+         RETURNING "ultraExpiresAt"`,
+        [organisationId],
       );
       const row = result.rows[0];
-      if (!row) throw new NotFoundException("GridFlow entitlement not found.");
-      await this.audit(tx, identity, request, "ADD_RESEARCH_CREDITS", "ProductEntitlement", organisationId, { amount: input.amount, reason: input.reason, balance: row.researchCreditsGranted - row.researchCreditsUsed });
-      return { ...row, remaining: row.researchCreditsGranted - row.researchCreditsUsed };
-    });
-  }
-
-  async renewUltra(identity: RequestIdentity, organisationId: string, input: RenewUltraDto, request: Request) {
-    return this.database.transaction(async (tx) => {
-      const result = await tx.query<{ expiresAt: Date | string }>(
-        `UPDATE "ProductEntitlement" SET
-           "expiresAt"=GREATEST(COALESCE("expiresAt",CURRENT_TIMESTAMP),CURRENT_TIMESTAMP)+($2::text||' days')::interval,
-           "updatedAt"=CURRENT_TIMESTAMP
-         WHERE "tenantId"=$1::uuid AND "plan"='ULTRA' AND "status"='ACTIVE'
-         RETURNING "expiresAt"`,
-        [organisationId, input.days],
-      );
-      const row = result.rows[0];
-      if (!row) throw new BadRequestException("Only an active GridFlow Ultra entitlement can be renewed.");
-      await this.audit(tx, identity, request, "RENEW_ULTRA", "ProductEntitlement", organisationId, {
-        days: input.days,
-        reason: input.reason,
-        expiresAt: new Date(row.expiresAt).toISOString(),
+      if (!row) throw new BadRequestException("GridFlow Ultra has not previously been enabled for this active customer.");
+      await this.audit(tx, identity, request, "ULTRA_PAYMENT_PENDING", "ProductEntitlement", organisationId, {
+        reason: input.reason.trim(),
+        ultraExpiresAt: new Date(row.ultraExpiresAt).toISOString(),
       });
-      return { organisationId, plan: "ULTRA", expiresAt: row.expiresAt };
+      return { organisationId, ultraStatus: "PAYMENT_PENDING", ultraExpiresAt: row.ultraExpiresAt };
     });
   }
 
@@ -213,6 +226,20 @@ export class PlatformService {
     );
     const refundable = reserved.rows.reduce((total, row) => total + row.amount, 0);
     if (refundable > 0) {
+      await tx.query(
+        `UPDATE "ResearchCreditBucket" b SET "reserved"=GREATEST(0,b."reserved"-allocated.amount),"updatedAt"=CURRENT_TIMESTAMP
+         FROM (
+           SELECT a."bucketId",SUM(a."amount")::int AS amount FROM "ResearchCreditReservationAllocation" a
+           JOIN "ResearchCreditReservation" r ON r."id"=a."reservationId"
+           WHERE r."tenantId"=$1::uuid AND r."status"='RESERVED' AND a."status"='RESERVED' GROUP BY a."bucketId"
+         ) allocated WHERE b."id"=allocated."bucketId"`,
+        [tenantId],
+      );
+      await tx.query(
+        `UPDATE "ResearchCreditReservationAllocation" a SET "status"='REFUNDED',"updatedAt"=CURRENT_TIMESTAMP
+         FROM "ResearchCreditReservation" r WHERE r."id"=a."reservationId" AND r."tenantId"=$1::uuid AND r."status"='RESERVED' AND a."status"='RESERVED'`,
+        [tenantId],
+      );
       await tx.query(
         `UPDATE "ProductEntitlement" SET
            "researchCreditsUsed"=CASE WHEN "researchCreditsUnlimited" THEN "researchCreditsUsed"

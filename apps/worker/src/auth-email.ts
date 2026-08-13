@@ -43,20 +43,44 @@ function newDeviceContent(payload: Record<string, unknown>) {
 }
 
 function purchaseFulfilmentContent(payload: Record<string, unknown>) {
-  const activationUrl = typeof payload.activationUrl === "string" ? payload.activationUrl : "";
+  const activationUrl = typeof payload.activationUrl === "string" ? payload.activationUrl : null;
   const receiptUrl = typeof payload.receiptUrl === "string" ? payload.receiptUrl : "";
-  const plan = payload.plan === "ULTRA" ? "GridFlow Ultra" : "GridFlow Core";
+  const productName = typeof payload.productName === "string" ? payload.productName : "GridFlow purchase";
+  const productType = typeof payload.productType === "string" ? payload.productType : "CORE_ONBOARDING";
   const amountMinor = Number(payload.amountMinor);
   const currency = typeof payload.currency === "string" ? payload.currency : "";
   const receiptNumber = typeof payload.receiptNumber === "string" ? payload.receiptNumber : "";
   const activationExpiresAt = typeof payload.activationExpiresAt === "string" ? payload.activationExpiresAt : "";
-  if (!activationUrl.startsWith("https://") && !activationUrl.startsWith("http://")) throw new Error("Purchase email is missing a valid activation URL.");
+  if (productType === "CORE_ONBOARDING" && (!activationUrl || (!activationUrl.startsWith("https://") && !activationUrl.startsWith("http://")))) throw new Error("Core purchase email is missing a valid activation URL.");
   if (!receiptUrl.startsWith("https://") && !receiptUrl.startsWith("http://")) throw new Error("Purchase email is missing a valid receipt URL.");
   if (!Number.isInteger(amountMinor) || amountMinor < 1 || !/^[A-Z]{3}$/.test(currency) || !receiptNumber) throw new Error("Purchase email is missing valid receipt details.");
   const amount = new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amountMinor / 100);
-  const subject = `Your ${plan} activation and receipt`;
-  const text = `Payment recorded for ${plan} (${amount}).\nReceipt: ${receiptNumber}\n\nActivate your email-bound GridFlow workspace:\n${activationUrl}\n\nThe activation link expires at ${activationExpiresAt}. After registration, your workspace remains locked while GridFlow verifies and approves access.\n\nView your payment receipt:\n${receiptUrl}\n\nKeep these private links secure.`;
-  const html = `<p>Payment recorded for <strong>${escapeHtml(plan)}</strong> (${escapeHtml(amount)}).</p><p>Receipt: <strong>${escapeHtml(receiptNumber)}</strong></p><p><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#064ebc;color:#fff;text-decoration:none;font-weight:700">Activate GridFlow</a></p><p>The email-bound activation link expires at ${escapeHtml(activationExpiresAt)}. After registration, the workspace remains locked while GridFlow verifies and approves access.</p><p><a href="${escapeHtml(receiptUrl)}">View payment receipt</a></p><p>Keep these private links secure.</p>`;
+  const activationText = activationUrl ? `\n\nActivate your email-bound GridFlow workspace:\n${activationUrl}\n\nThe activation link expires at ${activationExpiresAt}. After registration, your workspace remains locked while GridFlow verifies and approves access.` : "\n\nThe verified entitlement has been applied to your existing GridFlow workspace.";
+  const activationHtml = activationUrl ? `<p><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:12px 18px;border-radius:8px;background:#064ebc;color:#fff;text-decoration:none;font-weight:700">Activate GridFlow</a></p><p>The email-bound activation link expires at ${escapeHtml(activationExpiresAt)}. After registration, the workspace remains locked while GridFlow verifies and approves access.</p>` : "<p>The verified entitlement has been applied to your existing GridFlow workspace.</p>";
+  const subject = activationUrl ? `Your ${productName} activation and receipt` : `Your ${productName} receipt`;
+  const text = `Payment recorded for ${productName} (${amount}).\nReceipt: ${receiptNumber}${activationText}\n\nView your payment receipt:\n${receiptUrl}\n\nKeep this private receipt link secure.`;
+  const html = `<p>Payment recorded for <strong>${escapeHtml(productName)}</strong> (${escapeHtml(amount)}).</p><p>Receipt: <strong>${escapeHtml(receiptNumber)}</strong></p>${activationHtml}<p><a href="${escapeHtml(receiptUrl)}">View payment receipt</a></p><p>Keep this private receipt link secure.</p>`;
+  return { subject, text, html };
+}
+
+function ultraRenewalReminderContent(payload: Record<string, unknown>) {
+  const stage = typeof payload.stage === "string" ? payload.stage : "SEVEN_DAYS";
+  const role = payload.recipientRole === "ADMIN" ? "ADMIN" : "CUSTOMER";
+  const organisationName = typeof payload.organisationName === "string" ? payload.organisationName : "GridFlow customer";
+  const ownerName = typeof payload.ownerName === "string" ? payload.ownerName : "there";
+  const ultraExpiresAt = typeof payload.ultraExpiresAt === "string" ? payload.ultraExpiresAt : "";
+  if (!ultraExpiresAt || Number.isNaN(new Date(ultraExpiresAt).getTime())) throw new Error("Ultra reminder is missing a valid expiry time.");
+  const expired = stage === "EXPIRED";
+  const timing = stage === "SEVEN_DAYS" ? "within 7 days" : stage === "THREE_DAYS" ? "within 3 days" : "now";
+  const subject = role === "ADMIN"
+    ? `${organisationName}: GridFlow Ultra ${expired ? "expired" : `renewal due ${timing}`}`
+    : `Your GridFlow Ultra access ${expired ? "has expired" : `ends ${timing}`}`;
+  const greeting = role === "ADMIN" ? `Customer: ${organisationName}` : `Hi ${ownerName}`;
+  const action = expired
+    ? "Ultra has ended. Core access continues, and unused purchased research credits remain available."
+    : `Ultra ends at ${ultraExpiresAt}. It does not renew or charge automatically. Contact GridFlow support if you want another 30-day period.`;
+  const text = `${greeting},\n\n${action}\n\nCore remains available if Ultra is not renewed.`;
+  const html = `<p>${escapeHtml(greeting)},</p><p>${escapeHtml(action)}</p><p>Core remains available if Ultra is not renewed.</p>`;
   return { subject, text, html };
 }
 
@@ -82,6 +106,8 @@ export class AuthEmailProcessor {
           ? newDeviceContent(row.payload)
           : row.template === "PURCHASE_FULFILMENT"
             ? purchaseFulfilmentContent(row.payload)
+            : row.template === "ULTRA_RENEWAL_REMINDER"
+              ? ultraRenewalReminderContent(row.payload)
           : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
       await this.deliver(row.id, row.recipient, content);
       await this.database.query(

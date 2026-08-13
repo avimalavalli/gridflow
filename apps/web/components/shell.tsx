@@ -99,6 +99,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Launch Control", href: "/launch", icon: Rocket, keywords: "release acceptance launch checklist production approval", roles: ["OWNER", "ADMIN"] },
       { label: "Platform Admin", href: "/platform", icon: LockKeyhole, keywords: "customer activation approval core ultra licences", platformAdminOnly: true },
       { label: "Research Economics", href: "/platform/economics", icon: CircleDollarSign, keywords: "cost telemetry atlas sage relay margin ultra validation", platformAdminOnly: true },
+      { label: "Acceptance Lab", href: "/platform/acceptance", icon: ClipboardCheck, keywords: "phase 8c internal testing journeys findings feature freeze", platformAdminOnly: true },
     ],
   },
 ] as const;

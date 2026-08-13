@@ -34,12 +34,15 @@ Implemented in `docs/PHASE_8B_COMMERCIAL_LAUNCH_LAYER.md`. The Ultra amount, cre
 
 The instrumentation and approval workflow are built in `/platform/economics`. The evidence window itself must be run with release-owned production providers before launch.
 
-## Phase 8C — Acceptance and feature freeze
+## Phase 8C — Acceptance and feature freeze — built
 
-1. Run internal test organisations through onboarding and the complete discover-to-renewal lifecycle, including Wise fulfilment and Ultra expiry.
-2. Record confusion, dead ends, defects and unnecessary clicks; fix only demonstrated product gaps.
-3. Complete desktop, mobile, keyboard, accessibility and performance acceptance on physical devices.
-4. Freeze the V1 feature surface and clear every Launch Control requirement.
+1. Use `/platform/acceptance` to run at least two internal test organisations through the fixed 22-step Core-to-renewal lifecycle, including individually quoted Wise fulfilment and Ultra expiry.
+2. Cover both a new Core driver and an Ultra renewal, with at least one desktop and one mobile journey.
+3. Record confusion, dead ends, defects, unnecessary clicks, performance and accessibility findings while testing; resolve or deliberately defer every finding with a reason.
+4. Retest changed steps. Any evidence change automatically reopens an earlier freeze.
+5. Freeze the exact release commit only after Phase 8B.2 economics approval and all independent acceptance gates pass.
+
+The Acceptance Lab, structured finding workflow and fail-closed Launch Control integration are built. The real internal journeys and physical-device evidence remain operational release work. See `docs/PHASE_8C_ACCEPTANCE_FEATURE_FREEZE.md`.
 
 ## Phase 9 — Security hardening
 

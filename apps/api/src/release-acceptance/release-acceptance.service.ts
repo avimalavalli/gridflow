@@ -30,6 +30,7 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "openai_configuration", category: "AGENTS", title: "Live agent provider", description: "A release-owned OpenAI key and production agent model are configured server-side.", required: true, automated: true },
   { key: "research_cost_configuration", category: "AGENTS", title: "Research cost telemetry", description: "Model-token and web-search unit costs are configured so every live research run has complete cost telemetry.", required: true, automated: true },
   { key: "research_economics_approved", category: "PRODUCT", title: "Research economics approval", description: "The owner has approved a 100+ run Atlas, Sage and Relay validation with reconciled provider spend.", required: true, automated: true },
+  { key: "product_feature_freeze", category: "PRODUCT", title: "Product feature freeze", description: "Phase 8C acceptance journeys, findings and device coverage are complete and frozen against this exact release commit.", required: true, automated: true },
   { key: "gmail_oauth_configuration", category: "OUTREACH", title: "Gmail OAuth configuration", description: "Google OAuth, callback and encrypted token storage are configured.", required: true, automated: true },
   { key: "password_mail_configuration", category: "AUTH", title: "Password email delivery", description: "The production password-reset email provider and sender identity are configured.", required: true, automated: true },
   { key: "backup_configuration", category: "DATA", title: "Off-host backups", description: "A recent encrypted off-host backup has completed and supplied signed evidence.", required: true, automated: true },
@@ -57,7 +58,7 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "browser_qa", category: "QA", title: "Desktop browser QA", description: "Core journeys pass on current Chrome, Edge, Safari and Firefox releases.", required: true, automated: false },
   { key: "mobile_qa", category: "QA", title: "Mobile and tablet QA", description: "Core journeys remain usable on representative iOS, Android and tablet viewports.", required: true, automated: false },
   { key: "accessibility_qa", category: "QA", title: "Accessibility acceptance", description: "Keyboard navigation, focus order, contrast, labels, reduced motion and screen-reader basics are verified.", required: true, automated: false },
-  { key: "selected_athlete_signoff", category: "PRODUCT", title: "Selected-athlete sign-off", description: "The owner and selected athletes approve the real workflow before wider access opens.", required: true, automated: false },
+  { key: "selected_athlete_signoff", category: "PRODUCT", title: "Internal product-owner sign-off", description: "The product owner approves the real internal Core and Ultra acceptance journeys before direct public access opens.", required: true, automated: false },
 ] as const;
 
 interface ReleaseRow extends Record<string, unknown> {
@@ -586,7 +587,7 @@ export class ReleaseAcceptanceService {
   }
 
   private async evaluateAutomatedChecks(tx: SqlExecutor, tenantId: string, releaseId: string, databaseReady: boolean, proofStatus: OperationsProofStatus): Promise<void> {
-    const [counts, economicsApproval] = await Promise.all([tx.query<HealthCounts>(
+    const [counts, economicsApproval, featureFreeze] = await Promise.all([tx.query<HealthCounts>(
       `SELECT
          (SELECT COUNT(*)::int FROM "AutomationJob" WHERE "tenantId"=$1::uuid AND "status"='DEAD_LETTER') AS "deadLetterJobs",
          (SELECT COUNT(*)::int FROM "AuthEmailOutbox" a WHERE a."status"='DEAD_LETTER' AND EXISTS (
@@ -599,6 +600,10 @@ export class ReleaseAcceptanceService {
     ), tx.query<{ id: string; approvedAt: Date; successfulRuns: number }>(
       `SELECT "id","approvedAt",COALESCE(("metricsSnapshot"->>'successfulRuns')::int,0) AS "successfulRuns"
        FROM "ResearchEconomicsValidation" WHERE "status"='APPROVED' ORDER BY "approvedAt" DESC LIMIT 1`,
+    ), tx.query<{ id: string; frozenAt: Date }>(
+      `SELECT "id","frozenAt" FROM "ProductAcceptanceCycle"
+       WHERE "releaseVersion"=$1 AND "commitSha"=$2 AND "status"='FROZEN' LIMIT 1`,
+      [currentReleaseVersion(), currentReleaseCommit() ?? ""],
     )]);
     const health = counts.rows[0] ?? { deadLetterJobs: 0, deadLetterAuthMail: 0, failedAgentRuns: 0, failedChannelActions: 0, awaitingHumanReview: 0 };
 
@@ -640,6 +645,9 @@ export class ReleaseAcceptanceService {
       research_economics_approved: apiConfig.nodeEnv !== "production" || Boolean(economicsApproval.rows[0])
         ? { status: "PASS", detail: economicsApproval.rows[0] ? `${economicsApproval.rows[0].successfulRuns} research runs were approved on ${economicsApproval.rows[0].approvedAt.toISOString()}.` : "Development environment; an approved production economics window is required before release." }
         : { status: "BLOCKED", detail: "Complete and owner-approve the 100+ run Research Economics validation in Platform Admin." },
+      product_feature_freeze: apiConfig.nodeEnv !== "production" || Boolean(featureFreeze.rows[0])
+        ? { status: "PASS", detail: featureFreeze.rows[0] ? `Phase 8C product evidence was frozen on ${featureFreeze.rows[0].frozenAt.toISOString()} for commit ${currentReleaseCommit()?.slice(0, 12)}.` : "Development environment; an exact-commit Phase 8C freeze is required before release." }
+        : { status: "BLOCKED", detail: "Complete both internal Acceptance Lab journeys, resolve all findings and freeze this exact commit." },
       gmail_oauth_configuration: configured(process.env.GOOGLE_OAUTH_CLIENT_ID) && configured(process.env.GOOGLE_OAUTH_CLIENT_SECRET) && configured(process.env.GOOGLE_OAUTH_REDIRECT_URI) && configured(process.env.INTEGRATION_ENCRYPTION_KEY)
         ? { status: "PASS", detail: "Google OAuth callback and encrypted token storage are configured." }
         : { status: "BLOCKED", detail: "Google OAuth credentials, callback URI and INTEGRATION_ENCRYPTION_KEY are required." },

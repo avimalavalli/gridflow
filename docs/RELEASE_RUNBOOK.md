@@ -11,7 +11,8 @@
 7. Confirm OpenAI, Gmail, Resend, logging, alerting and backup ownership.
 8. Open **Launch Control** and confirm every automated check is green.
 9. Refresh Phase 8A live evidence in **Launch Control**. Atlas, Sage, Relay, Echo, Gmail, password recovery and MFA cannot record `PASS` until GridFlow finds their complete post-deployment evidence chains. Add useful human review notes and external evidence links only where they add information; never paste credentials, tokens or message bodies.
-10. The organisation owner approves the release only after Launch Control reaches `READY`.
+10. Complete the two-organisation Core/Ultra journeys in **Acceptance Lab**, close every finding and freeze the exact deployed commit. Any later evidence change reopens the freeze and must be retested.
+11. The organisation owner approves the release only after Launch Control reaches `READY`.
 
 ## Deployment
 
@@ -31,6 +32,6 @@
 4. Restore a backup only when data repair cannot be safely performed forward.
 5. Re-run readiness, isolation, queue and suppression checks.
 
-## Opening athlete access
+## Opening public access
 
-Start with selected athlete organisations. Review errors, agent acceptance, sending outcomes and cost daily. Expand only when evidence quality and operational reliability remain within the agreed release thresholds.
+Open public acquisition only after the closed internal rehearsal and exact-commit owner approval. This is a direct launch, not a customer beta. Keep non-critical feature work frozen during the launch window and review errors, agent acceptance, sending outcomes, support demand and provider cost daily.

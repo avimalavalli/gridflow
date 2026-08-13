@@ -32,7 +32,7 @@ describe("GridFlow database", () => {
     const migrations = await database.query<{ count: number }>(
       `SELECT COUNT(*)::int AS "count" FROM "_GridFlowMigration"`,
     );
-    expect(migrations.rows[0]?.count).toBe(25);
+    expect(migrations.rows[0]?.count).toBe(26);
   });
 
   it("enforces tenant-scoped company keys at database level", async () => {

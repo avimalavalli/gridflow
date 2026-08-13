@@ -713,6 +713,64 @@ enum AcceptanceCheckCategory {
   QA
 }
 
+enum ProductAcceptanceCycleStatus {
+  COLLECTING
+  FROZEN
+}
+
+enum ProductAcceptanceJourneyStatus {
+  IN_PROGRESS
+  BLOCKED
+  PASSED
+  ABANDONED
+}
+
+enum ProductAcceptanceStepStatus {
+  PENDING
+  PASS
+  FAIL
+  BLOCKED
+  NOT_APPLICABLE
+}
+
+enum ProductAcceptancePersona {
+  NEW_CORE_DRIVER
+  ULTRA_RENEWAL
+  CORE_AFTER_ULTRA
+  MOBILE_RECOVERY
+}
+
+enum AcceptanceDeviceClass {
+  DESKTOP
+  MOBILE
+  TABLET
+}
+
+enum ProductFindingType {
+  BUG
+  FRICTION
+  CONFUSION
+  DEAD_END
+  UNNECESSARY_CLICK
+  PERFORMANCE
+  ACCESSIBILITY
+}
+
+enum ProductFindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  OBSERVATION
+}
+
+enum ProductFindingStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DEFERRED
+}
+
 model User {
   id             String                   @id @default(uuid()) @db.Uuid
   email          String                   @unique
@@ -764,6 +822,10 @@ model User {
   commercialPurchasesCreated CommercialPurchase[] @relation("CommercialPurchaseCreatedBy")
   commercialPurchasesReviewed CommercialPurchase[] @relation("CommercialPurchaseReviewedBy")
   researchEconomicsApprovals ResearchEconomicsValidation[] @relation("ResearchEconomicsApprovedBy")
+  productAcceptanceJourneys ProductAcceptanceJourney[] @relation("ProductAcceptanceJourneyTester")
+  productAcceptanceFindingsCreated ProductAcceptanceFinding[] @relation("ProductAcceptanceFindingCreatedBy")
+  productAcceptanceFindingsResolved ProductAcceptanceFinding[] @relation("ProductAcceptanceFindingResolvedBy")
+  productAcceptanceFreezes ProductAcceptanceCycle[] @relation("ProductAcceptanceFrozenBy")
   productExperienceProgress ProductExperienceProgress[]
   automationPoliciesUpdated AutomationControlPolicy[] @relation("AutomationPolicyUpdatedBy")
   automationDecisionsMade AutomationDecision[] @relation("AutomationDecisionDecidedBy")
@@ -849,6 +911,7 @@ model Organisation {
   deliveryEvidence DeliveryEvidence[]
   deliveryReports DeliveryReport[]
   renewalCases RenewalCase[]
+  productAcceptanceJourneys ProductAcceptanceJourney[]
 }
 
 model ActivationGrant {
@@ -1020,6 +1083,98 @@ model ResearchEconomicsValidation {
   approvedBy            User?                             @relation("ResearchEconomicsApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
 
   @@index([status, startedAt])
+}
+
+model ProductAcceptanceCycle {
+  id                String                       @id @default(uuid()) @db.Uuid
+  releaseVersion    String
+  commitSha         String
+  status            ProductAcceptanceCycleStatus @default(COLLECTING)
+  minimumJourneys   Int                          @default(2)
+  frozenAt          DateTime?                    @db.Timestamptz(3)
+  frozenByUserId    String?                      @db.Uuid
+  freezeNotes       String?
+  createdAt         DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                     @updatedAt @db.Timestamptz(3)
+  frozenBy          User?                        @relation("ProductAcceptanceFrozenBy", fields: [frozenByUserId], references: [id], onDelete: SetNull)
+  journeys          ProductAcceptanceJourney[]
+  findings          ProductAcceptanceFinding[]
+
+  @@unique([releaseVersion, commitSha])
+  @@index([status, updatedAt])
+}
+
+model ProductAcceptanceJourney {
+  id                String                            @id @default(uuid()) @db.Uuid
+  cycleId           String                            @db.Uuid
+  organisationId    String?                           @db.Uuid
+  persona           ProductAcceptancePersona
+  deviceClass       AcceptanceDeviceClass
+  browser           String
+  status            ProductAcceptanceJourneyStatus    @default(IN_PROGRESS)
+  notes             String?
+  testerUserId      String                            @db.Uuid
+  startedAt         DateTime                          @default(now()) @db.Timestamptz(3)
+  completedAt       DateTime?                         @db.Timestamptz(3)
+  createdAt         DateTime                          @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                          @updatedAt @db.Timestamptz(3)
+  cycle             ProductAcceptanceCycle            @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  organisation      Organisation?                     @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  tester            User                              @relation("ProductAcceptanceJourneyTester", fields: [testerUserId], references: [id], onDelete: Restrict)
+  steps             ProductAcceptanceStep[]
+  findings          ProductAcceptanceFinding[]
+
+  @@index([cycleId, status, deviceClass])
+  @@index([organisationId, createdAt])
+}
+
+model ProductAcceptanceStep {
+  id                String                       @id @default(uuid()) @db.Uuid
+  journeyId         String                       @db.Uuid
+  key               String
+  sequence          Int
+  category          String
+  title             String
+  description       String
+  evidenceRequired  Boolean                      @default(false)
+  status            ProductAcceptanceStepStatus  @default(PENDING)
+  notes             String?
+  evidenceReference String?
+  testedAt          DateTime?                    @db.Timestamptz(3)
+  createdAt         DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                     @updatedAt @db.Timestamptz(3)
+  journey           ProductAcceptanceJourney     @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  findings          ProductAcceptanceFinding[]
+
+  @@unique([journeyId, key])
+  @@index([journeyId, sequence])
+}
+
+model ProductAcceptanceFinding {
+  id                String                         @id @default(uuid()) @db.Uuid
+  cycleId           String                         @db.Uuid
+  journeyId         String                         @db.Uuid
+  stepId            String?                        @db.Uuid
+  type              ProductFindingType
+  severity          ProductFindingSeverity
+  status            ProductFindingStatus           @default(OPEN)
+  title             String
+  detail            String
+  route             String?
+  resolution        String?
+  createdByUserId   String                         @db.Uuid
+  resolvedByUserId  String?                        @db.Uuid
+  resolvedAt        DateTime?                      @db.Timestamptz(3)
+  createdAt         DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                       @updatedAt @db.Timestamptz(3)
+  cycle             ProductAcceptanceCycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  journey           ProductAcceptanceJourney       @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  step              ProductAcceptanceStep?         @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  createdBy         User                           @relation("ProductAcceptanceFindingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  resolvedBy        User?                          @relation("ProductAcceptanceFindingResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([cycleId, status, severity])
+  @@index([journeyId, createdAt])
 }
 
 model OrganisationMembership {

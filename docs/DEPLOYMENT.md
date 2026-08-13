@@ -81,7 +81,7 @@ LOG_DRAIN_CONFIGURED=true
 10. Complete every automated and manual item in **Launch Control**.
 11. The organisation owner approves the cycle only when Launch Control reaches `READY`.
 12. Deploy the main application domain, confirm the deployed commit, then mark the cycle `RELEASED`.
-13. Open selected athlete accounts and watch errors, AI quality, sending outcomes and cost before wider access.
+13. After the closed internal rehearsal and owner approval, open public acquisition directly and watch errors, AI quality, sending outcomes, support demand and cost throughout the launch window.
 
 ## Rollback boundary
 

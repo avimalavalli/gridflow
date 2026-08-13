@@ -771,6 +771,32 @@ enum ProductFindingStatus {
   DEFERRED
 }
 
+enum LegalDocumentType {
+  PRIVACY_POLICY
+  TERMS_OF_SERVICE
+  DATA_PROCESSING_ADDENDUM
+  COOKIE_NOTICE
+}
+
+enum PrivacyRequestType {
+  ACCESS
+  CORRECTION
+  DELETION
+  RESTRICTION
+  OBJECTION
+  PORTABILITY
+  COMPLAINT
+  ACCOUNT_CLOSURE
+}
+
+enum PrivacyRequestStatus {
+  RECEIVED
+  IDENTITY_CHECK
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
 model User {
   id             String                   @id @default(uuid()) @db.Uuid
   email          String                   @unique
@@ -841,6 +867,65 @@ model User {
   deliveryReportsShared DeliveryReport[] @relation("DeliveryReportSharedBy")
   renewalCasesPrepared RenewalCase[] @relation("RenewalCasePreparedBy")
   renewalCasesApproved RenewalCase[] @relation("RenewalCaseApprovedBy")
+}
+
+/// Global abuse-control counters. Keys are HMAC digests; raw IP/email values are never stored.
+model SecurityRateLimit {
+  id              String   @id @default(uuid()) @db.Uuid
+  scope           String
+  keyHash         String
+  windowStartedAt DateTime @db.Timestamptz(3)
+  count           Int      @default(1)
+  expiresAt       DateTime @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([scope, keyHash, windowStartedAt])
+  @@index([expiresAt])
+}
+
+/// Immutable evidence that a person actively accepted a particular legal-document version.
+model LegalAcceptance {
+  id                 String            @id @default(uuid()) @db.Uuid
+  userId             String?           @db.Uuid
+  organisationId     String?           @db.Uuid
+  documentType       LegalDocumentType
+  documentVersion    String
+  ageConfirmed       Boolean           @default(false)
+  authorityConfirmed Boolean           @default(false)
+  ipAddress          String?
+  userAgent          String?
+  acceptedAt         DateTime          @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, documentType, documentVersion])
+  @@index([organisationId, acceptedAt])
+  @@index([documentType, documentVersion, acceptedAt])
+}
+
+/// Rights, complaints and account-closure workflow with a durable acknowledgement trail.
+model PrivacyRequest {
+  id                   String               @id @default(uuid()) @db.Uuid
+  reference            String               @unique
+  requestType          PrivacyRequestType
+  status               PrivacyRequestStatus @default(RECEIVED)
+  requesterName        String
+  requesterEmail       String
+  userId               String?              @db.Uuid
+  organisationId       String?              @db.Uuid
+  details              String
+  acknowledgementText String
+  acknowledgedAt       DateTime             @db.Timestamptz(3)
+  responseDueAt        DateTime             @db.Timestamptz(3)
+  completedAt          DateTime?            @db.Timestamptz(3)
+  resolutionNotes      String?
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
+
+  @@index([status, responseDueAt])
+  @@index([requesterEmail, createdAt])
+  @@index([organisationId, createdAt])
 }
 
 model Organisation {

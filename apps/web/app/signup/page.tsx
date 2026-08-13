@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { GRIDFLOW_LEGAL } from "@gridflow/domain";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,6 +18,11 @@ export default function SignupPage() {
     organisationType: "DRIVER",
     betaCode: "",
     activationToken: activationFromQuery,
+    acceptTerms: false,
+    acceptPrivacy: false,
+    ageConfirmed: false,
+    authorityConfirmed: false,
+    legalVersion: GRIDFLOW_LEGAL.version,
   });
   const [hasActivation, setHasActivation] = useState(Boolean(activationFromQuery));
   const [busy, setBusy] = useState(false);
@@ -88,6 +94,13 @@ export default function SignupPage() {
           ) : null}
           {signupMode === "CODE" ? <label className="full">Private beta access code<input value={form.betaCode} onChange={(event) => setForm({ ...form, betaCode: event.target.value })} /></label> : null}
           {signupMode === "CLOSED" ? <div className="notice notice-error full">New GridFlow registrations are currently closed.</div> : null}
+          <fieldset className="legal-consent full">
+            <legend>Before creating the account</legend>
+            <label><input required type="checkbox" checked={form.acceptTerms} onChange={(event) => setForm({ ...form, acceptTerms: event.target.checked })}/><span>I accept the <Link href="/legal/terms" target="_blank" rel="noreferrer">Terms of Service</Link>.</span></label>
+            <label><input required type="checkbox" checked={form.acceptPrivacy} onChange={(event) => setForm({ ...form, acceptPrivacy: event.target.checked })}/><span>I have read the <Link href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</Link>.</span></label>
+            <label><input required type="checkbox" checked={form.ageConfirmed} onChange={(event) => setForm({ ...form, ageConfirmed: event.target.checked })}/><span>I confirm that I am at least {GRIDFLOW_LEGAL.minimumAge}.</span></label>
+            <label><input required type="checkbox" checked={form.authorityConfirmed} onChange={(event) => setForm({ ...form, authorityConfirmed: event.target.checked })}/><span>I have authority to create this organisation and provide its data.</span></label>
+          </fieldset>
           <div className="full"><button className="button button-primary button-large" type="submit" disabled={busy || signupMode === null || signupMode === "CLOSED"}>{busy ? "Creating organisation…" : "Create GridFlow account"}</button></div>
           {message ? <div className="notice notice-error full">{message}</div> : null}
         </form>

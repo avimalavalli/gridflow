@@ -59,6 +59,7 @@ async function request(path, { cookie, method = "GET", body } = {}) {
     method,
     headers: {
       ...(cookie ? { cookie } : {}),
+      ...(cookie && !["GET", "HEAD", "OPTIONS"].includes(method) ? { origin: "http://localhost:3000" } : {}),
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -78,6 +79,11 @@ async function register(email, name, organisationName) {
       organisationName,
       organisationType: "DRIVER",
       password: "private-beta-password-123",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      ageConfirmed: true,
+      authorityConfirmed: true,
+      legalVersion: "2026-08-13",
     }),
   });
   if (!response.ok) throw new Error(`Registration failed: ${response.status} ${await response.text()}`);
@@ -140,6 +146,11 @@ try {
       token: tokenA,
       name: "Commercial Operator",
       password: "commercial-password-123",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      ageConfirmed: true,
+      authorityConfirmed: true,
+      legalVersion: "2026-08-13",
     }),
   });
   assert(acceptedAResponse.ok, `Athlete A invitation acceptance failed: ${await acceptedAResponse.text()}`);
@@ -165,6 +176,11 @@ try {
       token: tokenB,
       name: "Commercial Operator",
       password: "commercial-password-123",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      ageConfirmed: true,
+      authorityConfirmed: true,
+      legalVersion: "2026-08-13",
     }),
   });
   assert(acceptedBResponse.ok, `Existing user invitation acceptance failed: ${await acceptedBResponse.text()}`);

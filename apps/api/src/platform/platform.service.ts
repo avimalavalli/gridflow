@@ -57,7 +57,7 @@ export class PlatformService {
   constructor(private readonly database: DatabaseService) {}
 
   async overview() {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       await tx.query(
         `UPDATE "ActivationGrant" SET "status"='EXPIRED',"updatedAt"=CURRENT_TIMESTAMP
          WHERE "status"='ISSUED' AND "expiresAt"<=CURRENT_TIMESTAMP`,
@@ -149,14 +149,14 @@ export class PlatformService {
   }
 
   async economicsOverview() {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const validation = await this.latestEconomicsValidation(tx);
       return this.economicsSnapshot(tx, validation);
     });
   }
 
   async startEconomicsValidation(identity: RequestIdentity, request: Request) {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const ultraPriceMinor = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
       if (!Number.isInteger(ultraPriceMinor) || ultraPriceMinor < 1) {
         throw new BadRequestException("Configure the GridFlow Ultra GBP amount before starting research-economics validation.");
@@ -183,7 +183,7 @@ export class PlatformService {
   }
 
   async reconcileEconomicsValidation(identity: RequestIdentity, id: string, input: ReconcileResearchEconomicsDto, request: Request) {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const validation = await this.latestEconomicsValidation(tx, id);
       if (!validation || validation.status !== "COLLECTING") throw new BadRequestException("Only the active research-economics window can be reconciled.");
       const evidence = await this.economicsSnapshot(tx, validation);
@@ -212,7 +212,7 @@ export class PlatformService {
 
   async approveEconomicsValidation(identity: RequestIdentity, id: string, input: ApproveResearchEconomicsDto, request: Request) {
     if (!input.confirmComplete) throw new BadRequestException("Confirm that the reconciled provider costs match the validation window.");
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const validation = await this.latestEconomicsValidation(tx, id);
       if (!validation || validation.status !== "COLLECTING") throw new BadRequestException("Only the active research-economics window can be approved.");
       const snapshot = await this.economicsSnapshot(tx, validation);
@@ -323,7 +323,7 @@ export class PlatformService {
     const email = normaliseEmail(input.email);
     const rawToken = createOpaqueToken();
     const expiresAt = new Date(Date.now() + input.expiresInDays * 86_400_000);
-    const grant = await this.database.transaction(async (tx) => {
+    const grant = await this.database.platformTransaction(async (tx) => {
       await tx.query(
         `UPDATE "ActivationGrant" SET "status"='REVOKED',"updatedAt"=CURRENT_TIMESTAMP
          WHERE "email"=$1 AND "status"='ISSUED'`,
@@ -351,7 +351,7 @@ export class PlatformService {
   }
 
   async revokeGrant(identity: RequestIdentity, grantId: string, request: Request) {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const result = await tx.query(
         `UPDATE "ActivationGrant" SET "status"='REVOKED',"updatedAt"=CURRENT_TIMESTAMP
          WHERE "id"=$1::uuid AND "status"='ISSUED'`,
@@ -370,7 +370,7 @@ export class PlatformService {
     if (organisationId === identity.tenantId && input.action !== "APPROVE") {
       throw new BadRequestException("Switch to a separate platform-admin organisation before stopping the organisation currently in use.");
     }
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const current = await tx.query<{ accessStatus: string; plan: "CORE" | "ULTRA"; entitlementStatus: string }>(
         `SELECT o."accessStatus"::text AS "accessStatus",pe."plan"::text AS "plan",pe."status"::text AS "entitlementStatus"
          FROM "Organisation" o JOIN "ProductEntitlement" pe ON pe."tenantId"=o."id"
@@ -416,7 +416,7 @@ export class PlatformService {
   }
 
   async markUltraPaymentPending(identity: RequestIdentity, organisationId: string, input: MarkUltraPaymentPendingDto, request: Request) {
-    return this.database.transaction(async (tx) => {
+    return this.database.platformTransaction(async (tx) => {
       const result = await tx.query<{ ultraExpiresAt: Date | string }>(
         `UPDATE "ProductEntitlement" SET "ultraStatus"='PAYMENT_PENDING',"ultraPaymentPendingAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
          WHERE "tenantId"=$1::uuid AND "status"='ACTIVE' AND "ultraExpiresAt">CURRENT_TIMESTAMP

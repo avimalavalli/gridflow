@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsOptional,
@@ -39,6 +40,22 @@ export class RegisterDto {
   @IsString()
   @MaxLength(256)
   activationToken?: string;
+
+  @IsBoolean()
+  acceptTerms!: boolean;
+
+  @IsBoolean()
+  acceptPrivacy!: boolean;
+
+  @IsBoolean()
+  ageConfirmed!: boolean;
+
+  @IsBoolean()
+  authorityConfirmed!: boolean;
+
+  @IsString()
+  @MaxLength(32)
+  legalVersion!: string;
 }
 
 export class LoginDto {
@@ -64,6 +81,22 @@ export class AcceptInvitationDto {
   @MinLength(12)
   @MaxLength(128)
   password!: string;
+
+  @IsBoolean()
+  acceptTerms!: boolean;
+
+  @IsBoolean()
+  acceptPrivacy!: boolean;
+
+  @IsBoolean()
+  ageConfirmed!: boolean;
+
+  @IsBoolean()
+  authorityConfirmed!: boolean;
+
+  @IsString()
+  @MaxLength(32)
+  legalVersion!: string;
 }
 
 export class SwitchOrganisationDto {

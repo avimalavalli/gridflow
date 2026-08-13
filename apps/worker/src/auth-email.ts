@@ -84,6 +84,23 @@ function ultraRenewalReminderContent(payload: Record<string, unknown>) {
   return { subject, text, html };
 }
 
+function privacyRequestContent(payload: Record<string, unknown>, alert: boolean) {
+  const reference = typeof payload.reference === "string" ? payload.reference : "";
+  const requestType = typeof payload.requestType === "string" ? payload.requestType.replaceAll("_", " ").toLowerCase() : "privacy request";
+  const supportEmail = typeof payload.supportEmail === "string" ? payload.supportEmail : "gridflowsupport@gmail.com";
+  if (!/^GF-PRIV-\d{4}-[A-F0-9]{10}$/.test(reference)) throw new Error("Privacy email is missing a valid reference.");
+  if (alert) {
+    const subject = `Privacy request received: ${reference}`;
+    const text = `GridFlow received a ${requestType}.\n\nReference: ${reference}\n\nOpen the protected platform privacy queue to verify identity, investigate and record the response. Do not request passwords, activation tokens, recovery codes or API keys.`;
+    const html = `<p>GridFlow received a <strong>${escapeHtml(requestType)}</strong>.</p><p>Reference: <strong>${escapeHtml(reference)}</strong></p><p>Open the protected platform privacy queue to verify identity, investigate and record the response. Do not request passwords, activation tokens, recovery codes or API keys.</p>`;
+    return { subject, text, html };
+  }
+  const subject = `GridFlow received your privacy request (${reference})`;
+  const text = `We received your ${requestType}.\n\nReference: ${reference}\n\nWe will verify and investigate it without undue delay. We aim to respond within one month and will explain if a lawful extension is needed. Contact ${supportEmail} and include the reference if you need to add information. Never send a password, recovery code, activation token or API key.`;
+  const html = `<p>We received your <strong>${escapeHtml(requestType)}</strong>.</p><p>Reference: <strong>${escapeHtml(reference)}</strong></p><p>We will verify and investigate it without undue delay. We aim to respond within one month and will explain if a lawful extension is needed.</p><p>Contact <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a> and include the reference if you need to add information. Never send a password, recovery code, activation token or API key.</p>`;
+  return { subject, text, html };
+}
+
 export class AuthEmailProcessor {
   constructor(private readonly database: GridFlowDatabase) {}
 
@@ -108,10 +125,16 @@ export class AuthEmailProcessor {
             ? purchaseFulfilmentContent(row.payload)
             : row.template === "ULTRA_RENEWAL_REMINDER"
               ? ultraRenewalReminderContent(row.payload)
+            : row.template === "PRIVACY_REQUEST_ACKNOWLEDGEMENT"
+              ? privacyRequestContent(row.payload, false)
+            : row.template === "PRIVACY_REQUEST_ALERT"
+              ? privacyRequestContent(row.payload, true)
           : (() => { throw new Error(`Unsupported auth email template: ${row.template}`); })();
       await this.deliver(row.id, row.recipient, content);
       await this.database.query(
-        `UPDATE "AuthEmailOutbox" SET "status"='SENT',"sentAt"=CURRENT_TIMESTAMP,"errorDetails"=NULL,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
+        `UPDATE "AuthEmailOutbox" SET "status"='SENT',"sentAt"=CURRENT_TIMESTAMP,"errorDetails"=NULL,
+           "payload"=jsonb_build_object('delivered',true,'template',"template",'redactedAt',CURRENT_TIMESTAMP),
+           "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
         [row.id],
       );
       return { processed: true, id: row.id, result: "sent" };

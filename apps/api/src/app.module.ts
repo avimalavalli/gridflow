@@ -37,10 +37,14 @@ import { RenewalsModule } from "./renewals/renewals.module.js";
 import { SearchModule } from "./search/search.module.js";
 import { CommerceModule } from "./commerce/commerce.module.js";
 import { AcceptanceLabModule } from "./acceptance-lab/acceptance-lab.module.js";
+import { SecurityModule } from "./security/security.module.js";
+import { PrivacyModule } from "./privacy/privacy.module.js";
 
 @Module({
   imports: [
     DatabaseModule,
+    SecurityModule,
+    PrivacyModule,
     AuthModule,
     ContextModule,
     HealthModule,

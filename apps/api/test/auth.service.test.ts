@@ -61,6 +61,7 @@ afterEach(async () => {
 });
 
 describe("GridFlow account recovery and MFA", () => {
+  const legalAcceptance = { acceptTerms: true, acceptPrivacy: true, ageConfirmed: true, authorityConfirmed: true, legalVersion: "2026-08-13" } as const;
   it("resets passwords, revokes sessions and completes an MFA login", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-auth-service-"));
     database = await createDatabase("pglite://memory");
@@ -73,6 +74,7 @@ describe("GridFlow account recovery and MFA", () => {
     const auth = new AuthService(db as never, sessions);
     const registrationResponse = response();
     const registered = await auth.register({
+      ...legalAcceptance,
       email: "athlete@example.test",
       password: "old-private-password-123",
       name: "Test Athlete",
@@ -81,6 +83,8 @@ describe("GridFlow account recovery and MFA", () => {
     }, request(), registrationResponse.response);
     expect(registered.security.mfaEnabled).toBe(false);
     expect(registrationResponse.cookie()).toContain("gridflow_session=");
+    const acceptances = await database.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "LegalAcceptance" WHERE "documentVersion"='2026-08-13' AND "ageConfirmed"=true AND "authorityConfirmed"=true`);
+    expect(acceptances.rows[0]?.count).toBe(2);
 
     await auth.forgotPassword({ email: "athlete@example.test" }, request());
     const resetEmail = await database.query<{ payload: unknown }>(`SELECT "payload" FROM "AuthEmailOutbox" WHERE "template"='PASSWORD_RESET'`);
@@ -126,6 +130,7 @@ describe("GridFlow account recovery and MFA", () => {
 
     const firstResponse = response();
     await auth.register({
+      ...legalAcceptance,
       email: "devices@example.test",
       password: "private-password-123",
       name: "Device Test",

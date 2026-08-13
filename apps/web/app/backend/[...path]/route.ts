@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverApiBases } from "../../../lib/api-base";
 
 export const dynamic = "force-dynamic";
+const MAX_PROXY_BODY_BYTES = 512 * 1024;
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -48,12 +49,42 @@ function connectionMessage(error: unknown): string {
   return error.message.slice(0, 300);
 }
 
+async function readBoundedBody(request: NextRequest): Promise<ArrayBuffer | undefined> {
+  if (!request.body) return undefined;
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > MAX_PROXY_BODY_BYTES) {
+    throw new RangeError("GridFlow request body is too large.");
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_PROXY_BODY_BYTES) {
+      await reader.cancel();
+      throw new RangeError("GridFlow request body is too large.");
+    }
+    chunks.push(value);
+  }
+  if (!total) return undefined;
+  const buffer = new ArrayBuffer(total);
+  const body = new Uint8Array(buffer);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return buffer;
+}
+
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   try {
     const { path } = await context.params;
     const encodedPath = path.map((segment) => encodeURIComponent(segment)).join("/");
     const method = request.method.toUpperCase();
-    const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();
+    const body = method === "GET" || method === "HEAD" ? undefined : await readBoundedBody(request);
     const headers = upstreamHeaders(request);
     const bases = serverApiBases();
     let lastConnectionError: unknown;
@@ -94,6 +125,12 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
 
     throw lastConnectionError ?? new Error("No GridFlow API endpoint was available.");
   } catch (error) {
+    if (error instanceof RangeError) {
+      return NextResponse.json(
+        { statusCode: 413, message: "GridFlow accepts request bodies up to 512 KB.", error: "Payload Too Large" },
+        { status: 413, headers: { "cache-control": "no-store" } },
+      );
+    }
     const configurationError = error instanceof Error && error.message.includes("not configured");
     return NextResponse.json(
       {

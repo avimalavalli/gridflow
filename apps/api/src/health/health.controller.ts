@@ -26,10 +26,12 @@ export class HealthController {
     const production = apiConfig.nodeEnv === "production";
     let databaseReady = false;
     let databaseKind: string | null = null;
+    let databaseSecurity: Awaited<ReturnType<DatabaseService["securityPosture"]>> = null;
     try {
       const database = await this.database.ping();
       databaseReady = database.database === "ok";
       databaseKind = database.kind;
+      databaseSecurity = await this.database.securityPosture();
     } catch {
       databaseReady = false;
     }
@@ -37,6 +39,8 @@ export class HealthController {
     try { proofStatus = await this.proofs.status(); } catch { proofStatus = null; }
     const checks = {
       database: databaseReady,
+      databaseTransport: !production || (process.env.DATABASE_SSL === "true" && databaseSecurity?.encrypted === true),
+      databaseLeastPrivilege: !production || (databaseSecurity?.superuser === false && databaseSecurity?.bypassRls === false),
       productionAuth: !production || (!apiConfig.devBootstrap && apiConfig.secureCookies && apiConfig.authEncryptionKey.length >= 32),
       agentProvider: !production || Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_AGENT_MODEL?.trim()),
       gmailOAuth: !production || Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID?.trim() && process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim() && process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() && process.env.INTEGRATION_ENCRYPTION_KEY?.trim()),
@@ -54,6 +58,10 @@ export class HealthController {
       failedChecks,
       database: databaseReady ? "ok" : "unavailable",
       kind: databaseKind,
+      databaseSecurity: production ? {
+        encrypted: databaseSecurity?.encrypted ?? false,
+        leastPrivilege: databaseSecurity ? !databaseSecurity.superuser && !databaseSecurity.bypassRls : false,
+      } : undefined,
       proofs: {
         monitoring: { fresh: proofStatus?.monitor.fresh ?? false, recordedAt: proofStatus?.monitor.recordedAt ?? null, ageMinutes: proofStatus?.monitor.ageMinutes ?? null },
         backupRestore: { fresh: proofStatus?.backup.fresh ?? false, recordedAt: proofStatus?.backup.recordedAt ?? null, ageMinutes: proofStatus?.backup.ageMinutes ?? null },

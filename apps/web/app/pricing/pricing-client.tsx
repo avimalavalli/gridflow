@@ -35,13 +35,15 @@ export function PricingClient({ catalogue }: { catalogue: CommercialCatalogue })
   ];
   return <>
     <div className="public-pricing-grid">
-      <article className="public-price-card">
-        <div><div className="public-kicker">Permanent foundation</div><h2>{catalogue.core.name}</h2><div className="public-price"><strong>Individually quoted</strong><span>one-time onboarding, agreed for each driver</span></div></div>
+      <article className="public-price-card core">
+        <div className="public-price-card-head"><div><div className="public-kicker">Permanent foundation</div><h2>{catalogue.core.name}</h2></div><span className="public-plan-label">Yours permanently</span></div>
+        <div className="public-price"><strong>Individually quoted</strong><span>one-time onboarding, agreed for each driver</span></div>
         <ul>{coreBenefits.map((item) => <li key={item}><Check size={15}/><span>{item}</span></li>)}</ul>
         <ContactButton email={catalogue.supportEmail} subject="GridFlow Core quote">Request a Core quote</ContactButton>
       </article>
       <article className="public-price-card featured">
-        <div><div className="public-kicker">Optional managed layer</div><h2>{catalogue.ultra.name}</h2><div className="public-price"><strong>{money(catalogue.ultra.amountMinor) ?? "Price available on request"}</strong><span>per {catalogue.ultra.periodDays} paid days</span></div></div>
+        <div className="public-price-card-head"><div><div className="public-kicker">Optional managed layer</div><h2>{catalogue.ultra.name}</h2></div><span className="public-plan-label">Flexible capacity</span></div>
+        <div className="public-price"><strong>{money(catalogue.ultra.amountMinor) ?? "Price available on request"}</strong><span>per {catalogue.ultra.periodDays} paid days</span></div>
         <ul>{ultraBenefits.map((item) => <li key={item}><Check size={15}/><span>{item}</span></li>)}</ul>
         <ContactButton email={catalogue.supportEmail} subject="GridFlow Ultra renewal">Arrange an Ultra period</ContactButton>
       </article>

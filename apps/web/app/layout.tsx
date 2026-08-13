@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./product-finish.css";
+import "./public-finish.css";
 
 export const metadata: Metadata = {
   title: "GridFlow",

@@ -22,7 +22,8 @@ export default async function PricingPage() {
       <div className="public-kicker">Simple commercial model</div>
       <h1>Keep Core permanently. Add managed capacity when you need it.</h1>
       <p>Core is individually quoted for each driver. Ultra and research packs are optional additions for existing Core customers, paid by Wise Business invoice and activated only after verification.</p>
+      <div className="public-hero-pills"><span>Permanent Core access</span><span>No automatic renewal</span><span>Wise-verified activation</span></div>
     </section>
-    <section className="public-section"><PricingClient catalogue={data}/></section>
+    <section className="public-section public-pricing-section"><div className="public-section-head public-section-head-centred"><div className="public-kicker">Choose the right operating level</div><h2>A permanent foundation with optional managed capacity.</h2></div><PricingClient catalogue={data}/></section>
   </PublicShell>;
 }

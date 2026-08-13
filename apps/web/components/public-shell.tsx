@@ -1,12 +1,15 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
+import gridFlowLogo from "./assets/gridflow-logo.png";
+import gridFlowMark from "./assets/gridflow-mark.png";
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="public-site">
       <header className="public-nav">
         <Link className="public-brand" href="/" aria-label="GridFlow home">
-          <span className="public-brand-mark" aria-hidden="true">GF</span>
+          <Image className="public-brand-logo" src={gridFlowMark} alt="" priority/>
           <span className="public-brand-copy"><strong><span>GRID</span>FLOW</strong><small>Commercial OS</small></span>
         </Link>
         <nav aria-label="Public navigation">
@@ -19,7 +22,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       <main id="main-content" tabIndex={-1}>{children}</main>
       <footer className="public-footer">
         <div className="public-footer-brand">
-          <div className="public-footer-title"><span className="public-brand-mark" aria-hidden="true">GF</span><strong>GridFlow</strong></div>
+          <div className="public-footer-logo-lockup"><Image src={gridFlowLogo} alt="GridFlow"/></div>
           <span>Sponsorship Commercial Operating System for athletes and teams.</span>
         </div>
         <div className="public-footer-control"><ShieldCheck size={15}/><span>Human-controlled by design</span></div>

@@ -9,7 +9,7 @@
   --text: #152238;
   --ink: #152238;
   --muted: #5e6c82;
-  --muted-2: #718096;
+  --muted-2: #5e6c82;
   --line: #e1e6ed;
   --border: #e1e6ed;
   --line-strong: #cfd7e2;
@@ -955,6 +955,40 @@ tbody tr:hover {
 .finding-resolution select,
 .finding-resolution input {
   min-height: 36px;
+}
+
+.launch-score small,
+.launch-meta,
+.launch-check-meta,
+.launch-live-steps strong,
+.launch-live-steps small,
+.launch-live-action,
+.launch-operations-link small,
+.launch-operations-link > span:last-child,
+.launch-status-picker button {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.launch-check-title strong {
+  font-size: 13px;
+}
+
+.launch-live-action,
+.launch-operations-link > span:last-child {
+  color: var(--blue);
+}
+
+.launch-check-copy > p,
+.launch-check-detail,
+.launch-live-evidence > p,
+.launch-check-note {
+  font-size: 11px;
+}
+
+.launch-check-form textarea,
+.launch-check-form input {
+  font-size: 13px;
 }
 
 .automation-tabs {

@@ -68,6 +68,11 @@ afterEach(async () => {
 });
 
 describe("GridFlow Wise commercial fulfilment", () => {
+  it("uses the official GridFlow support inbox when no deployment override is present", () => {
+    delete process.env.COMMERCE_SUPPORT_EMAIL;
+    expect(commerce.catalogue().supportEmail).toBe("gridflowsupport@gmail.com");
+  });
+
   it("keeps Core individually quoted and publishes only configured add-ons", () => {
     expect(commerce.catalogue()).toMatchObject({
       core: { quoteRequired: true, amountMinor: null, starterCredits: 500, seatLimit: 1 },

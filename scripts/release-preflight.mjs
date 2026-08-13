@@ -21,7 +21,6 @@ const required = [
   "BACKUP_STORAGE_URL",
   "COMMERCE_ULTRA_PRICE_MINOR",
   "COMMERCE_RESEARCH_PACKS_JSON",
-  "COMMERCE_SUPPORT_EMAIL",
 ];
 
 const failures = [];
@@ -39,7 +38,8 @@ if (!/^https:\/\//.test(process.env.WEB_ORIGIN ?? "")) failures.push("WEB_ORIGIN
 if (!/^https:\/\//.test(process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "")) failures.push("GOOGLE_OAUTH_REDIRECT_URI must use HTTPS.");
 if (!/^https:\/\//.test(process.env.BACKUP_STORAGE_URL ?? "")) failures.push("BACKUP_STORAGE_URL must use HTTPS.");
 if (!/^https:\/\//.test(process.env.PRODUCTION_MONITOR_URL ?? "")) failures.push("PRODUCTION_MONITOR_URL must use HTTPS.");
-if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.COMMERCE_SUPPORT_EMAIL ?? "")) failures.push("COMMERCE_SUPPORT_EMAIL must be a valid address.");
+const supportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "gridflowsupport@gmail.com").trim().toLowerCase();
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) failures.push("COMMERCE_SUPPORT_EMAIL must be a valid address when overridden.");
 const ultraAmount = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
 if (!Number.isInteger(ultraAmount) || ultraAmount < 1) failures.push("COMMERCE_ULTRA_PRICE_MINOR must be a positive GBP amount in minor units.");
 for (const name of ["OPENAI_INPUT_COST_PER_MILLION_USD", "OPENAI_OUTPUT_COST_PER_MILLION_USD", "OPENAI_WEB_SEARCH_COST_PER_CALL_USD"]) {

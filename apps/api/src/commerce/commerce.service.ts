@@ -3,7 +3,7 @@ import type { SqlExecutor } from "@gridflow/database";
 import { randomBytes } from "node:crypto";
 import type { Request } from "express";
 import { createOpaqueToken, hashOpaqueToken, normaliseEmail } from "../auth/auth.crypto.js";
-import { apiConfig } from "../config.js";
+import { apiConfig, configuredSupportEmail } from "../config.js";
 import type { RequestIdentity } from "../context/tenant-context.service.js";
 import { DatabaseService } from "../database/database.service.js";
 import type { ConfirmManualPurchaseDto, ReceiptLookupDto, ResolveCommercialPurchaseDto } from "./commerce.dto.js";
@@ -99,7 +99,7 @@ export class CommerceService {
   constructor(private readonly database: DatabaseService) {}
 
   catalogue() {
-    const supportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim().toLowerCase();
+    const supportEmail = configuredSupportEmail();
     const ultraAmountMinor = configuredPositiveInteger("COMMERCE_ULTRA_PRICE_MINOR");
     const packs = configuredResearchPacks();
     return {
@@ -124,7 +124,7 @@ export class CommerceService {
         published: ultraAmountMinor !== null,
       },
       researchPacks: packs,
-      supportEmail: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) ? supportEmail : null,
+      supportEmail,
       payment: {
         provider: "Wise Business",
         currency: CURRENCY,
@@ -132,7 +132,7 @@ export class CommerceService {
         onlineCheckout: false,
         verification: "AUTHORISED_ADMIN" as const,
       },
-      configurationComplete: ultraAmountMinor !== null && packs.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail),
+      configurationComplete: ultraAmountMinor !== null && packs.length > 0,
     };
   }
 

@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -56,6 +58,7 @@ jobs:
           exit 1
 
       - run: npm run db:schema-check
+      - run: npm run security:scan
       - run: npm run agents:evaluate
       - run: npm run validate
 
@@ -74,6 +77,9 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npx next build --webpack --experimental-build-mode generate
+
+      - name: Verify production bundle contains no browser source maps or secrets
+        run: npm run security:scan
 
       - name: Install release browsers
         run: npx playwright install --with-deps chromium firefox webkit
@@ -127,3 +133,25 @@ jobs:
           path: ~/.npm/_logs/*.log
           if-no-files-found: ignore
           retention-days: 7
+
+  codeql:
+    name: CodeQL static security analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.16.0
+          package-manager-cache: false
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:server
+      - uses: github/codeql-action/analyze@v4

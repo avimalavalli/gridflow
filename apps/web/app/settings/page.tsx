@@ -71,6 +71,7 @@ export default async function SettingsPage() {
             </div>
           )}
           <SecurityClient mfaEnabled={auth.security.mfaEnabled} />
+          <section className="card"><div className="card-head"><div><h2>Privacy and account data</h2><p>Export your workspace, review policy acceptances, exercise privacy rights or request controlled account closure.</p></div><a className="button button-secondary" href="/privacy">Open Privacy Centre</a></div></section>
           <IntegrationsClient gmail={integrations.gmail} />
         </div>
       )}

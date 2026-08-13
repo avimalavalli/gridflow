@@ -37,6 +37,7 @@ import type {
   VerifyMfaSetupDto,
 } from "./auth.dto.js";
 import { SessionService, type SessionIdentity } from "./session.service.js";
+import { GRIDFLOW_LEGAL } from "@gridflow/domain";
 
 interface UserRow extends Record<string, unknown> {
   id: string;
@@ -97,6 +98,12 @@ export class AuthService {
 
   async register(input: RegisterDto, request: Request, response: Response) {
     this.assertRegistrationAllowed(input.betaCode, input.activationToken);
+    if (!input.acceptTerms || !input.acceptPrivacy || !input.ageConfirmed || !input.authorityConfirmed) {
+      throw new BadRequestException("You must accept the Terms and Privacy Policy and confirm age and authority to create GridFlow.");
+    }
+    if (input.legalVersion !== GRIDFLOW_LEGAL.version) {
+      throw new BadRequestException("GridFlow's legal terms changed. Refresh this page and review the current version.");
+    }
     const email = normaliseEmail(input.email);
     const passwordHash = await hashPassword(input.password);
     const organisationSlug = createOrganisationSlug(input.organisationName);
@@ -148,6 +155,15 @@ export class AuthService {
         `INSERT INTO "OrganisationMembership" ("organisationId", "userId", "role")
          VALUES ($1::uuid, $2::uuid, 'OWNER')`,
         [organisationId, userId],
+      );
+
+      await tx.query(
+        `INSERT INTO "LegalAcceptance" (
+           "userId","organisationId","documentType","documentVersion","ageConfirmed","authorityConfirmed","ipAddress","userAgent"
+         ) VALUES
+           ($1::uuid,$2::uuid,'TERMS_OF_SERVICE',$3,true,true,$4,$5),
+           ($1::uuid,$2::uuid,'PRIVACY_POLICY',$3,true,true,$4,$5)`,
+        [userId, organisationId, GRIDFLOW_LEGAL.version, request.ip ?? null, request.header("user-agent") ?? null],
       );
 
       const entitlement = await tx.query<{ id: string }>(
@@ -391,6 +407,9 @@ export class AuthService {
     request: Request,
     response: Response,
   ) {
+    if (!input.acceptTerms || !input.acceptPrivacy || !input.ageConfirmed || !input.authorityConfirmed || input.legalVersion !== GRIDFLOW_LEGAL.version) {
+      throw new BadRequestException("Review and accept the current GridFlow Terms and Privacy Policy before joining.");
+    }
     const { hashOpaqueToken } = await import("./auth.crypto.js");
     const tokenHash = hashOpaqueToken(input.token);
     const result = await this.database.transaction(async (tx) => {
@@ -461,6 +480,17 @@ export class AuthService {
          VALUES ($1::uuid, $2::uuid, $3::"MembershipRole")
          ON CONFLICT ("organisationId", "userId") DO UPDATE SET "role" = EXCLUDED."role"`,
         [invitation.organisationId, userId, invitation.role],
+      );
+      await tx.query(
+        `INSERT INTO "LegalAcceptance" (
+           "userId","organisationId","documentType","documentVersion","ageConfirmed","authorityConfirmed","ipAddress","userAgent"
+         ) VALUES
+           ($1::uuid,$2::uuid,'TERMS_OF_SERVICE',$3,true,true,$4,$5),
+           ($1::uuid,$2::uuid,'PRIVACY_POLICY',$3,true,true,$4,$5)
+         ON CONFLICT ("userId","documentType","documentVersion") DO UPDATE SET
+           "organisationId"=EXCLUDED."organisationId","ageConfirmed"=true,"authorityConfirmed"=true,
+           "ipAddress"=EXCLUDED."ipAddress","userAgent"=EXCLUDED."userAgent","acceptedAt"=CURRENT_TIMESTAMP`,
+        [userId, invitation.organisationId, GRIDFLOW_LEGAL.version, request.ip ?? null, request.header("user-agent") ?? null],
       );
       await tx.query(
         `UPDATE "OrganisationInvitation"

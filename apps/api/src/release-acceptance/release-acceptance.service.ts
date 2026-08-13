@@ -54,12 +54,25 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "password_reset_live_acceptance", category: "AUTH", title: "Password recovery acceptance", description: "A real password-reset email arrives, the token works once and existing sessions are revoked.", required: true, automated: false, evidenceRequired: true },
   { key: "mfa_device_acceptance", category: "AUTH", title: "Authenticator-device acceptance", description: "MFA setup, login challenge and one-time recovery codes work on a real authenticator device.", required: true, automated: false, evidenceRequired: true },
   { key: "permissions_review", category: "SECURITY", title: "Permission and tenant-isolation review", description: "Owner, admin, operator, reviewer and read-only permissions are verified across separate athlete organisations.", required: true, automated: false },
+  { key: "production_database_assurance", category: "INFRASTRUCTURE", title: "Production database security evidence", description: "Railway evidence confirms the final region, verified TLS connection, non-superuser/non-BYPASSRLS runtime role, backup retention and restore target.", required: true, automated: false },
+  { key: "provider_security_review", category: "SECURITY", title: "Production provider and secret review", description: "Production credentials are inventoried and rotated where needed; Google OAuth, Gmail data-use settings and the transactional sender are verified against the exact release.", required: true, automated: false },
+  { key: "penetration_test", category: "SECURITY", title: "Production-equivalent penetration test", description: "An independent or suitably separated test covers authentication, authorisation, IDOR, RLS, injection, XSS, CSRF, SSRF, OAuth and abuse controls, with no open Critical or High finding.", required: true, automated: false },
+  { key: "privacy_operations_rehearsal", category: "DATA", title: "Privacy and incident operations rehearsal", description: "The rights/complaint, account-closure, breach-response, notification and backup re-deletion procedures are rehearsed with retained evidence and named owners.", required: true, automated: false },
+  { key: "legal_solicitor_review", category: "DATA", title: "UK legal review", description: "A qualified UK solicitor has reviewed and approved the launch Privacy Policy, Terms, DPA, Cookie Notice and consumer cancellation wording for the final business model.", required: true, automated: false },
   { key: "backup_restore_rehearsal", category: "DATA", title: "Production restore rehearsal", description: "The latest encrypted production backup was restored into clean PostgreSQL and its GridFlow schema was verified.", required: true, automated: true },
   { key: "browser_qa", category: "QA", title: "Desktop browser QA", description: "Core journeys pass on current Chrome, Edge, Safari and Firefox releases.", required: true, automated: false },
   { key: "mobile_qa", category: "QA", title: "Mobile and tablet QA", description: "Core journeys remain usable on representative iOS, Android and tablet viewports.", required: true, automated: false },
   { key: "accessibility_qa", category: "QA", title: "Accessibility acceptance", description: "Keyboard navigation, focus order, contrast, labels, reduced motion and screen-reader basics are verified.", required: true, automated: false },
   { key: "selected_athlete_signoff", category: "PRODUCT", title: "Internal product-owner sign-off", description: "The product owner approves the real internal Core and Ultra acceptance journeys before direct public access opens.", required: true, automated: false },
 ] as const;
+
+const NON_WAIVABLE_CHECKS = new Set([
+  "production_database_assurance",
+  "provider_security_review",
+  "penetration_test",
+  "privacy_operations_rehearsal",
+  "legal_solicitor_review",
+]);
 
 interface ReleaseRow extends Record<string, unknown> {
   id: string;
@@ -199,6 +212,9 @@ export class ReleaseAcceptanceService {
       const row = existing.rows[0];
       if (!row) throw new NotFoundException("Release acceptance check was not found.");
       if (row.automated) throw new BadRequestException("Automated release checks cannot be manually overridden. Fix the underlying release condition instead.");
+      if (input.status === "WAIVED" && NON_WAIVABLE_CHECKS.has(row.key)) {
+        throw new BadRequestException("This launch-assurance check cannot be waived. Record verified evidence or keep the release blocked.");
+      }
 
       const release = await this.findRelease(tx, tenantId, row.releaseAcceptanceId);
       if (!release) throw new NotFoundException("Release acceptance cycle was not found.");

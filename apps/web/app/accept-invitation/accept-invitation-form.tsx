@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatLabel } from "../../lib/format";
+import { GRIDFLOW_LEGAL } from "@gridflow/domain";
 
 interface InvitationInfo {
   email: string;
@@ -22,6 +23,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   const [acceptedNeedsSignIn, setAcceptedNeedsSignIn] = useState(false);
   const [challengeToken, setChallengeToken] = useState("");
   const [code, setCode] = useState("");
+  const [consent, setConsent] = useState({ acceptTerms: false, acceptPrivacy: false, ageConfirmed: false, authorityConfirmed: false });
 
   useEffect(() => {
     if (!token) return;
@@ -47,7 +49,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, name, password }),
+        body: JSON.stringify({ token, name, password, ...consent, legalVersion: GRIDFLOW_LEGAL.version }),
       });
       const body = (await response.json()) as { message?: string | string[]; code?: string; mfaRequired?: boolean; challengeToken?: string };
       if (!response.ok && body.code === "TRUSTED_DEVICE_LIMIT") {
@@ -104,6 +106,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         {info && !acceptedNeedsSignIn && !challengeToken ? <form onSubmit={submit} className="auth-form">
           <label>Your name<input required minLength={2} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label>Password<input required type="password" minLength={12} maxLength={128} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /><small>Existing users should enter their current password. New users should create one.</small></label>
+          <fieldset className="legal-consent"><legend>Before joining</legend><label><input required type="checkbox" checked={consent.acceptTerms} onChange={event=>setConsent({...consent,acceptTerms:event.target.checked})}/><span>I accept the <Link href="/legal/terms" target="_blank" rel="noreferrer">Terms</Link>.</span></label><label><input required type="checkbox" checked={consent.acceptPrivacy} onChange={event=>setConsent({...consent,acceptPrivacy:event.target.checked})}/><span>I have read the <Link href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</Link>.</span></label><label><input required type="checkbox" checked={consent.ageConfirmed} onChange={event=>setConsent({...consent,ageConfirmed:event.target.checked})}/><span>I am at least {GRIDFLOW_LEGAL.minimumAge}.</span></label><label><input required type="checkbox" checked={consent.authorityConfirmed} onChange={event=>setConsent({...consent,authorityConfirmed:event.target.checked})}/><span>I am authorised to join this organisation.</span></label></fieldset>
           <button className="button button-primary button-large" type="submit" disabled={busy}>{busy ? "Joining organisation…" : "Accept invitation"}</button>
         </form> : null}
         {visibleMessage ? <div className={`notice ${acceptedNeedsSignIn ? "notice-success" : "notice-error"}`}>{visibleMessage}</div> : null}

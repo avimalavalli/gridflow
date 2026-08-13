@@ -12,6 +12,7 @@ interface OperationalEvent {
   statusCode?: number;
   durationMs?: number;
   errorType?: string;
+  details?: Record<string, unknown>;
 }
 
 export class PublicOperationalException extends HttpException {}

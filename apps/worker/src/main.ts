@@ -13,6 +13,7 @@ import { OrbitProcessor } from "./orbit.js";
 import { ForgeProcessor } from "./forge.js";
 import { TenantAgentProviderResolver } from "./tenant-agent-provider.js";
 import { CommercialLifecycleProcessor } from "./commercial-lifecycle.js";
+import { DataRetentionProcessor } from "./data-retention.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
@@ -41,6 +42,7 @@ const emailProcessor = new EmailAutomationProcessor(database);
 const gmailSync = new GmailSyncProcessor(database);
 const authEmailProcessor = new AuthEmailProcessor(database);
 const commercialLifecycle = new CommercialLifecycleProcessor(database);
+const dataRetention = new DataRetentionProcessor(database);
 const pulse = new PulseProcessor(database);
 const recoveredAuthEmails = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredAuthEmails) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: recoveredAuthEmails } });
@@ -51,6 +53,11 @@ const initialCommercialLifecycle = await commercialLifecycle.reconcile().catch((
 if (initialCommercialLifecycle && (initialCommercialLifecycle.lifecycleUpdates || initialCommercialLifecycle.remindersQueued)) {
   logWorkerEvent({ event: "commercial-lifecycle-reconciled", level: "info", details: initialCommercialLifecycle });
 }
+const initialRetention = await dataRetention.reconcile().catch((error) => {
+  reportWorkerError("data-retention-initial-reconciliation-failed", error);
+  return null;
+});
+if (initialRetention && Object.values(initialRetention).some(Boolean)) logWorkerEvent({ event: "data-retention-reconciled", level: "info", details: initialRetention });
 const recoveredEmails = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredEmails) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: recoveredEmails } });
 const initialPulse = await pulse.reconcile();
@@ -155,6 +162,7 @@ if (once) {
   process.on("SIGTERM", () => { void stop(); });
 
   let lastRecoveryAt = Date.now();
+  let lastRetentionAt = Date.now();
   while (!stopping) {
     if (Date.now() - lastRecoveryAt >= 60_000) {
       {
@@ -216,6 +224,14 @@ if (once) {
         logWorkerEvent({ event: "pulse-reconciled", level: "info", details: pulseResult });
       }
       lastRecoveryAt = Date.now();
+    }
+    if (Date.now() - lastRetentionAt >= 60 * 60_000) {
+      const retention = await dataRetention.reconcile().catch((error) => {
+        reportWorkerError("data-retention-reconciliation-failed", error);
+        return null;
+      });
+      if (retention && Object.values(retention).some(Boolean)) logWorkerEvent({ event: "data-retention-reconciled", level: "info", details: retention });
+      lastRetentionAt = Date.now();
     }
     const processed = await runOnce().catch((error) => {
       reportWorkerError("worker-loop-failed", error);

@@ -49,6 +49,7 @@ async function webRequest(path, { cookie, method = "GET", body } = {}) {
     method,
     headers: {
       ...(cookie ? { cookie } : {}),
+      ...(cookie && !["GET", "HEAD", "OPTIONS"].includes(method) ? { origin: webBase } : {}),
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -126,6 +127,11 @@ try {
       name: "Web Proxy Athlete",
       organisationName: "Web Proxy Racing",
       organisationType: "DRIVER",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      ageConfirmed: true,
+      authorityConfirmed: true,
+      legalVersion: "2026-08-13",
     },
   });
   assert(registered.response.ok, `Registration through the web proxy failed: ${JSON.stringify(registered.payload)}`);

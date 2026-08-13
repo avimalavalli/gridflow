@@ -13,7 +13,7 @@ import {
   type EmailPolicyInput,
   type GmailMessageSummary,
 } from "@gridflow/integrations";
-import type { SqlExecutor } from "@gridflow/database";
+import { setTenantContext, type SqlExecutor } from "@gridflow/database";
 import { DatabaseService } from "../database/database.service.js";
 import { apiConfig } from "../config.js";
 import type { RequestIdentity } from "../context/tenant-context.service.js";
@@ -175,6 +175,7 @@ export class IntegrationsService {
         [parsed.tenantId, parsed.userId],
       );
       if (!membership.rows.length) throw new BadRequestException("The Gmail connection no longer belongs to an active GridFlow organisation.");
+      await setTenantContext(tx, parsed.tenantId);
 
       const existing = await tx.query<IntegrationRow>(
         `SELECT "encryptedRefreshToken" FROM "IntegrationAccount" WHERE "tenantId"=$1::uuid AND "provider"='GMAIL'`,

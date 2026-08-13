@@ -170,7 +170,7 @@ export function loadConfig(): ApiConfig {
     secureCookies,
     trustProxy: readBoolean(process.env.TRUST_PROXY, nodeEnv === "production"),
     passwordResetMinutes: readPositiveInteger("AUTH_PASSWORD_RESET_MINUTES", process.env.AUTH_PASSWORD_RESET_MINUTES, 30),
-    loginLockoutAttempts: readPositiveInteger("AUTH_LOGIN_LOCKOUT_ATTEMPTS", process.env.AUTH_LOGIN_LOCKOUT_ATTEMPTS, 8),
+    loginLockoutAttempts: readPositiveInteger("AUTH_LOGIN_LOCKOUT_ATTEMPTS", process.env.AUTH_LOGIN_LOCKOUT_ATTEMPTS, 5),
     loginLockoutMinutes: readPositiveInteger("AUTH_LOGIN_LOCKOUT_MINUTES", process.env.AUTH_LOGIN_LOCKOUT_MINUTES, 15),
     mfaChallengeMinutes: readPositiveInteger("AUTH_MFA_CHALLENGE_MINUTES", process.env.AUTH_MFA_CHALLENGE_MINUTES, 5),
     authEncryptionKey,

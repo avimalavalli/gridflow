@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Request, Response } from "express";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDatabase, migrateDatabase, setTenantContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
+import { createDatabase, migrateDatabase, setPlatformContext, setTenantContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
 import { apiConfig } from "../src/config.js";
 import { AuthService } from "../src/auth/auth.service.js";
 import { SessionService } from "../src/auth/session.service.js";
@@ -13,6 +13,7 @@ import { PlatformService } from "../src/platform/platform.service.js";
 class TestDatabaseService {
   constructor(private readonly database: GridFlowDatabase) {}
   transaction<T>(callback: (tx: SqlExecutor) => Promise<T>) { return this.database.transaction(callback); }
+  platformTransaction<T>(callback: (tx: SqlExecutor) => Promise<T>) { return this.database.transaction(async (tx) => { await setPlatformContext(tx); return callback(tx); }); }
   tenantTransaction<T>(tenantId: string, callback: (tx: SqlExecutor) => Promise<T>) {
     return this.database.transaction(async (tx) => { await setTenantContext(tx, tenantId); return callback(tx); });
   }
@@ -54,6 +55,7 @@ afterEach(async () => {
 });
 
 describe("GridFlow paid activation and owner approval", () => {
+  const legalAcceptance = { acceptTerms: true, acceptPrivacy: true, ageConfirmed: true, authorityConfirmed: true, legalVersion: "2026-08-13" } as const;
   it("locks a one-time activation until approval and stops access with credit refund", async () => {
     directory = await mkdtemp(join(tmpdir(), "gridflow-platform-access-"));
     database = await createDatabase("pglite://memory");
@@ -117,6 +119,7 @@ describe("GridFlow paid activation and owner approval", () => {
 
     const registrationResponse = response();
     const registered = await auth.register({
+      ...legalAcceptance,
       email: "racer@example.test",
       password: "racer-private-password-123",
       name: "Test Racer",
@@ -131,6 +134,7 @@ describe("GridFlow paid activation and owner approval", () => {
       researchCreditsGranted: 500,
     });
     await expect(auth.register({
+      ...legalAcceptance,
       email: "second-racer@example.test",
       password: "another-private-password-123",
       name: "Second Racer",

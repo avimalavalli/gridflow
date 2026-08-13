@@ -26,7 +26,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           <span>Sponsorship Commercial Operating System for athletes and teams.</span>
         </div>
         <div className="public-footer-control"><ShieldCheck size={15}/><span>Human-controlled by design</span></div>
-        <nav aria-label="Footer navigation"><Link href="/product">Product</Link><Link href="/pricing">Pricing</Link><Link href="/support">Support</Link><Link href="/login">Sign in</Link></nav>
+        <nav aria-label="Footer navigation"><Link href="/product">Product</Link><Link href="/pricing">Pricing</Link><Link href="/support">Support</Link><Link href="/privacy">Privacy Centre</Link><Link href="/legal/privacy">Privacy</Link><Link href="/legal/terms">Terms</Link><Link href="/legal/cookies">Cookies</Link><Link href="/login">Sign in</Link></nav>
       </footer>
     </div>
   );

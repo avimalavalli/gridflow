@@ -3,13 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Request } from "express";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDatabase, migrateDatabase, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
+import { createDatabase, migrateDatabase, setPlatformContext, type GridFlowDatabase, type SqlExecutor } from "@gridflow/database";
 import type { RequestIdentity } from "../src/context/tenant-context.service.js";
 import { PlatformService } from "../src/platform/platform.service.js";
 
 class TestDatabaseService {
   constructor(private readonly database: GridFlowDatabase) {}
   transaction<T>(callback: (tx: SqlExecutor) => Promise<T>) { return this.database.transaction(callback); }
+  platformTransaction<T>(callback: (tx: SqlExecutor) => Promise<T>) { return this.database.transaction(async (tx) => { await setPlatformContext(tx); return callback(tx); }); }
 }
 
 const openDatabases: GridFlowDatabase[] = [];

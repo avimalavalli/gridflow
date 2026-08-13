@@ -9,3 +9,8 @@ export async function setTenantContext(
     [tenantId],
   );
 }
+
+/** Explicitly marks a transaction as a cross-tenant platform operation. */
+export async function setPlatformContext(executor: SqlExecutor): Promise<void> {
+  await executor.query(`SELECT set_config('app.platform_operation', 'true', true)`);
+}

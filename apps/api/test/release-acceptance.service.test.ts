@@ -81,6 +81,11 @@ describe("ReleaseAcceptanceService", () => {
     await expect(service.approve(tenantId, userId)).rejects.toThrow(/every required/i);
 
     const manualChecks = first.groups.flatMap((group) => group.checks).filter((check) => !check.automated);
+    const penetrationTest = manualChecks.find((check) => check.key === "penetration_test")!;
+    await expect(service.updateCheck(tenantId, userId, penetrationTest.id, {
+      status: "WAIVED",
+      notes: "Attempted waiver.",
+    })).rejects.toThrow(/cannot be waived/i);
     for (const check of manualChecks) {
       await service.updateCheck(tenantId, userId, check.id, check.evidenceRequired
         ? { status: "WAIVED", notes: `Test fixture explicitly waives external live evidence for ${check.title}.` }

@@ -73,6 +73,10 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   await page.getByLabel("Email").fill(`phase51-${suffix}-${testInfo.retry}@example.test`);
   await page.getByLabel("Organisation name").fill(`GridFlow ${suffix} ${testInfo.retry}`);
   await page.getByLabel("Password").fill("GridFlow-browser-test-2026!");
+  await page.getByLabel(/I accept the Terms of Service/i).check();
+  await page.getByLabel(/I have read the Privacy Policy/i).check();
+  await page.getByLabel(/I confirm that I am at least 18/i).check();
+  await page.getByLabel(/I have authority to create this organisation/i).check();
   await page.getByRole("button", { name: "Create GridFlow account" }).click();
   await page.waitForURL(/\/(welcome|onboarding|pending-approval)/);
   await expect(page.locator("main")).toBeVisible();

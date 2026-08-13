@@ -4,7 +4,7 @@ import { HealthController } from "../src/health/health.controller.js";
 import { PublicOperationalException } from "../src/observability.js";
 
 const originalConfig = { ...apiConfig };
-const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_RESEARCH_PACKS_JSON", "COMMERCE_SUPPORT_EMAIL"] as const;
+const envKeys = ["OPENAI_API_KEY", "OPENAI_AGENT_MODEL", "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI", "INTEGRATION_ENCRYPTION_KEY", "COMMERCE_ULTRA_PRICE_MINOR", "COMMERCE_RESEARCH_PACKS_JSON", "COMMERCE_SUPPORT_EMAIL", "DATABASE_SSL"] as const;
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 
 function proof(fresh: boolean) {
@@ -16,6 +16,7 @@ function configureProductionDependencies() {
   process.env.COMMERCE_ULTRA_PRICE_MINOR = "3999";
   process.env.COMMERCE_RESEARCH_PACKS_JSON = JSON.stringify([{ code: "PACK_100", credits: 100, amountMinor: 1199 }]);
   process.env.COMMERCE_SUPPORT_EMAIL = "support@gridflow.test";
+  process.env.DATABASE_SSL = "true";
 }
 
 afterEach(() => {
@@ -31,7 +32,7 @@ describe("HealthController readiness", () => {
     Object.assign(apiConfig, { nodeEnv: "production", devBootstrap: false, secureCookies: true, authEncryptionKey: "a".repeat(32), authMailProvider: "RESEND", resendApiKey: "resend", authFromEmail: "GridFlow <test@app.test>" });
     configureProductionDependencies();
     const controller = new HealthController(
-      { ping: async () => ({ database: "ok", kind: "pglite" }) } as never,
+      { ping: async () => ({ database: "ok", kind: "postgres" }), securityPosture: async () => ({ encrypted: true, superuser: false, bypassRls: false }) } as never,
       { status: async () => ({ configured: true, monitor: proof(false), backup: proof(true) }) } as never,
     );
 
@@ -50,7 +51,7 @@ describe("HealthController readiness", () => {
     Object.assign(apiConfig, { nodeEnv: "production", devBootstrap: false, secureCookies: true, authEncryptionKey: "a".repeat(32), authMailProvider: "RESEND", resendApiKey: "resend", authFromEmail: "GridFlow <test@app.test>" });
     configureProductionDependencies();
     const controller = new HealthController(
-      { ping: async () => ({ database: "ok", kind: "postgres" }) } as never,
+      { ping: async () => ({ database: "ok", kind: "postgres" }), securityPosture: async () => ({ encrypted: true, superuser: false, bypassRls: false }) } as never,
       { status: async () => ({ configured: true, monitor: proof(true), backup: proof(true) }) } as never,
     );
     await expect(controller.ready()).resolves.toMatchObject({ status: "ready", failedChecks: [] });

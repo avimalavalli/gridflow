@@ -55,10 +55,10 @@ Every reminder is unique per organisation, expiry and stage, so retries cannot c
 ```text
 COMMERCE_ULTRA_PRICE_MINOR=<positive GBP minor-unit amount>
 COMMERCE_RESEARCH_PACKS_JSON=[{"code":"PACK_CODE","credits":100,"amountMinor":1199}]
-COMMERCE_SUPPORT_EMAIL=<valid support address>
+COMMERCE_SUPPORT_EMAIL=gridflowsupport@gmail.com
 ```
 
-Core has no price variable. Wise credentials are not stored in GridFlow because verification is performed by an authorised admin against the external Wise Business record. Production readiness fails closed until the Ultra amount, at least one unique valid pack and the support email are configured.
+Core has no price variable. Wise credentials are not stored in GridFlow because verification is performed by an authorised admin against the external Wise Business record. GridFlow defaults to the official support inbox above unless a deployment deliberately overrides it. Production readiness fails closed until the Ultra amount and at least one unique valid pack are configured.
 
 ## Acceptance coverage
 

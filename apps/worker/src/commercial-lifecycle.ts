@@ -1,5 +1,7 @@
 import type { GridFlowDatabase, SqlExecutor } from "@gridflow/database";
 
+const DEFAULT_SUPPORT_EMAIL = "gridflowsupport@gmail.com";
+
 type ReminderStage = "SEVEN_DAYS" | "THREE_DAYS" | "EXPIRED";
 
 interface RenewalCandidate extends Record<string, unknown> {
@@ -70,15 +72,16 @@ export class CommercialLifecycleProcessor {
       `INSERT INTO "AuthEmailOutbox" ("recipient","template","payload","updatedAt") VALUES ($1,'ULTRA_RENEWAL_REMINDER',$2::jsonb,CURRENT_TIMESTAMP) RETURNING "id"`,
       [candidate.ownerEmail, JSON.stringify({ ...payload, recipientRole: "CUSTOMER" })],
     );
-    const supportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim().toLowerCase();
+    const configuredSupportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim().toLowerCase();
+    const supportEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuredSupportEmail)
+      ? configuredSupportEmail
+      : DEFAULT_SUPPORT_EMAIL;
     let adminEmailId: string | null = null;
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) {
-      const admin = await tx.query<{ id: string }>(
-        `INSERT INTO "AuthEmailOutbox" ("recipient","template","payload","updatedAt") VALUES ($1,'ULTRA_RENEWAL_REMINDER',$2::jsonb,CURRENT_TIMESTAMP) RETURNING "id"`,
-        [supportEmail, JSON.stringify({ ...payload, recipientRole: "ADMIN", customerEmail: candidate.ownerEmail })],
-      );
-      adminEmailId = admin.rows[0]!.id;
-    }
+    const admin = await tx.query<{ id: string }>(
+      `INSERT INTO "AuthEmailOutbox" ("recipient","template","payload","updatedAt") VALUES ($1,'ULTRA_RENEWAL_REMINDER',$2::jsonb,CURRENT_TIMESTAMP) RETURNING "id"`,
+      [supportEmail, JSON.stringify({ ...payload, recipientRole: "ADMIN", customerEmail: candidate.ownerEmail })],
+    );
+    adminEmailId = admin.rows[0]!.id;
     await tx.query(
       `UPDATE "UltraRenewalReminder" SET "customerEmailId"=$2::uuid,"adminEmailId"=$3::uuid WHERE "id"=$1::uuid`,
       [reminderId, customer.rows[0]!.id, adminEmailId],

@@ -23,6 +23,14 @@ beforeEach(async()=>{database=await createDatabase("pglite://memory");await migr
 afterEach(async()=>{await database.close();if(originalSupport===undefined)delete process.env.COMMERCE_SUPPORT_EMAIL;else process.env.COMMERCE_SUPPORT_EMAIL=originalSupport;});
 
 describe("Ultra commercial lifecycle",()=>{
+  it("copies renewal notices to the official GridFlow inbox when no override is present",async()=>{
+    delete process.env.COMMERCE_SUPPORT_EMAIL;
+    await customer("official-inbox","CURRENT_TIMESTAMP+INTERVAL '2 days'");
+    await new CommercialLifecycleProcessor(database).reconcile();
+    const admin=await database.query<{recipient:string;payload:{recipientRole:string}}>(`SELECT "recipient","payload" FROM "AuthEmailOutbox" WHERE "template"='ULTRA_RENEWAL_REMINDER' AND "payload"->>'recipientRole'='ADMIN'`);
+    expect(admin.rows).toEqual([{recipient:"gridflowsupport@gmail.com",payload:expect.objectContaining({recipientRole:"ADMIN"})}]);
+  });
+
   it("moves accounts through due and expired states and queues each customer/admin reminder once",async()=>{
     const seven=await customer("seven-day","CURRENT_TIMESTAMP+INTERVAL '6 days'");
     await customer("three-day","CURRENT_TIMESTAMP+INTERVAL '2 days'");

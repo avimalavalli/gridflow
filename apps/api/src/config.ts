@@ -29,8 +29,17 @@ export interface ApiConfig {
   resendApiKey: string;
 }
 
+export const DEFAULT_SUPPORT_EMAIL = "gridflowsupport@gmail.com";
+
+export function configuredSupportEmail(): string {
+  const configured = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configured)
+    ? configured
+    : DEFAULT_SUPPORT_EMAIL;
+}
+
 export function commercialLaunchConfigured(): boolean {
-  const supportEmail = (process.env.COMMERCE_SUPPORT_EMAIL ?? "").trim();
+  const supportEmail = configuredSupportEmail();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) return false;
   const ultraAmount = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
   if (!Number.isInteger(ultraAmount) || ultraAmount < 1) return false;

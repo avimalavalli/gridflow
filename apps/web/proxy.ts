@@ -11,6 +11,7 @@ const publicPaths = [
   "/accept-invitation",
   "/forgot-password",
   "/reset-password",
+  "/icon.png",
 ];
 
 export function proxy(request: NextRequest) {

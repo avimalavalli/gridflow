@@ -77,6 +77,11 @@ export class GeminiAgentProvider implements AgentModelProvider {
         outputTokens,
         totalTokens: response.usage?.total_tokens ?? inputTokens + outputTokens,
         estimatedCostUsd: 0,
+        modelCostUsd: 0,
+        webSearchCalls: 0,
+        webSearchCostUsd: 0,
+        externalProviderUsage: {},
+        externalProviderCostUsd: 0,
       },
       providerResponseId: response.id,
     };

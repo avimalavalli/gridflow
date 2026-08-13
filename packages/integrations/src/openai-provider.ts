@@ -78,7 +78,12 @@ export class OpenAIAgentProvider implements AgentModelProvider {
 
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
-    const estimated = cost(inputTokens, this.inputCost) + cost(outputTokens, this.outputCost);
+    const modelCostUsd = cost(inputTokens, this.inputCost) + cost(outputTokens, this.outputCost);
+    const modelCostConfigured = this.inputCost !== undefined && this.outputCost !== undefined;
+    const webSearchCalls = response.output.filter((item) => item.type === "web_search_call").length;
+    const webSearchUnitCost = numberEnv("OPENAI_WEB_SEARCH_COST_PER_CALL_USD");
+    const webSearchCostUsd = webSearchUnitCost === undefined ? null : webSearchCalls * webSearchUnitCost;
+    const costConfigured = modelCostConfigured && webSearchCostUsd !== null;
 
     const validated = validateAgentOutput<TOutput>(request.definition, parsed);
     if (request.definition.webSearchAllowed) {
@@ -92,7 +97,12 @@ export class OpenAIAgentProvider implements AgentModelProvider {
         inputTokens,
         outputTokens,
         totalTokens: response.usage?.total_tokens ?? inputTokens + outputTokens,
-        estimatedCostUsd: this.inputCost || this.outputCost ? estimated : null,
+        estimatedCostUsd: costConfigured ? modelCostUsd + webSearchCostUsd : null,
+        modelCostUsd: modelCostConfigured ? modelCostUsd : null,
+        webSearchCalls,
+        webSearchCostUsd,
+        externalProviderUsage: { webSearchCalls },
+        externalProviderCostUsd: 0,
       },
       providerResponseId: response.id,
     };

@@ -15,7 +15,11 @@ export class FixtureAgentProvider implements AgentModelProvider {
     return {
       output: validateAgentOutput<TOutput>(request.definition, raw),
       model: "gridflow-fixture",
-      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostUsd: 0 },
+      usage: {
+        inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostUsd: 0,
+        modelCostUsd: 0, webSearchCalls: 0, webSearchCostUsd: 0,
+        externalProviderUsage: {}, externalProviderCostUsd: 0,
+      },
       providerResponseId: `fixture-${request.idempotencyKey}`,
     };
   }

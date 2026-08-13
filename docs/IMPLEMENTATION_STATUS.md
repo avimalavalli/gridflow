@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 8B.1 Wise Commercial Model
+# GridFlow implementation status — Phase 8B.2 Research Economics
 
 ## Built and verified
 
@@ -6,6 +6,9 @@
 - **Wise-only fulfilment** with exact GBP verification, unique payment references, system-controlled entitlements, exception review, token-bound receipts and immutable audits.
 - **Separated credit accounting** for Core starter, Ultra-included and purchased credits, including exact reservations, final-failure refunds, expiry-safe purchased balances and a default adjustable daily safety ceiling of 30.
 - **Ultra lifecycle automation** with early-renewal extension, scheduled included credits, ACTIVE/RENEWAL_DUE/PAYMENT_PENDING/EXPIRED states, Core fallback and idempotent customer/admin reminders.
+- **Production research-cost telemetry** with provider, model, token, web-search and external-cost dimensions on every new research completion.
+- **Research Economics** with clean 100+ run evidence windows, complete-telemetry enforcement, Atlas/Sage/Relay distribution, average/median/P90 analysis, reconciled GBP spend and 100/500/750/1,000-credit projections.
+- **Owner-controlled economics approval** with immutable snapshots, audit history and automated Launch Control gates for cost configuration and approved Ultra economics.
 
 - Multi-athlete organisations, roles, invitations and isolated data.
 - Athlete onboarding, personalised markets, outreach policy and Discovery Briefs.
@@ -45,13 +48,13 @@
 
 ## Validation result
 
-- 137 automated tests passed across 53 files.
+- 138 automated tests passed across 54 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 76 models and 24 registered migrations.
+- Database schema check passed: 77 models and 25 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility and Phase 8B.1 public product/pricing/support/receipt behaviour, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
+- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility, Phase 8B.1 public product/pricing/support/receipt behaviour and the Phase 8B.2 Research Economics entry state, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
@@ -65,4 +68,4 @@ The Phase 6 release workflow completed the dependency audit, browser, responsive
 6. Completion of every required Launch Control check.
 7. Owner approval, closed production rehearsal and direct public deployment.
 
-The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application and Phase 8B.1 commercial model are functionally closed for the agreed scope. Live provider acceptance, internal feature-freeze acceptance, security, privacy/legal and production launch rehearsal remain before public launch.
+The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application and Phase 8B.2 commercial instrumentation are functionally closed for the agreed scope. The live 100+ run economics window, live provider acceptance, internal feature-freeze acceptance, security, privacy/legal and production launch rehearsal remain before public launch.

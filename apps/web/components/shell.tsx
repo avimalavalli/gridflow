@@ -11,6 +11,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  CircleDollarSign,
   ChevronRight,
   ContactRound,
   DatabaseZap,
@@ -97,6 +98,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
       { label: "Operations", href: "/operations", icon: Activity, keywords: "release health monitoring quality failures readiness", roles: ["OWNER", "ADMIN"] },
       { label: "Launch Control", href: "/launch", icon: Rocket, keywords: "release acceptance launch checklist production approval", roles: ["OWNER", "ADMIN"] },
       { label: "Platform Admin", href: "/platform", icon: LockKeyhole, keywords: "customer activation approval core ultra licences", platformAdminOnly: true },
+      { label: "Research Economics", href: "/platform/economics", icon: CircleDollarSign, keywords: "cost telemetry atlas sage relay margin ultra validation", platformAdminOnly: true },
     ],
   },
 ] as const;

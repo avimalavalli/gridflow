@@ -5,6 +5,9 @@ const required = [
   "AUTH_FROM_EMAIL",
   "RESEND_API_KEY",
   "OPENAI_API_KEY",
+  "OPENAI_INPUT_COST_PER_MILLION_USD",
+  "OPENAI_OUTPUT_COST_PER_MILLION_USD",
+  "OPENAI_WEB_SEARCH_COST_PER_CALL_USD",
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
@@ -39,6 +42,10 @@ if (!/^https:\/\//.test(process.env.PRODUCTION_MONITOR_URL ?? "")) failures.push
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.COMMERCE_SUPPORT_EMAIL ?? "")) failures.push("COMMERCE_SUPPORT_EMAIL must be a valid address.");
 const ultraAmount = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
 if (!Number.isInteger(ultraAmount) || ultraAmount < 1) failures.push("COMMERCE_ULTRA_PRICE_MINOR must be a positive GBP amount in minor units.");
+for (const name of ["OPENAI_INPUT_COST_PER_MILLION_USD", "OPENAI_OUTPUT_COST_PER_MILLION_USD", "OPENAI_WEB_SEARCH_COST_PER_CALL_USD"]) {
+  const value = Number(process.env[name] ?? "");
+  if (!Number.isFinite(value) || value < 0) failures.push(`${name} must be a non-negative USD unit cost.`);
+}
 try {
   const packs = JSON.parse(process.env.COMMERCE_RESEARCH_PACKS_JSON ?? "");
   const codes = new Set();

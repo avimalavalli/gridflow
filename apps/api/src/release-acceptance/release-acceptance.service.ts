@@ -28,6 +28,8 @@ const DEFAULT_CHECKS: readonly DefaultCheck[] = [
   { key: "ci_validation", category: "QA", title: "Continuous integration", description: "The full release CI workflow has passed for this exact commit.", required: true, automated: true },
   { key: "dependency_audit", category: "SECURITY", title: "Dependency security audit", description: "A fresh dependency vulnerability audit has completed successfully.", required: true, automated: true },
   { key: "openai_configuration", category: "AGENTS", title: "Live agent provider", description: "A release-owned OpenAI key and production agent model are configured server-side.", required: true, automated: true },
+  { key: "research_cost_configuration", category: "AGENTS", title: "Research cost telemetry", description: "Model-token and web-search unit costs are configured so every live research run has complete cost telemetry.", required: true, automated: true },
+  { key: "research_economics_approved", category: "PRODUCT", title: "Research economics approval", description: "The owner has approved a 100+ run Atlas, Sage and Relay validation with reconciled provider spend.", required: true, automated: true },
   { key: "gmail_oauth_configuration", category: "OUTREACH", title: "Gmail OAuth configuration", description: "Google OAuth, callback and encrypted token storage are configured.", required: true, automated: true },
   { key: "password_mail_configuration", category: "AUTH", title: "Password email delivery", description: "The production password-reset email provider and sender identity are configured.", required: true, automated: true },
   { key: "backup_configuration", category: "DATA", title: "Off-host backups", description: "A recent encrypted off-host backup has completed and supplied signed evidence.", required: true, automated: true },
@@ -584,7 +586,7 @@ export class ReleaseAcceptanceService {
   }
 
   private async evaluateAutomatedChecks(tx: SqlExecutor, tenantId: string, releaseId: string, databaseReady: boolean, proofStatus: OperationsProofStatus): Promise<void> {
-    const counts = await tx.query<HealthCounts>(
+    const [counts, economicsApproval] = await Promise.all([tx.query<HealthCounts>(
       `SELECT
          (SELECT COUNT(*)::int FROM "AutomationJob" WHERE "tenantId"=$1::uuid AND "status"='DEAD_LETTER') AS "deadLetterJobs",
          (SELECT COUNT(*)::int FROM "AuthEmailOutbox" a WHERE a."status"='DEAD_LETTER' AND EXISTS (
@@ -594,7 +596,10 @@ export class ReleaseAcceptanceService {
          (SELECT COUNT(*)::int FROM "ChannelAction" WHERE "tenantId"=$1::uuid AND "status"='FAILED') AS "failedChannelActions",
          (SELECT COUNT(*)::int FROM "AgentRun" WHERE "tenantId"=$1::uuid AND "status"='SUCCEEDED' AND "qualityStatus" IN ('PASS','REVIEW') AND "humanReviewStatus"='UNREVIEWED') AS "awaitingHumanReview"`,
       [tenantId],
-    );
+    ), tx.query<{ id: string; approvedAt: Date; successfulRuns: number }>(
+      `SELECT "id","approvedAt",COALESCE(("metricsSnapshot"->>'successfulRuns')::int,0) AS "successfulRuns"
+       FROM "ResearchEconomicsValidation" WHERE "status"='APPROVED' ORDER BY "approvedAt" DESC LIMIT 1`,
+    )]);
     const health = counts.rows[0] ?? { deadLetterJobs: 0, deadLetterAuthMail: 0, failedAgentRuns: 0, failedChannelActions: 0, awaitingHumanReview: 0 };
 
     const productionSecurity = apiConfig.nodeEnv !== "production"
@@ -625,6 +630,16 @@ export class ReleaseAcceptanceService {
       openai_configuration: configured(process.env.OPENAI_API_KEY) && configured(process.env.OPENAI_AGENT_MODEL)
         ? { status: "PASS", detail: `Live agent provider configured with ${process.env.OPENAI_AGENT_MODEL}.` }
         : { status: "BLOCKED", detail: "OPENAI_API_KEY and OPENAI_AGENT_MODEL are required for live acceptance." },
+      research_cost_configuration: apiConfig.nodeEnv !== "production" || (
+        configured(process.env.OPENAI_INPUT_COST_PER_MILLION_USD)
+        && configured(process.env.OPENAI_OUTPUT_COST_PER_MILLION_USD)
+        && configured(process.env.OPENAI_WEB_SEARCH_COST_PER_CALL_USD)
+      )
+        ? { status: "PASS", detail: apiConfig.nodeEnv === "production" ? "Model-token and web-search unit costs are configured." : "Development environment; complete research-cost configuration is required in production." }
+        : { status: "BLOCKED", detail: "Configure OpenAI input-token, output-token and web-search unit costs before collecting production economics." },
+      research_economics_approved: apiConfig.nodeEnv !== "production" || Boolean(economicsApproval.rows[0])
+        ? { status: "PASS", detail: economicsApproval.rows[0] ? `${economicsApproval.rows[0].successfulRuns} research runs were approved on ${economicsApproval.rows[0].approvedAt.toISOString()}.` : "Development environment; an approved production economics window is required before release." }
+        : { status: "BLOCKED", detail: "Complete and owner-approve the 100+ run Research Economics validation in Platform Admin." },
       gmail_oauth_configuration: configured(process.env.GOOGLE_OAUTH_CLIENT_ID) && configured(process.env.GOOGLE_OAUTH_CLIENT_SECRET) && configured(process.env.GOOGLE_OAUTH_REDIRECT_URI) && configured(process.env.INTEGRATION_ENCRYPTION_KEY)
         ? { status: "PASS", detail: "Google OAuth callback and encrypted token storage are configured." }
         : { status: "BLOCKED", detail: "Google OAuth credentials, callback URI and INTEGRATION_ENCRYPTION_KEY are required." },

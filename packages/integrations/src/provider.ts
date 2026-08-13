@@ -5,6 +5,11 @@ export interface AgentUsage {
   outputTokens: number;
   totalTokens: number;
   estimatedCostUsd: number | null;
+  modelCostUsd?: number | null;
+  webSearchCalls?: number;
+  webSearchCostUsd?: number | null;
+  externalProviderUsage?: Record<string, number>;
+  externalProviderCostUsd?: number | null;
 }
 
 export interface AgentGenerationRequest {

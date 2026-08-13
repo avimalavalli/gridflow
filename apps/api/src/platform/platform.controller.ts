@@ -1,7 +1,13 @@
 import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { TenantContextService } from "../context/tenant-context.service.js";
-import { CreateActivationGrantDto, MarkUltraPaymentPendingDto, OrganisationAccessDecisionDto } from "./platform.dto.js";
+import {
+  ApproveResearchEconomicsDto,
+  CreateActivationGrantDto,
+  MarkUltraPaymentPendingDto,
+  OrganisationAccessDecisionDto,
+  ReconcileResearchEconomicsDto,
+} from "./platform.dto.js";
 import { PlatformService } from "./platform.service.js";
 import { CommerceService } from "../commerce/commerce.service.js";
 import { ConfirmManualPurchaseDto, ResolveCommercialPurchaseDto } from "../commerce/commerce.dto.js";
@@ -20,6 +26,27 @@ export class PlatformController {
   async overview(@Req() request: Request) {
     await this.admin(request);
     return { ...(await this.platform.overview()), commerce: this.commerce.catalogue() };
+  }
+
+  @Get("economics")
+  async economics(@Req() request: Request) {
+    await this.admin(request);
+    return { ...(await this.platform.economicsOverview()), commerce: this.commerce.catalogue() };
+  }
+
+  @Post("economics/start")
+  async startEconomics(@Req() request: Request) {
+    return this.platform.startEconomicsValidation(await this.admin(request), request);
+  }
+
+  @Post("economics/:id/reconcile")
+  async reconcileEconomics(@Req() request: Request, @Param("id") id: string, @Body() input: ReconcileResearchEconomicsDto) {
+    return this.platform.reconcileEconomicsValidation(await this.admin(request), id, input, request);
+  }
+
+  @Post("economics/:id/approve")
+  async approveEconomics(@Req() request: Request, @Param("id") id: string, @Body() input: ApproveResearchEconomicsDto) {
+    return this.platform.approveEconomicsValidation(await this.admin(request), id, input, request);
   }
 
   @Post("activation-grants")

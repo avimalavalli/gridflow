@@ -215,13 +215,17 @@ body {
 .topbar-kicker {
   max-width: 340px;
   overflow: hidden;
-  color: var(--muted-2);
+  color: var(--muted);
   font-size: 10px;
   font-weight: 650;
   letter-spacing: .035em;
   text-overflow: ellipsis;
   text-transform: none;
   white-space: nowrap;
+}
+
+kbd {
+  color: var(--muted);
 }
 
 .topbar-title {

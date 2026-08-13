@@ -2,9 +2,18 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 async function expectNoWcagViolations(page: Parameters<typeof AxeBuilder>[0]["page"]) {
-  const result = await new AxeBuilder({ page })
+  await page.waitForLoadState("domcontentloaded");
+  const analyse = () => new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
+  let result: Awaited<ReturnType<typeof analyse>>;
+  try {
+    result = await analyse();
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("Execution context was destroyed")) throw error;
+    await page.waitForLoadState("domcontentloaded");
+    result = await analyse();
+  }
   expect(result.violations.map((violation) => ({ id: violation.id, impact: violation.impact, targets: violation.nodes.map((node) => node.target) }))).toEqual([]);
 }
 
@@ -143,7 +152,10 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Your three highest-leverage moves" })).toBeVisible();
     const searchCompany = `Search Sponsor ${suffix}`;
-    const companyResponse = await page.request.post("/backend/companies", { data: { companyName: searchCompany, website: `https://${suffix}.search.example`, country: "United Kingdom", industries: "Technology" } });
+    const companyResponse = await page.request.post("/backend/companies", {
+      data: { companyName: searchCompany, website: `https://${suffix}.search.example`, country: "United Kingdom", industries: "Technology" },
+      headers: { Origin: "http://localhost:3000" },
+    });
     expect(companyResponse.ok()).toBe(true);
     await page.keyboard.press("Control+K");
     const command = page.getByRole("dialog", { name: "Search GridFlow" });

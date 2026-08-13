@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 8B.2 commercial launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, production research-cost telemetry and evidence-bound Ultra economics approval, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 8C product-acceptance launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, production research-cost telemetry, evidence-bound Ultra economics approval, an exact-commit Acceptance Lab and automatic feature-freeze revocation, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -26,6 +26,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Opportunity stage reasons, explicit closed-deal reopening, automatic next-action safeguards, immutable history and a unified meeting/task/close-date calendar.
 - Evidence-first agents with retries, recovery, versioning, tokens, cost and quality reports.
 - Owner-only Research Economics with provider/model/token/search telemetry, 100+ run sampling, median/P90 cost analysis, reconciled provider spend, 100/500-credit projections and guarded Ultra approval.
+- Platform-owner Acceptance Lab with 22-step Core-to-renewal journeys, structured product findings, desktop/mobile coverage and an exact-commit feature freeze that automatically reopens when evidence changes.
 - Orbit pre-meeting briefs and human-notes-only debriefs with idempotent task creation, explicit opportunity approval and follow-up drafts that cannot send themselves.
 - Forge proposal intelligence with human commercial briefs, grounded packages and pricing, immutable versions, editable approval, print/PDF views and explicit human-confirmed delivery records.
 - Seal contract operations with immutable checksummed terms, owner legal approval, externally verified signer states, signed-document evidence, exact payment schedules, overdue detection and explicit activation/deal-win controls.
@@ -76,6 +77,6 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/PHASE_7A_SEAL.md`, `docs/PHASE_6_3_AUTOMATION_COCKPIT.md`, `docs/PHASE_6_2_GUIDED_EXPERIENCE.md`, `docs/PHASE_6_1_1_TRUSTED_DEVICES.md`, `docs/PHASE_6_OPPORTUNITY_MEETING_OS.md`, `docs/MILESTONE9_LIVE_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/PHASE_8C_ACCEPTANCE_FEATURE_FREEZE.md`, `docs/PHASE_8B_2_RESEARCH_ECONOMICS.md`, `docs/PHASE_8A_LIVE_INTEGRATION_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
 
 Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

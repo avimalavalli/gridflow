@@ -1,4 +1,4 @@
-# GridFlow implementation status — Phase 8B.2 Research Economics
+# GridFlow implementation status — Phase 8C Acceptance and Feature Freeze
 
 ## Built and verified
 
@@ -9,6 +9,9 @@
 - **Production research-cost telemetry** with provider, model, token, web-search and external-cost dimensions on every new research completion.
 - **Research Economics** with clean 100+ run evidence windows, complete-telemetry enforcement, Atlas/Sage/Relay distribution, average/median/P90 analysis, reconciled GBP spend and 100/500/750/1,000-credit projections.
 - **Owner-controlled economics approval** with immutable snapshots, audit history and automated Launch Control gates for cost configuration and approved Ultra economics.
+- **Exact-commit Acceptance Lab** with two-organisation Core/Ultra journeys, a fixed 22-step Core-to-renewal workflow, desktop/mobile coverage and evidence-required research steps.
+- **Structured product finding control** for defects, friction, confusion, dead ends, unnecessary clicks, performance and accessibility, including severity, resolution and deliberate deferral rationale.
+- **Fail-closed feature freeze** that requires passed journeys, closed findings and Phase 8B.2 approval, then automatically reopens when any accepted step or finding changes.
 
 - Multi-athlete organisations, roles, invitations and isolated data.
 - Athlete onboarding, personalised markets, outreach policy and Discovery Briefs.
@@ -48,13 +51,13 @@
 
 ## Validation result
 
-- 138 automated tests passed across 54 files.
+- 139 automated tests passed across 55 files.
 - 8/8 agent-quality regression fixtures matched their expected outcome.
-- Database schema check passed: 77 models and 25 registered migrations.
+- Database schema check passed: 81 models and 26 registered migrations.
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility, Phase 8B.1 public product/pricing/support/receipt behaviour and the Phase 8B.2 Research Economics entry state, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
+- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility, Phase 8B.1 public product/pricing/support/receipt behaviour, Phase 8B.2 Research Economics and the Phase 8C Acceptance Lab entry state, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
@@ -68,4 +71,4 @@ The Phase 6 release workflow completed the dependency audit, browser, responsive
 6. Completion of every required Launch Control check.
 7. Owner approval, closed production rehearsal and direct public deployment.
 
-The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application and Phase 8B.2 commercial instrumentation are functionally closed for the agreed scope. The live 100+ run economics window, live provider acceptance, internal feature-freeze acceptance, security, privacy/legal and production launch rehearsal remain before public launch.
+The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application, Phase 8B.2 commercial instrumentation and Phase 8C acceptance enforcement are functionally closed for the agreed scope. The live 100+ run economics window, live provider acceptance, two real internal feature-freeze journeys, security, privacy/legal and production launch rehearsal remain before public launch.

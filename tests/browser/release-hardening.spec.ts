@@ -129,6 +129,13 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     const economicsViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(economicsViewport.scrollWidth, `${testInfo.project.name} research economics has horizontal overflow`).toBeLessThanOrEqual(economicsViewport.width + 1);
     await expectNoWcagViolations(page);
+    await page.goto("/platform/acceptance");
+    await expect(page.getByRole("heading", { name: "Acceptance Lab", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Product acceptance is collecting" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create 22-step journey" })).toBeVisible();
+    const acceptanceViewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(acceptanceViewport.scrollWidth, `${testInfo.project.name} Acceptance Lab has horizontal overflow`).toBeLessThanOrEqual(acceptanceViewport.width + 1);
+    await expectNoWcagViolations(page);
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "Your three highest-leverage moves" })).toBeVisible();
     const searchCompany = `Search Sponsor ${suffix}`;

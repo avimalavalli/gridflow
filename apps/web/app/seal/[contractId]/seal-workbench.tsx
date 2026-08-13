@@ -2,50 +2,947 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Banknote, CheckCircle2, ExternalLink, FileClock, FileSignature, ShieldAlert, UsersRound } from "lucide-react";
+import {
+  Banknote,
+  CheckCircle2,
+  ExternalLink,
+  FileClock,
+  FileSignature,
+  ShieldAlert,
+  UsersRound,
+} from "lucide-react";
 import { StatusBadge } from "../../../components/status-badge";
+import { formatLabel } from "../../../lib/format";
 
 interface ContractView {
-  id: string; opportunityId:string; proposalId:string|null; contractNumber: string; title: string; status: string; valueMinor: number; currency: string; startDate: string; endDate: string; governingLaw: string|null; internalOwner: string|null;
-  documentUrl: string|null; signedDocumentUrl: string|null; reviewNote: string|null; reviewedAt: string|null; sentForSignatureAt: string|null; fullySignedAt: string|null; activatedAt: string|null;
-  companyName: string; opportunityName: string; opportunityStage: string; proposalTitle: string|null; versionNumber: number; terms: Record<string,unknown>; checksumSha256: string; createdByName: string|null; reviewedByName: string|null;
+  id: string;
+  opportunityId: string;
+  proposalId: string | null;
+  contractNumber: string;
+  title: string;
+  status: string;
+  valueMinor: number;
+  currency: string;
+  startDate: string;
+  endDate: string;
+  governingLaw: string | null;
+  internalOwner: string | null;
+  documentUrl: string | null;
+  signedDocumentUrl: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  sentForSignatureAt: string | null;
+  fullySignedAt: string | null;
+  activatedAt: string | null;
+  companyName: string;
+  opportunityName: string;
+  opportunityStage: string;
+  proposalTitle: string | null;
+  versionNumber: number;
+  terms: Record<string, unknown>;
+  checksumSha256: string;
+  createdByName: string | null;
+  reviewedByName: string | null;
 }
-interface Signer { id:string; contactId:string|null; name:string; email:string|null; role:string; party:string; required:boolean; sequence:number; status:string; requestedAt:string|null; viewedAt:string|null; signedAt:string|null; declineReason:string|null }
-interface Milestone { id:string; title:string; sequence:number; amountMinor:number; amountPaidMinor:number; currency:string; dueDate:string; status:string; effectiveStatus:string; invoiceReference:string|null; paymentReference:string|null; paidAt:string|null }
-export interface SealDetail { contract:ContractView; versions:Array<{id:string;versionNumber:number;checksumSha256:string;createdAt:string;createdByName:string|null}>; signers:Signer[]; milestones:Milestone[] }
+interface Signer {
+  id: string;
+  contactId: string | null;
+  name: string;
+  email: string | null;
+  role: string;
+  party: string;
+  required: boolean;
+  sequence: number;
+  status: string;
+  requestedAt: string | null;
+  viewedAt: string | null;
+  signedAt: string | null;
+  declineReason: string | null;
+}
+interface Milestone {
+  id: string;
+  title: string;
+  sequence: number;
+  amountMinor: number;
+  amountPaidMinor: number;
+  currency: string;
+  dueDate: string;
+  status: string;
+  effectiveStatus: string;
+  invoiceReference: string | null;
+  paymentReference: string | null;
+  paidAt: string | null;
+}
+export interface SealDetail {
+  contract: ContractView;
+  versions: Array<{
+    id: string;
+    versionNumber: number;
+    checksumSha256: string;
+    createdAt: string;
+    createdByName: string | null;
+  }>;
+  signers: Signer[];
+  milestones: Milestone[];
+}
 
-const money=(minor:number,code:string)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:code,maximumFractionDigits:0}).format(Number(minor)/100);
-const displayDate=(value:string|null)=>value?new Intl.DateTimeFormat("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(value)):"Not recorded";
+const money = (minor: number, code: string) =>
+  new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: code,
+    maximumFractionDigits: 0,
+  }).format(Number(minor) / 100);
+const displayDate = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(value))
+    : "Not recorded";
 
-export function SealWorkbench({data}:{data:SealDetail}) {
-  const router=useRouter(); const contract=data.contract;
-  const [busy,setBusy]=useState(""); const [message,setMessage]=useState(""); const [notes,setNotes]=useState("");
-  const [sentConfirmed,setSentConfirmed]=useState(false); const [signatureConfirmed,setSignatureConfirmed]=useState(false); const [executionConfirmed,setExecutionConfirmed]=useState(false); const [documentUrl,setDocumentUrl]=useState(contract.documentUrl??"");
-  const [signedUrl,setSignedUrl]=useState(contract.signedDocumentUrl??""); const [markWon,setMarkWon]=useState(contract.opportunityStage==="VERBAL_AGREEMENT");
-  const [financialConfirmed,setFinancialConfirmed]=useState(false); const [payment,setPayment]=useState<Record<string,{status:string;amount:string;invoice:string;reference:string}>>(()=>Object.fromEntries(data.milestones.map((m)=>[m.id,{status:m.amountPaidMinor>0?"PARTIALLY_PAID":"INVOICED",amount:String(m.amountMinor/100),invoice:m.invoiceReference??"",reference:m.paymentReference??""}])));
-  const [terminationConfirmed,setTerminationConfirmed]=useState(false); const [terminationReason,setTerminationReason]=useState("");
-  const commercialTerms=(contract.terms?.commercialTerms??{}) as Record<string,unknown>;
-  const [revision,setRevision]=useState({title:contract.title,value:String(contract.valueMinor/100),currency:contract.currency,startDate:String(contract.startDate).slice(0,10),endDate:String(contract.endDate).slice(0,10),governingLaw:contract.governingLaw??"",internalOwner:contract.internalOwner??"",documentUrl:contract.documentUrl??"",terms:JSON.stringify(commercialTerms,null,2)});
+export function SealWorkbench({ data }: { data: SealDetail }) {
+  const router = useRouter();
+  const contract = data.contract;
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState("");
+  const [notes, setNotes] = useState("");
+  const [sentConfirmed, setSentConfirmed] = useState(false);
+  const [signatureConfirmed, setSignatureConfirmed] = useState(false);
+  const [executionConfirmed, setExecutionConfirmed] = useState(false);
+  const [documentUrl, setDocumentUrl] = useState(contract.documentUrl ?? "");
+  const [signedUrl, setSignedUrl] = useState(contract.signedDocumentUrl ?? "");
+  const [markWon, setMarkWon] = useState(
+    contract.opportunityStage === "VERBAL_AGREEMENT",
+  );
+  const [financialConfirmed, setFinancialConfirmed] = useState(false);
+  const [payment, setPayment] = useState<
+    Record<
+      string,
+      { status: string; amount: string; invoice: string; reference: string }
+    >
+  >(() =>
+    Object.fromEntries(
+      data.milestones.map((m) => [
+        m.id,
+        {
+          status: m.amountPaidMinor > 0 ? "PARTIALLY_PAID" : "INVOICED",
+          amount: String(m.amountMinor / 100),
+          invoice: m.invoiceReference ?? "",
+          reference: m.paymentReference ?? "",
+        },
+      ]),
+    ),
+  );
+  const [terminationConfirmed, setTerminationConfirmed] = useState(false);
+  const [terminationReason, setTerminationReason] = useState("");
+  const commercialTerms = (contract.terms?.commercialTerms ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const [revision, setRevision] = useState({
+    title: contract.title,
+    value: String(contract.valueMinor / 100),
+    currency: contract.currency,
+    startDate: String(contract.startDate).slice(0, 10),
+    endDate: String(contract.endDate).slice(0, 10),
+    governingLaw: contract.governingLaw ?? "",
+    internalOwner: contract.internalOwner ?? "",
+    documentUrl: contract.documentUrl ?? "",
+    terms: JSON.stringify(commercialTerms, null, 2),
+  });
 
-  async function act(path:string,body?:unknown,key=path){setBusy(key);setMessage("");try{const response=await fetch(`/backend/seal/${contract.id}${path}`,{method:"POST",credentials:"include",headers:body===undefined?undefined:{"content-type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});const payload=await response.json().catch(()=>({})) as {message?:string|string[]};if(!response.ok)throw new Error(Array.isArray(payload.message)?payload.message.join(" "):payload.message||"Seal could not record the decision.");setMessage("Decision recorded with a tenant audit event.");router.refresh();}catch(cause){setMessage(cause instanceof Error?cause.message:"Seal could not record the decision.");}finally{setBusy("");}}
-  async function saveRevision(event:React.FormEvent){event.preventDefault();let terms:Record<string,unknown>;try{terms=JSON.parse(revision.terms) as Record<string,unknown>;}catch{setMessage("Commercial terms must be valid JSON.");return;}await act("/revise",{opportunityId:contract.opportunityId,proposalId:contract.proposalId??undefined,title:revision.title,valueMinor:Math.round(Number(revision.value)*100),currency:revision.currency,startDate:revision.startDate,endDate:revision.endDate,governingLaw:revision.governingLaw||undefined,internalOwner:revision.internalOwner||undefined,documentUrl:revision.documentUrl||undefined,terms,signers:data.signers.map((s)=>({contactId:s.contactId??undefined,name:s.name,email:s.email??undefined,role:s.role,party:s.party,required:s.required})),milestones:data.milestones.map((m)=>({title:m.title,amountMinor:Number(m.amountMinor),currency:m.currency,dueDate:String(m.dueDate).slice(0,10)}))},"revise");}
+  async function act(path: string, body?: unknown, key = path) {
+    setBusy(key);
+    setMessage("");
+    try {
+      const response = await fetch(`/backend/seal/${contract.id}${path}`, {
+        method: "POST",
+        credentials: "include",
+        headers:
+          body === undefined
+            ? undefined
+            : { "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        message?: string | string[];
+      };
+      if (!response.ok)
+        throw new Error(
+          Array.isArray(payload.message)
+            ? payload.message.join(" ")
+            : payload.message || "Seal could not record the decision.",
+        );
+      setMessage("Decision recorded with a tenant audit event.");
+      router.refresh();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Seal could not record the decision.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+  async function saveRevision(event: React.FormEvent) {
+    event.preventDefault();
+    let terms: Record<string, unknown>;
+    try {
+      terms = JSON.parse(revision.terms) as Record<string, unknown>;
+    } catch {
+      setMessage("Commercial terms must be valid JSON.");
+      return;
+    }
+    await act(
+      "/revise",
+      {
+        opportunityId: contract.opportunityId,
+        proposalId: contract.proposalId ?? undefined,
+        title: revision.title,
+        valueMinor: Math.round(Number(revision.value) * 100),
+        currency: revision.currency,
+        startDate: revision.startDate,
+        endDate: revision.endDate,
+        governingLaw: revision.governingLaw || undefined,
+        internalOwner: revision.internalOwner || undefined,
+        documentUrl: revision.documentUrl || undefined,
+        terms,
+        signers: data.signers.map((s) => ({
+          contactId: s.contactId ?? undefined,
+          name: s.name,
+          email: s.email ?? undefined,
+          role: s.role,
+          party: s.party,
+          required: s.required,
+        })),
+        milestones: data.milestones.map((m) => ({
+          title: m.title,
+          amountMinor: Number(m.amountMinor),
+          currency: m.currency,
+          dueDate: String(m.dueDate).slice(0, 10),
+        })),
+      },
+      "revise",
+    );
+  }
 
-  return <div className="stack section-gap">
-    <div className="grid-4"><article className="metric-card"><span>Contract value</span><strong>{money(contract.valueMinor,contract.currency)}</strong><small>{contract.startDate} → {contract.endDate}</small></article><article className="metric-card"><span>Signatures</span><strong>{data.signers.filter((s)=>s.required&&s.status==="SIGNED").length}/{data.signers.filter((s)=>s.required).length}</strong><small>Required parties signed</small></article><article className="metric-card"><span>Collected</span><strong>{money(data.milestones.reduce((sum,m)=>sum+Number(m.amountPaidMinor),0),contract.currency)}</strong><small>Verified payment records</small></article><article className="metric-card"><span>Current version</span><strong>v{contract.versionNumber}</strong><small>{contract.checksumSha256.slice(0,12)}… immutable hash</small></article></div>
-    <div className="grid-2 balanced">
-      <section className="card"><div className="section-header"><div><div className="eyebrow">Commercial truth</div><h2>Contract record</h2></div><FileSignature size={20}/></div><div className="detail-list"><div><span>Opportunity</span><strong>{contract.opportunityName} · {contract.opportunityStage.replaceAll("_"," ")}</strong></div><div><span>Proposal</span><strong>{contract.proposalTitle??"No linked proposal"}</strong></div><div><span>Governing law</span><strong>{contract.governingLaw??"Not recorded"}</strong></div><div><span>Internal owner</span><strong>{contract.internalOwner??"Not assigned"}</strong></div><div><span>Reviewed by</span><strong>{contract.reviewedByName??"Not reviewed"}</strong></div></div>{contract.documentUrl?<a className="button button-secondary section-gap" href={contract.documentUrl} target="_blank" rel="noreferrer">Open draft evidence <ExternalLink size={13}/></a>:null}{contract.signedDocumentUrl?<a className="button button-primary section-gap" href={contract.signedDocumentUrl} target="_blank" rel="noreferrer">Open signed evidence <ExternalLink size={13}/></a>:null}</section>
-      <section className="card"><div className="section-header"><div><div className="eyebrow">Immutable history</div><h2>Version register</h2></div><FileClock size={20}/></div><div className="queue">{data.versions.map((version)=><div className="queue-item" key={version.id}><span className="metric-icon"><FileClock size={15}/></span><div><div className="queue-title">Version {version.versionNumber}</div><div className="queue-copy">{version.checksumSha256}</div><div className="table-sub">{displayDate(version.createdAt)} · {version.createdByName??"System"}</div></div></div>)}</div></section>
+  return (
+    <div className="stack section-gap">
+      <div className="grid-4">
+        <article className="metric-card">
+          <span>Contract value</span>
+          <strong>{money(contract.valueMinor, contract.currency)}</strong>
+          <small>
+            {contract.startDate} → {contract.endDate}
+          </small>
+        </article>
+        <article className="metric-card">
+          <span>Signatures</span>
+          <strong>
+            {
+              data.signers.filter((s) => s.required && s.status === "SIGNED")
+                .length
+            }
+            /{data.signers.filter((s) => s.required).length}
+          </strong>
+          <small>Required parties signed</small>
+        </article>
+        <article className="metric-card">
+          <span>Collected</span>
+          <strong>
+            {money(
+              data.milestones.reduce(
+                (sum, m) => sum + Number(m.amountPaidMinor),
+                0,
+              ),
+              contract.currency,
+            )}
+          </strong>
+          <small>Verified payment records</small>
+        </article>
+        <article className="metric-card">
+          <span>Current version</span>
+          <strong>v{contract.versionNumber}</strong>
+          <small>{contract.checksumSha256.slice(0, 12)}… immutable hash</small>
+        </article>
+      </div>
+      <div className="grid-2 balanced">
+        <section className="card">
+          <div className="section-header">
+            <div>
+              <div className="eyebrow">Commercial truth</div>
+              <h2>Contract record</h2>
+            </div>
+            <FileSignature size={20} />
+          </div>
+          <div className="detail-list">
+            <div>
+              <span>Opportunity</span>
+              <strong>
+                {contract.opportunityName} ·{" "}
+                {formatLabel(contract.opportunityStage)}
+              </strong>
+            </div>
+            <div>
+              <span>Proposal</span>
+              <strong>{contract.proposalTitle ?? "No linked proposal"}</strong>
+            </div>
+            <div>
+              <span>Governing law</span>
+              <strong>{contract.governingLaw ?? "Not recorded"}</strong>
+            </div>
+            <div>
+              <span>Internal owner</span>
+              <strong>{contract.internalOwner ?? "Not assigned"}</strong>
+            </div>
+            <div>
+              <span>Reviewed by</span>
+              <strong>{contract.reviewedByName ?? "Not reviewed"}</strong>
+            </div>
+          </div>
+          {contract.documentUrl ? (
+            <a
+              className="button button-secondary section-gap"
+              href={contract.documentUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open draft evidence <ExternalLink size={13} />
+            </a>
+          ) : null}
+          {contract.signedDocumentUrl ? (
+            <a
+              className="button button-primary section-gap"
+              href={contract.signedDocumentUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open signed evidence <ExternalLink size={13} />
+            </a>
+          ) : null}
+        </section>
+        <section className="card">
+          <div className="section-header">
+            <div>
+              <div className="eyebrow">Immutable history</div>
+              <h2>Version register</h2>
+            </div>
+            <FileClock size={20} />
+          </div>
+          <div className="queue">
+            {data.versions.map((version) => (
+              <div className="queue-item" key={version.id}>
+                <span className="metric-icon">
+                  <FileClock size={15} />
+                </span>
+                <div>
+                  <div className="queue-title">
+                    Version {version.versionNumber}
+                  </div>
+                  <div className="queue-copy">{version.checksumSha256}</div>
+                  <div className="table-sub">
+                    {displayDate(version.createdAt)} ·{" "}
+                    {version.createdByName ?? "System"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+      {["DRAFT", "REJECTED"].includes(contract.status) ? (
+        <section className="card">
+          <div className="section-header">
+            <div>
+              <div className="eyebrow">Version editor</div>
+              <h2>
+                {contract.status === "REJECTED"
+                  ? "Create the corrected contract version"
+                  : "Refine the internal draft"}
+              </h2>
+              <p>
+                Saving produces a new immutable checksummed version. It never
+                overwrites the earlier evidence.
+              </p>
+            </div>
+            <FileClock size={20} />
+          </div>
+          <form className="form-grid" onSubmit={saveRevision}>
+            <label className="field form-full">
+              <span>Contract title</span>
+              <input
+                required
+                value={revision.title}
+                onChange={(e) =>
+                  setRevision({ ...revision, title: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Contract value</span>
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={revision.value}
+                onChange={(e) =>
+                  setRevision({ ...revision, value: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <input
+                required
+                maxLength={3}
+                value={revision.currency}
+                onChange={(e) =>
+                  setRevision({
+                    ...revision,
+                    currency: e.target.value.toUpperCase(),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Starts</span>
+              <input
+                required
+                type="date"
+                value={revision.startDate}
+                onChange={(e) =>
+                  setRevision({ ...revision, startDate: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Ends</span>
+              <input
+                required
+                type="date"
+                value={revision.endDate}
+                onChange={(e) =>
+                  setRevision({ ...revision, endDate: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Governing law</span>
+              <input
+                value={revision.governingLaw}
+                onChange={(e) =>
+                  setRevision({ ...revision, governingLaw: e.target.value })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Internal owner</span>
+              <input
+                value={revision.internalOwner}
+                onChange={(e) =>
+                  setRevision({ ...revision, internalOwner: e.target.value })
+                }
+              />
+            </label>
+            <label className="field form-full">
+              <span>Draft evidence URL</span>
+              <input
+                type="url"
+                value={revision.documentUrl}
+                onChange={(e) =>
+                  setRevision({ ...revision, documentUrl: e.target.value })
+                }
+              />
+            </label>
+            <label className="field form-full">
+              <span>Structured commercial terms</span>
+              <textarea
+                className="code-area"
+                required
+                value={revision.terms}
+                onChange={(e) =>
+                  setRevision({ ...revision, terms: e.target.value })
+                }
+              />
+              <small>
+                Edit only verified terms. JSON preserves structured rights,
+                deliverables, dependencies and exclusions.
+              </small>
+            </label>
+            <div className="form-actions form-full">
+              <button
+                className="button button-secondary"
+                disabled={Boolean(busy)}
+              >
+                {busy === "revise"
+                  ? "Saving version…"
+                  : "Save new immutable version"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <div className="eyebrow">Legal decision gate</div>
+            <h2>Review and signature authority</h2>
+            <p>
+              These actions confirm something that happened outside GridFlow.
+              They never send a contract or sign on anyone’s behalf.
+            </p>
+          </div>
+          <ShieldAlert size={20} />
+        </div>
+        {["DRAFT", "REJECTED"].includes(contract.status) ? (
+          <button
+            className="button button-primary"
+            disabled={Boolean(busy)}
+            onClick={() => act("/submit-review")}
+          >
+            {busy ? "Recording…" : "Submit for owner review"}
+          </button>
+        ) : null}
+        {contract.status === "IN_REVIEW" ? (
+          <div className="form-grid">
+            <label className="field form-full">
+              <span>Review note</span>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="What was checked, or what must change?"
+              />
+            </label>
+            <div className="form-actions form-full">
+              <button
+                className="button button-secondary"
+                disabled={Boolean(busy)}
+                onClick={() =>
+                  act("/review", { decision: "REJECT", notes }, "review")
+                }
+              >
+                Reject for revision
+              </button>
+              <button
+                className="button button-primary"
+                disabled={Boolean(busy)}
+                onClick={() =>
+                  act("/review", { decision: "APPROVE", notes }, "review")
+                }
+              >
+                Approve contract terms
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {contract.status === "APPROVED" ? (
+          <div className="form-grid">
+            <label className="field form-full">
+              <span>Final draft evidence URL</span>
+              <input
+                type="url"
+                placeholder="https://…"
+                value={documentUrl}
+                onChange={(e) => setDocumentUrl(e.target.value)}
+              />
+            </label>
+            <label className="checkbox-row form-full">
+              <input
+                type="checkbox"
+                checked={sentConfirmed}
+                onChange={(e) => setSentConfirmed(e.target.checked)}
+              />
+              <span>
+                I confirm this approved contract was actually sent to the named
+                parties for signature.
+              </span>
+            </label>
+            <div className="form-actions form-full">
+              <button
+                className="button button-primary"
+                disabled={Boolean(busy) || !sentConfirmed}
+                onClick={() =>
+                  act(
+                    "/mark-sent",
+                    {
+                      confirmSentForSignature: sentConfirmed,
+                      documentUrl: documentUrl || undefined,
+                    },
+                    "send",
+                  )
+                }
+              >
+                Record sent for signature
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {message ? (
+          <div
+            className={`notice section-gap ${/could not|required|only|confirm|must|cannot/i.test(message) ? "notice-error" : "notice-success"}`}
+            role="status"
+          >
+            {message}
+          </div>
+        ) : null}
+      </section>
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <div className="eyebrow">Required parties</div>
+            <h2>Signature register</h2>
+          </div>
+          <UsersRound size={20} />
+        </div>
+        {["SENT_FOR_SIGNATURE", "PARTIALLY_SIGNED"].includes(
+          contract.status,
+        ) ? (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={signatureConfirmed}
+              onChange={(e) => setSignatureConfirmed(e.target.checked)}
+            />
+            <span>
+              I verified signer changes against the external signature record or
+              signed document.
+            </span>
+          </label>
+        ) : null}
+        <div className="queue section-gap">
+          {data.signers.map((signer) => (
+            <div className="queue-item" key={signer.id}>
+              <span className="metric-icon">
+                {signer.status === "SIGNED" ? (
+                  <CheckCircle2 size={16} />
+                ) : (
+                  <FileSignature size={16} />
+                )}
+              </span>
+              <div className="queue-main">
+                <div className="queue-title">
+                  {signer.name} · {signer.party}
+                </div>
+                <div className="queue-copy">
+                  {signer.role}
+                  {signer.email ? ` · ${signer.email}` : ""}
+                </div>
+                <div className="table-sub">
+                  Requested {displayDate(signer.requestedAt)} · signed{" "}
+                  {displayDate(signer.signedAt)}
+                </div>
+              </div>
+              <div className="queue-meta">
+                <StatusBadge value={signer.status} />
+                {["SENT_FOR_SIGNATURE", "PARTIALLY_SIGNED"].includes(
+                  contract.status,
+                ) && signer.status !== "SIGNED" ? (
+                  <div className="toolbar-group">
+                    <button
+                      className="button button-ghost"
+                      disabled={!signatureConfirmed || Boolean(busy)}
+                      onClick={() =>
+                        act(
+                          `/signers/${signer.id}/status`,
+                          {
+                            status: "VIEWED",
+                            confirmExternallyVerified: signatureConfirmed,
+                          },
+                          signer.id,
+                        )
+                      }
+                    >
+                      Viewed
+                    </button>
+                    <button
+                      className="button button-primary"
+                      disabled={!signatureConfirmed || Boolean(busy)}
+                      onClick={() =>
+                        act(
+                          `/signers/${signer.id}/status`,
+                          {
+                            status: "SIGNED",
+                            confirmExternallyVerified: signatureConfirmed,
+                          },
+                          signer.id,
+                        )
+                      }
+                    >
+                      Signed
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      {contract.status === "SIGNED" ? (
+        <section className="card seal-activate">
+          <div className="section-header">
+            <div>
+              <div className="eyebrow">Execution gate</div>
+              <h2>Activate the signed partnership</h2>
+              <p>
+                Activation requires a secure link to the fully signed agreement.
+                Marking the opportunity won remains optional and explicit.
+              </p>
+            </div>
+            <ShieldAlert size={20} />
+          </div>
+          <div className="form-grid">
+            <label className="field form-full">
+              <span>Signed agreement evidence URL</span>
+              <input
+                required
+                type="url"
+                placeholder="https://…"
+                value={signedUrl}
+                onChange={(e) => setSignedUrl(e.target.value)}
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={executionConfirmed}
+                onChange={(e) => setExecutionConfirmed(e.target.checked)}
+              />
+              <span>
+                I confirm every required party executed this exact contract
+                version.
+              </span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={markWon}
+                onChange={(e) => setMarkWon(e.target.checked)}
+              />
+              <span>Also mark the verbal-agreement opportunity as won.</span>
+            </label>
+            <div className="form-actions form-full">
+              <button
+                className="button button-primary"
+                disabled={!executionConfirmed || !signedUrl || Boolean(busy)}
+                onClick={() =>
+                  act(
+                    "/activate",
+                    {
+                      confirmFullyExecuted: executionConfirmed,
+                      signedDocumentUrl: signedUrl,
+                      updateOpportunityToWon: markWon,
+                    },
+                    "activate",
+                  )
+                }
+              >
+                Activate signed contract
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+      <section className="card">
+        <div className="section-header">
+          <div>
+            <div className="eyebrow">Money control</div>
+            <h2>Payment milestones</h2>
+            <p>
+              Outstanding and overdue values are calculated from verified
+              records. GridFlow never assumes that an invoice was paid.
+            </p>
+          </div>
+          <Banknote size={20} />
+        </div>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={financialConfirmed}
+            onChange={(e) => setFinancialConfirmed(e.target.checked)}
+          />
+          <span>
+            I am recording information verified against an invoice or bank
+            record.
+          </span>
+        </label>
+        <div className="queue section-gap">
+          {data.milestones.map((milestone) => {
+            const record = payment[milestone.id]!;
+            return (
+              <div className="card seal-payment" key={milestone.id}>
+                <div className="section-header">
+                  <div>
+                    <div className="queue-title">
+                      {milestone.sequence}. {milestone.title}
+                    </div>
+                    <div className="queue-copy">
+                      {money(milestone.amountMinor, milestone.currency)} due{" "}
+                      {milestone.dueDate}
+                    </div>
+                  </div>
+                  <StatusBadge value={milestone.effectiveStatus} />
+                </div>
+                {["SIGNED", "ACTIVE", "EXPIRED", "TERMINATED"].includes(
+                  contract.status,
+                ) && milestone.status !== "PAID" ? (
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>Status</span>
+                      <select
+                        value={record.status}
+                        onChange={(e) =>
+                          setPayment({
+                            ...payment,
+                            [milestone.id]: {
+                              ...record,
+                              status: e.target.value,
+                            },
+                          })
+                        }
+                      >
+                        <option value="INVOICED">Invoiced</option>
+                        <option value="PARTIALLY_PAID">Partially paid</option>
+                        <option value="PAID">Paid</option>
+                        <option value="DISPUTED">Disputed</option>
+                        <option value="WAIVED">Waived</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Amount received</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={record.amount}
+                        onChange={(e) =>
+                          setPayment({
+                            ...payment,
+                            [milestone.id]: {
+                              ...record,
+                              amount: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Invoice reference</span>
+                      <input
+                        value={record.invoice}
+                        onChange={(e) =>
+                          setPayment({
+                            ...payment,
+                            [milestone.id]: {
+                              ...record,
+                              invoice: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Payment reference</span>
+                      <input
+                        value={record.reference}
+                        onChange={(e) =>
+                          setPayment({
+                            ...payment,
+                            [milestone.id]: {
+                              ...record,
+                              reference: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="form-actions form-full">
+                      <button
+                        className="button button-secondary"
+                        disabled={!financialConfirmed || Boolean(busy)}
+                        onClick={() =>
+                          act(
+                            `/milestones/${milestone.id}/record`,
+                            {
+                              status: record.status,
+                              amountPaidMinor: Math.round(
+                                Number(record.amount) * 100,
+                              ),
+                              invoiceReference: record.invoice || undefined,
+                              paymentReference: record.reference || undefined,
+                              confirmFinancialRecord: financialConfirmed,
+                            },
+                            milestone.id,
+                          )
+                        }
+                      >
+                        Record verified milestone
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      {["SIGNED", "ACTIVE"].includes(contract.status) ? (
+        <section className="card danger-zone">
+          <div className="section-header">
+            <div>
+              <div className="eyebrow">Controlled termination</div>
+              <h2>Terminate contract record</h2>
+              <p>
+                This records a legal decision; it does not send notice to the
+                other party.
+              </p>
+            </div>
+            <ShieldAlert size={20} />
+          </div>
+          <label className="field">
+            <span>Termination reason</span>
+            <textarea
+              value={terminationReason}
+              onChange={(e) => setTerminationReason(e.target.value)}
+              placeholder="Verified reason and source of authority…"
+            />
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={terminationConfirmed}
+              onChange={(e) => setTerminationConfirmed(e.target.checked)}
+            />
+            <span>
+              I confirm the authorised legal decision to terminate this
+              contract.
+            </span>
+          </label>
+          <button
+            className="button button-secondary section-gap"
+            disabled={
+              !terminationConfirmed ||
+              terminationReason.trim().length < 10 ||
+              Boolean(busy)
+            }
+            onClick={() =>
+              act(
+                "/terminate",
+                {
+                  confirmTermination: terminationConfirmed,
+                  reason: terminationReason,
+                },
+                "terminate",
+              )
+            }
+          >
+            Record termination
+          </button>
+        </section>
+      ) : null}
     </div>
-    {["DRAFT","REJECTED"].includes(contract.status)?<section className="card"><div className="section-header"><div><div className="eyebrow">Version editor</div><h2>{contract.status==="REJECTED"?"Create the corrected contract version":"Refine the internal draft"}</h2><p>Saving produces a new immutable checksummed version. It never overwrites the earlier evidence.</p></div><FileClock size={20}/></div><form className="form-grid" onSubmit={saveRevision}><label className="field form-full"><span>Contract title</span><input required value={revision.title} onChange={(e)=>setRevision({...revision,title:e.target.value})}/></label><label className="field"><span>Contract value</span><input required type="number" min="0.01" step="0.01" value={revision.value} onChange={(e)=>setRevision({...revision,value:e.target.value})}/></label><label className="field"><span>Currency</span><input required maxLength={3} value={revision.currency} onChange={(e)=>setRevision({...revision,currency:e.target.value.toUpperCase()})}/></label><label className="field"><span>Starts</span><input required type="date" value={revision.startDate} onChange={(e)=>setRevision({...revision,startDate:e.target.value})}/></label><label className="field"><span>Ends</span><input required type="date" value={revision.endDate} onChange={(e)=>setRevision({...revision,endDate:e.target.value})}/></label><label className="field"><span>Governing law</span><input value={revision.governingLaw} onChange={(e)=>setRevision({...revision,governingLaw:e.target.value})}/></label><label className="field"><span>Internal owner</span><input value={revision.internalOwner} onChange={(e)=>setRevision({...revision,internalOwner:e.target.value})}/></label><label className="field form-full"><span>Draft evidence URL</span><input type="url" value={revision.documentUrl} onChange={(e)=>setRevision({...revision,documentUrl:e.target.value})}/></label><label className="field form-full"><span>Structured commercial terms</span><textarea className="code-area" required value={revision.terms} onChange={(e)=>setRevision({...revision,terms:e.target.value})}/><small>Edit only verified terms. JSON preserves structured rights, deliverables, dependencies and exclusions.</small></label><div className="form-actions form-full"><button className="button button-secondary" disabled={Boolean(busy)}>{busy==="revise"?"Saving version…":"Save new immutable version"}</button></div></form></section>:null}
-    <section className="card"><div className="section-header"><div><div className="eyebrow">Legal decision gate</div><h2>Review and signature authority</h2><p>These actions confirm something that happened outside GridFlow. They never send a contract or sign on anyone’s behalf.</p></div><ShieldAlert size={20}/></div>
-      {["DRAFT","REJECTED"].includes(contract.status)?<button className="button button-primary" disabled={Boolean(busy)} onClick={()=>act("/submit-review")}>{busy?"Recording…":"Submit for owner review"}</button>:null}
-      {contract.status==="IN_REVIEW"?<div className="form-grid"><label className="field form-full"><span>Review note</span><textarea value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="What was checked, or what must change?"/></label><div className="form-actions form-full"><button className="button button-secondary" disabled={Boolean(busy)} onClick={()=>act("/review",{decision:"REJECT",notes},"review")}>Reject for revision</button><button className="button button-primary" disabled={Boolean(busy)} onClick={()=>act("/review",{decision:"APPROVE",notes},"review")}>Approve contract terms</button></div></div>:null}
-      {contract.status==="APPROVED"?<div className="form-grid"><label className="field form-full"><span>Final draft evidence URL</span><input type="url" placeholder="https://…" value={documentUrl} onChange={(e)=>setDocumentUrl(e.target.value)}/></label><label className="checkbox-row form-full"><input type="checkbox" checked={sentConfirmed} onChange={(e)=>setSentConfirmed(e.target.checked)}/><span>I confirm this approved contract was actually sent to the named parties for signature.</span></label><div className="form-actions form-full"><button className="button button-primary" disabled={Boolean(busy)||!sentConfirmed} onClick={()=>act("/mark-sent",{confirmSentForSignature:sentConfirmed,documentUrl:documentUrl||undefined},"send")}>Record sent for signature</button></div></div>:null}
-      {message?<div className={`notice section-gap ${/could not|required|only|confirm|must|cannot/i.test(message)?"notice-error":"notice-success"}`} role="status">{message}</div>:null}
-    </section>
-    <section className="card"><div className="section-header"><div><div className="eyebrow">Required parties</div><h2>Signature register</h2></div><UsersRound size={20}/></div>{["SENT_FOR_SIGNATURE","PARTIALLY_SIGNED"].includes(contract.status)?<label className="checkbox-row"><input type="checkbox" checked={signatureConfirmed} onChange={(e)=>setSignatureConfirmed(e.target.checked)}/><span>I verified signer changes against the external signature record or signed document.</span></label>:null}<div className="queue section-gap">{data.signers.map((signer)=><div className="queue-item" key={signer.id}><span className="metric-icon">{signer.status==="SIGNED"?<CheckCircle2 size={16}/>:<FileSignature size={16}/>}</span><div className="queue-main"><div className="queue-title">{signer.name} · {signer.party}</div><div className="queue-copy">{signer.role}{signer.email?` · ${signer.email}`:""}</div><div className="table-sub">Requested {displayDate(signer.requestedAt)} · signed {displayDate(signer.signedAt)}</div></div><div className="queue-meta"><StatusBadge value={signer.status}/>{["SENT_FOR_SIGNATURE","PARTIALLY_SIGNED"].includes(contract.status)&&signer.status!=="SIGNED"?<div className="toolbar-group"><button className="button button-ghost" disabled={!signatureConfirmed||Boolean(busy)} onClick={()=>act(`/signers/${signer.id}/status`,{status:"VIEWED",confirmExternallyVerified:signatureConfirmed},signer.id)}>Viewed</button><button className="button button-primary" disabled={!signatureConfirmed||Boolean(busy)} onClick={()=>act(`/signers/${signer.id}/status`,{status:"SIGNED",confirmExternallyVerified:signatureConfirmed},signer.id)}>Signed</button></div>:null}</div></div>)}</div></section>
-    {contract.status==="SIGNED"?<section className="card seal-activate"><div className="section-header"><div><div className="eyebrow">Execution gate</div><h2>Activate the signed partnership</h2><p>Activation requires a secure link to the fully signed agreement. Marking the opportunity won remains optional and explicit.</p></div><ShieldAlert size={20}/></div><div className="form-grid"><label className="field form-full"><span>Signed agreement evidence URL</span><input required type="url" placeholder="https://…" value={signedUrl} onChange={(e)=>setSignedUrl(e.target.value)}/></label><label className="checkbox-row"><input type="checkbox" checked={executionConfirmed} onChange={(e)=>setExecutionConfirmed(e.target.checked)}/><span>I confirm every required party executed this exact contract version.</span></label><label className="checkbox-row"><input type="checkbox" checked={markWon} onChange={(e)=>setMarkWon(e.target.checked)}/><span>Also mark the verbal-agreement opportunity as won.</span></label><div className="form-actions form-full"><button className="button button-primary" disabled={!executionConfirmed||!signedUrl||Boolean(busy)} onClick={()=>act("/activate",{confirmFullyExecuted:executionConfirmed,signedDocumentUrl:signedUrl,updateOpportunityToWon:markWon},"activate")}>Activate signed contract</button></div></div></section>:null}
-    <section className="card"><div className="section-header"><div><div className="eyebrow">Money control</div><h2>Payment milestones</h2><p>Outstanding and overdue values are calculated from verified records. GridFlow never assumes that an invoice was paid.</p></div><Banknote size={20}/></div><label className="checkbox-row"><input type="checkbox" checked={financialConfirmed} onChange={(e)=>setFinancialConfirmed(e.target.checked)}/><span>I am recording information verified against an invoice or bank record.</span></label><div className="queue section-gap">{data.milestones.map((milestone)=>{const record=payment[milestone.id]!;return <div className="card seal-payment" key={milestone.id}><div className="section-header"><div><div className="queue-title">{milestone.sequence}. {milestone.title}</div><div className="queue-copy">{money(milestone.amountMinor,milestone.currency)} due {milestone.dueDate}</div></div><StatusBadge value={milestone.effectiveStatus}/></div>{["SIGNED","ACTIVE","EXPIRED","TERMINATED"].includes(contract.status)&&milestone.status!=="PAID"?<div className="form-grid"><label className="field"><span>Status</span><select value={record.status} onChange={(e)=>setPayment({...payment,[milestone.id]:{...record,status:e.target.value}})}><option value="INVOICED">Invoiced</option><option value="PARTIALLY_PAID">Partially paid</option><option value="PAID">Paid</option><option value="DISPUTED">Disputed</option><option value="WAIVED">Waived</option></select></label><label className="field"><span>Amount received</span><input type="number" min="0" step="0.01" value={record.amount} onChange={(e)=>setPayment({...payment,[milestone.id]:{...record,amount:e.target.value}})}/></label><label className="field"><span>Invoice reference</span><input value={record.invoice} onChange={(e)=>setPayment({...payment,[milestone.id]:{...record,invoice:e.target.value}})}/></label><label className="field"><span>Payment reference</span><input value={record.reference} onChange={(e)=>setPayment({...payment,[milestone.id]:{...record,reference:e.target.value}})}/></label><div className="form-actions form-full"><button className="button button-secondary" disabled={!financialConfirmed||Boolean(busy)} onClick={()=>act(`/milestones/${milestone.id}/record`,{status:record.status,amountPaidMinor:Math.round(Number(record.amount)*100),invoiceReference:record.invoice||undefined,paymentReference:record.reference||undefined,confirmFinancialRecord:financialConfirmed},milestone.id)}>Record verified milestone</button></div></div>:null}</div>})}</div></section>
-    {["SIGNED","ACTIVE"].includes(contract.status)?<section className="card danger-zone"><div className="section-header"><div><div className="eyebrow">Controlled termination</div><h2>Terminate contract record</h2><p>This records a legal decision; it does not send notice to the other party.</p></div><ShieldAlert size={20}/></div><label className="field"><span>Termination reason</span><textarea value={terminationReason} onChange={(e)=>setTerminationReason(e.target.value)} placeholder="Verified reason and source of authority…"/></label><label className="checkbox-row"><input type="checkbox" checked={terminationConfirmed} onChange={(e)=>setTerminationConfirmed(e.target.checked)}/><span>I confirm the authorised legal decision to terminate this contract.</span></label><button className="button button-secondary section-gap" disabled={!terminationConfirmed||terminationReason.trim().length<10||Boolean(busy)} onClick={()=>act("/terminate",{confirmTermination:terminationConfirmed,reason:terminationReason},"terminate")}>Record termination</button></section>:null}
-  </div>;
+  );
 }

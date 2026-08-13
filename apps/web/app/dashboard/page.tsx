@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/empty-state";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { SetupChecklist } from "../../components/setup-checklist";
 import { DashboardFocus, type DashboardAction } from "./dashboard-focus";
+import { formatLabel } from "../../lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function DashboardPage() {
 
   return (
     <Shell title="Command Centre">
-      <PageHead eyebrow="Commercial OS" title="Turn sponsor work into a daily system" description="Prioritise the next commercial action, keep every conversation moving and see where the pipeline is creating value." action={<Link className="button button-primary" href={snapshot?.focusActions[0]?.href ?? "/discovery-briefs"}>{snapshot?.focusActions.length ? <ArrowUpRight size={15}/> : <Building2 size={15}/>} {snapshot?.focusActions.length ? "Open next action" : "Discover companies"}</Link>} />
+      <PageHead eyebrow="Today’s workspace" title="Commercial command centre" description="Review priorities, pipeline health and the next action for every active relationship." action={<Link className="button button-primary" href={snapshot?.focusActions[0]?.href ?? "/discovery-briefs"}>{snapshot?.focusActions.length ? <ArrowUpRight size={15}/> : <Building2 size={15}/>} {snapshot?.focusActions.length ? "Open next action" : "Discover companies"}</Link>} />
       <SetupChecklist />
       {!snapshot ? <DataUnavailable message={error} /> : <>
         <section className="metrics metrics-six">
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
           <div className="metric"><span className="metric-icon"><Send size={17}/></span><div className="metric-label">Drafts ready</div><div className="metric-value">{snapshot.metrics.outreachDraftsReady}</div><div className="metric-foot">Messages awaiting action</div></div>
           <div className="metric"><span className="metric-icon"><Handshake size={17}/></span><div className="metric-label">Active deals</div><div className="metric-value">{snapshot.metrics.opportunities}</div><div className="metric-foot">{money(snapshot.metrics.pipelineValueMinor)} pipeline value</div></div>
           <div className="metric"><span className="metric-icon"><Activity size={17}/></span><div className="metric-label">Replies</div><div className="metric-value">{snapshot.metrics.replies}</div><div className="metric-foot">Inbound commercial activity</div></div>
-          <div className="metric"><span className="metric-icon"><Bot size={17}/></span><div className="metric-label">AI cost</div><div className="metric-value">${Number(snapshot.metrics.estimatedAutomationCostUsd).toFixed(2)}</div><div className="metric-foot">{snapshot.metrics.automationFailures} failed runs</div></div>
+          <div className="metric"><span className="metric-icon"><Bot size={17}/></span><div className="metric-label">Research spend</div><div className="metric-value">${Number(snapshot.metrics.estimatedAutomationCostUsd).toFixed(2)}</div><div className="metric-foot">{snapshot.metrics.automationFailures} failed runs</div></div>
         </section>
 
         <div className="split-layout">
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
 
             <section className="card">
               <div className="section-header"><div><div className="eyebrow">Pipeline</div><h2>Commercial opportunities</h2><p>Value and deal count across each active stage.</p></div><Link className="button button-secondary" href="/opportunities">Open pipeline</Link></div>
-              {snapshot.opportunityStages.length === 0 ? <EmptyState title="No opportunities yet" copy="Convert a meaningful sponsor conversation into an opportunity to start tracking value and probability." action={<Link className="button button-primary" href="/opportunities">Create opportunity</Link>} /> : <div className="queue">{snapshot.opportunityStages.map((stage) => <div className="queue-item" key={stage.stage}><div className="queue-main"><div className="queue-title">{stage.stage.replaceAll("_"," ")}</div><div className="queue-copy">{stage.count} {stage.count === 1 ? "opportunity" : "opportunities"}</div></div><div className="queue-meta"><strong>{money(stage.valueMinor)}</strong></div></div>)}</div>}
+              {snapshot.opportunityStages.length === 0 ? <EmptyState title="No opportunities yet" copy="Convert a meaningful sponsor conversation into an opportunity to start tracking value and probability." action={<Link className="button button-primary" href="/opportunities">Create opportunity</Link>} /> : <div className="queue">{snapshot.opportunityStages.map((stage) => <div className="queue-item" key={stage.stage}><div className="queue-main"><div className="queue-title">{formatLabel(stage.stage)}</div><div className="queue-copy">{stage.count} {stage.count === 1 ? "opportunity" : "opportunities"}</div></div><div className="queue-meta"><strong>{money(stage.valueMinor)}</strong></div></div>)}</div>}
             </section>
           </div>
 
@@ -66,7 +67,7 @@ export default async function DashboardPage() {
 
             <section className="card">
               <div className="section-header"><div><div className="eyebrow">Activity</div><h2>Recent commercial history</h2></div><Link className="button button-ghost" href="/interactions">Full timeline</Link></div>
-              {snapshot.recentActivity.length === 0 ? <EmptyState title="No interactions recorded" copy="Emails, calls, LinkedIn actions and internal notes will create a traceable timeline." /> : <div className="timeline">{snapshot.recentActivity.map((item) => <div className="timeline-item" key={item.id}><span className="timeline-dot"/><div><div className="timeline-title">{item.summary}</div><div className="timeline-copy">{[item.companyName,item.contactName,item.outcome].filter(Boolean).join(" · ")}</div><div className="timeline-time">{item.channel?.replaceAll("_"," ") || item.direction} · {dateTime(item.occurredAt)}</div></div></div>)}</div>}
+              {snapshot.recentActivity.length === 0 ? <EmptyState title="No interactions recorded" copy="Emails, calls, LinkedIn actions and internal notes will create a traceable timeline." /> : <div className="timeline">{snapshot.recentActivity.map((item) => <div className="timeline-item" key={item.id}><span className="timeline-dot"/><div><div className="timeline-title">{item.summary}</div><div className="timeline-copy">{[item.companyName,item.contactName,item.outcome].filter(Boolean).join(" · ")}</div><div className="timeline-time">{formatLabel(item.channel ?? item.direction)} · {dateTime(item.occurredAt)}</div></div></div>)}</div>}
             </section>
           </div>
         </div>

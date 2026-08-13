@@ -4,6 +4,7 @@ import { DataUnavailable } from "../../../components/data-unavailable";
 import { Shell } from "../../../components/shell";
 import { StatusBadge } from "../../../components/status-badge";
 import { apiGet, ApiError } from "../../../lib/server-api";
+import { formatLabel } from "../../../lib/format";
 import { ReviewPanel } from "./review-panel";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export default async function AgentRunPage({ params }: { params: Promise<{ id: s
     error = cause instanceof ApiError ? cause.message : "Unknown agent-run error.";
   }
 
-  if (!run) return <Shell title="Agent Run"><DataUnavailable message={error || "Agent run was not found."} /></Shell>;
+  if (!run) return <Shell title="Research Run"><DataUnavailable message={error || "Research run was not found."} /></Shell>;
   const linked = target(run);
   const issues = run.qualityReport?.issues ?? [];
 
@@ -72,16 +73,16 @@ export default async function AgentRunPage({ params }: { params: Promise<{ id: s
 
     <div className="grid-2 balanced section-gap">
       <section className="card"><div className="section-header"><div><div className="eyebrow">Human decision</div><h2>Quality review</h2><p>Accept strong output or record exact tuning feedback for the next prompt version.</p></div><ShieldCheck size={20} /></div><ReviewPanel id={run.id} currentStatus={run.humanReviewStatus} currentNotes={run.humanReviewNotes} qualityStatus={run.qualityStatus} completed={run.status === "SUCCEEDED"} />{run.humanReviewedAt ? <div className="table-sub section-gap">Last reviewed {formatTime(run.humanReviewedAt)}{run.humanReviewedByName ? ` by ${run.humanReviewedByName}` : ""}.</div> : null}</section>
-      <section className="card"><div className="section-header"><div><div className="eyebrow">Automated gate</div><h2>Quality findings</h2><p>Deterministic checks applied before the output could enter the commercial workspace.</p></div><StatusBadge value={run.qualityStatus} /></div>{issues.length ? <div className="quality-issue-list">{issues.map((issue, index) => <article className={`quality-issue ${issue.severity === "error" ? "error" : issue.severity === "warning" ? "warning" : "info"}`} key={`${issue.code ?? "issue"}-${index}`}><div><strong>{issue.code?.replaceAll("_", " ") ?? "Quality finding"}</strong>{issue.path ? <span>{issue.path}</span> : null}</div><p>{issue.message}</p></article>)}</div> : <div className="empty">No automated quality issues were recorded for this run.</div>}</section>
+      <section className="card"><div className="section-header"><div><div className="eyebrow">Automated gate</div><h2>Quality findings</h2><p>Deterministic checks applied before the output could enter the commercial workspace.</p></div><StatusBadge value={run.qualityStatus} /></div>{issues.length ? <div className="quality-issue-list">{issues.map((issue, index) => <article className={`quality-issue ${issue.severity === "error" ? "error" : issue.severity === "warning" ? "warning" : "info"}`} key={`${issue.code ?? "issue"}-${index}`}><div><strong>{formatLabel(issue.code, "Quality finding")}</strong>{issue.path ? <span>{issue.path}</span> : null}</div><p>{issue.message}</p></article>)}</div> : <div className="empty">No automated quality issues were recorded for this run.</div>}</section>
     </div>
 
-    {run.errorDetails ? <section className="card danger-card section-gap"><div className="section-header"><div><div className="eyebrow">Failure</div><h2>{run.errorCode ?? "Agent run failed"}</h2></div></div><p className="error-detail">{run.errorDetails}</p></section> : null}
+    {run.errorDetails ? <section className="card danger-card section-gap"><div className="section-header"><div><div className="eyebrow">Failure</div><h2>{formatLabel(run.errorCode, "Research run failed")}</h2></div></div><p className="error-detail">{run.errorDetails}</p></section> : null}
 
     <section className="card section-gap"><div className="section-header"><div><div className="eyebrow">Evidence trail</div><h2>Sources used by {run.agentName}</h2><p>Every trusted claim should be traceable to a source found during this exact run.</p></div></div>{run.evidence.length ? <div className="evidence-grid">{run.evidence.map((source) => <article className="evidence-card" key={source.id}><div className="evidence-card-head"><StatusBadge value={source.sourceType} compact /><span>{source.confidence === null ? "No confidence" : `${Math.round(source.confidence * 100)}% confidence`}</span></div><h3>{source.title || safeHostname(source.url)}</h3><p>{source.extractedFact}</p><a href={source.url} target="_blank" rel="noreferrer">Open source <ExternalLink size={13} /></a></article>)}</div> : <div className="empty">No evidence records were attached to this run.</div>}</section>
 
     <div className="grid-2 balanced section-gap">
-      <section className="card"><div className="section-header"><div><div className="eyebrow">Agent input</div><h2>Context supplied</h2></div><FileJson2 size={19} /></div><pre className="json-viewer">{JSON.stringify(run.input, null, 2)}</pre></section>
-      <section className="card"><div className="section-header"><div><div className="eyebrow">Agent output</div><h2>Structured response</h2></div><FileJson2 size={19} /></div><pre className="json-viewer">{JSON.stringify(run.output, null, 2)}</pre></section>
+      <section className="card"><div className="section-header"><div><div className="eyebrow">Run input</div><h2>Context supplied</h2></div><FileJson2 size={19} /></div><pre className="json-viewer">{JSON.stringify(run.input, null, 2)}</pre></section>
+      <section className="card"><div className="section-header"><div><div className="eyebrow">Run output</div><h2>Structured response</h2></div><FileJson2 size={19} /></div><pre className="json-viewer">{JSON.stringify(run.output, null, 2)}</pre></section>
     </div>
 
     <section className="card section-gap compact-meta"><span><Clock3 size={14} /> Started {formatTime(run.startedAt)}</span><span><Coins size={14} /> {run.modelUsed ?? "No model"}</span></section>

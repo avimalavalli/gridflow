@@ -20,5 +20,5 @@ export default async function InteractionsPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown interaction error.";
   }
-  return <Shell title="Interactions"><PageHead eyebrow="Commercial history" title="Keep every conversation visible and accountable" description="A complete timeline across LinkedIn, email, phone calls, meetings and internal decisions." />{error ? <DataUnavailable message={error} /> : <InteractionsClient interactions={interactions} companies={companies} contacts={contacts} opportunities={opportunities} />}</Shell>;
+  return <Shell title="Interactions"><PageHead eyebrow="Commercial history" title="Interaction history" description="Review the complete timeline across LinkedIn, email, calls, meetings and internal notes." />{error ? <DataUnavailable message={error} /> : <InteractionsClient interactions={interactions} companies={companies} contacts={contacts} opportunities={opportunities} />}</Shell>;
 }

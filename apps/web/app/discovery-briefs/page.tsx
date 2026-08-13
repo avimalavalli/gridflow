@@ -18,7 +18,7 @@ export default async function DiscoveryBriefsPage() {
 
   return (
     <Shell title="Discovery Briefs">
-      <PageHead title="Your sponsor-search pipelines" description="Activate a strategy, then run Atlas → Sage → Relay → Echo from one control. GridFlow researches and drafts; you remain in charge of outreach." action={<a className="button button-secondary" href="/onboarding">Edit athlete profile</a>} />
+      <PageHead eyebrow="Research scope" title="Sponsor discovery briefs" description="Set the market and target criteria, then run the research workflow from one controlled brief." action={<a className="button button-secondary" href="/onboarding">Edit athlete profile</a>} />
       {error ? <DataUnavailable message={error} /> : briefs.length ? <BriefList initialBriefs={briefs} /> : <section className="card"><div className="empty">Complete onboarding to generate athlete-specific Discovery Briefs.</div></section>}
     </Shell>
   );

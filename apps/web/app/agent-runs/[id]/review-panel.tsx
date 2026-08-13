@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle2, RotateCcw, XCircle } from "lucide-react";
+import { formatLabel } from "../../../lib/format";
 
 type ReviewStatus = "ACCEPTED" | "NEEDS_TUNING" | "REJECTED";
 
@@ -39,7 +40,7 @@ export function ReviewPanel({
         const detail = Array.isArray(payload.message) ? payload.message.join(" ") : payload.message;
         throw new Error(detail || "The quality review could not be saved.");
       }
-      setMessage(status === "ACCEPTED" ? "Agent result accepted." : status === "NEEDS_TUNING" ? "Result added to the tuning queue." : "Agent result rejected.");
+      setMessage(status === "ACCEPTED" ? "Research result accepted." : status === "NEEDS_TUNING" ? "Result added to the tuning queue." : "Research result rejected.");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The quality review could not be saved.");
@@ -49,11 +50,11 @@ export function ReviewPanel({
   }
 
   if (!completed) {
-    return <div className="empty">Human review becomes available after the agent run completes successfully.</div>;
+    return <div className="empty">Human review becomes available after the research run completes successfully.</div>;
   }
 
   return <div className="stack compact">
-    <div className="review-current"><span>Current decision</span><strong>{currentStatus.replaceAll("_", " ")}</strong></div>
+    <div className="review-current"><span>Current decision</span><strong>{formatLabel(currentStatus)}</strong></div>
     <label className="field"><span>Review notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Record what was strong, inaccurate or must change before the next run." maxLength={4000} /></label>
     <div className="review-actions">
       <button className="button button-primary" type="button" disabled={Boolean(busy) || qualityStatus === "FAIL"} onClick={() => submit("ACCEPTED")}><CheckCircle2 size={15} />{busy === "ACCEPTED" ? "Saving…" : "Accept result"}</button>

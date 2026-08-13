@@ -11,9 +11,9 @@ export default async function ResearchEconomicsPage() {
     const data = await apiGet<ResearchEconomicsData>("/platform/economics");
     return <Shell title="Research Economics">
       <PageHead
-        eyebrow="Phase 8B.2"
+        eyebrow="Commercial validation"
         title="Research economics"
-        description="Prove the real cost of Atlas, Sage and Relay before GridFlow Ultra economics can be approved."
+        description="Review the measured cost of Atlas, Sage and Relay before approving GridFlow Ultra economics."
       />
       <ResearchEconomicsClient initial={data} />
     </Shell>;

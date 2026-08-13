@@ -4,6 +4,7 @@ import { Shell } from "../../components/shell";
 import { apiGet, ApiError } from "../../lib/server-api";
 import { IntegrationsClient } from "./integrations-client";
 import { SecurityClient } from "./security-client";
+import { formatLabel } from "../../lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export default async function SettingsPage() {
 
   return (
     <Shell title="Settings">
-      <PageHead title="Commercial controls" description="Athlete strategy, outreach policy and connected delivery accounts for this organisation." action={<div className="channel-actions"><a className="button button-secondary" href="/settings/ai">AI setup</a><a className="button button-primary" href="/onboarding">Edit onboarding</a></div>} />
+      <PageHead eyebrow="Workspace configuration" title="Settings" description="Manage athlete strategy, outreach policy and connected accounts for this organisation." action={<div className="channel-actions"><a className="button button-secondary" href="/settings/ai">Intelligence setup</a><a className="button button-primary" href="/onboarding">Edit profile</a></div>} />
       {error ? <DataUnavailable message={error} /> : (
         <div className="stack">
           {!data?.profile ? <section className="card"><div className="empty">Complete onboarding to create the athlete profile and policy.</div></section> : (
@@ -61,9 +62,9 @@ export default async function SettingsPage() {
               <section className="card">
                 <div className="card-head"><h2>Outreach policy</h2><span className="badge blue">User controlled</span></div>
                 {data.policy ? <div className="queue">
-                  <div className="queue-item"><div><div className="queue-title">Channel strategy</div><div className="queue-copy">{data.policy.strategy.replaceAll("_", " ")}</div></div></div>
-                  <div className="queue-item"><div><div className="queue-title">Email automation</div><div className="queue-copy">{data.policy.emailAutomationMode.replaceAll("_", " ")}</div></div></div>
-                  <div className="queue-item"><div><div className="queue-title">Approval policy</div><div className="queue-copy">{data.policy.approvalMode.replaceAll("_", " ")}</div></div></div>
+                  <div className="queue-item"><div><div className="queue-title">Channel strategy</div><div className="queue-copy">{formatLabel(data.policy.strategy)}</div></div></div>
+                  <div className="queue-item"><div><div className="queue-title">Email automation</div><div className="queue-copy">{formatLabel(data.policy.emailAutomationMode)}</div></div></div>
+                  <div className="queue-item"><div><div className="queue-title">Approval policy</div><div className="queue-copy">{formatLabel(data.policy.approvalMode)}</div></div></div>
                   <div className="queue-item"><div><div className="queue-title">Email cap and timezone</div><div className="queue-copy">{data.policy.dailyEmailLimit === 0 ? "No GridFlow cap" : `${data.policy.dailyEmailLimit} per day`} · {data.policy.timezone}</div></div></div>
                 </div> : <div className="empty">No outreach policy has been saved.</div>}
               </section>

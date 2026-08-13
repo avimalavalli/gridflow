@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Ban, CheckCircle2, ExternalLink, RefreshCcw, Save, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { StatusBadge } from "../../../components/status-badge";
+import { formatLabel } from "../../../lib/format";
 import type { ForgeContent, ForgeDetail, ForgePackageOption } from "../forge-types";
 
 const lines = (value: string[]) => value.join("\n");
@@ -94,7 +95,7 @@ export function ForgeReviewDesk({ data }: { data: ForgeDetail }) {
 
       <section className="stack"><div className="section-header"><div><div className="eyebrow">Commercial architecture</div><h2>Package options</h2></div><span className="badge neutral">{draft.package_options.length} option{draft.package_options.length === 1 ? "" : "s"}</span></div>
         <div className="forge-package-grid">{draft.package_options.map((option, index) => <article className="card forge-package-editor" key={`${option.name}:${index}`}>
-          <div className="forge-package-head"><span>{index + 1}</span><div><input aria-label="Package name" disabled={!reviewable} value={option.name} onChange={(event) => changePackage(index, { name: event.target.value })}/><small>{option.investment_status.replaceAll("_", " ")}</small></div></div>
+          <div className="forge-package-head"><span>{index + 1}</span><div><input aria-label="Package name" disabled={!reviewable} value={option.name} onChange={(event) => changePackage(index, { name: event.target.value })}/><small>{formatLabel(option.investment_status)}</small></div></div>
           <label className="field"><span>Positioning</span><textarea disabled={!reviewable} value={option.positioning} onChange={(event) => changePackage(index, { positioning: event.target.value })}/></label>
           <div className="grid-2"><label className="field"><span>Investment · {option.currency}</span><input disabled={!reviewable || option.investment_status === "NEEDS_INPUT"} type="number" min="0" step="0.01" value={option.investment_minor / 100} onChange={(event) => changePackage(index, { investment_minor: Math.round(Number(event.target.value) * 100) })}/></label><label className="field"><span>Term · months</span><input disabled type="number" value={option.term_months}/></label></div>
           <label className="field"><span>Deliverables · one per line</span><textarea disabled={!reviewable} value={lines(option.deliverables)} onChange={(event) => changePackage(index, { deliverables: split(event.target.value) })}/></label>

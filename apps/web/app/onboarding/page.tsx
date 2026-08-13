@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, ExternalLink, KeyRound, Sav
 import { recommendDiscoveryBriefs, type AthleteProfileInput, type DiscoveryBriefRecommendation } from "@gridflow/domain";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
+import { formatLabel } from "../../lib/format";
 
 const split = (value: string): string[] => value.split(",").map((item) => item.trim()).filter(Boolean);
 type ApprovalMode = "EVERY_MESSAGE" | "INITIAL_ONLY" | "HIGH_VALUE_ONLY" | "NONE";
@@ -25,11 +26,11 @@ const initialProfile: OnboardingForm = {
 };
 
 const steps = [
-  { title: "Programme", copy: "Who you are and where you compete" },
-  { title: "Commercial story", copy: "Why a sponsor should remember you" },
-  { title: "Target market", copy: "Where Atlas should look" },
-  { title: "Safety controls", copy: "How outreach is governed" },
-  { title: "AI & review", copy: "Confirm everything before launch" },
+  { title: "Profile", copy: "Your programme and competition footprint" },
+  { title: "Commercial context", copy: "Your story, audience and differentiators" },
+  { title: "Target criteria", copy: "Markets, industries and deal range" },
+  { title: "Outreach controls", copy: "Approval, timing and channel rules" },
+  { title: "Review", copy: "Confirm the profile and provider connection" },
 ] as const;
 
 export default function OnboardingPage() {
@@ -137,7 +138,7 @@ export default function OnboardingPage() {
 
   return (
     <Shell title="Guided setup">
-      <PageHead eyebrow="Resumable onboarding" title="Build the operating system around your programme" description="GridFlow saves each step automatically. You can close the page, change devices and continue from the same place." action={<span className={`draft-status ${draftStatus}`}><Save size={13}/>{draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Progress saved" : draftStatus === "error" ? "Save interrupted" : "Ready"}</span>} />
+      <PageHead eyebrow="Workspace setup" title="Set up your commercial profile" description="Complete the five short sections once. Progress saves automatically across your two approved devices." action={<span className={`draft-status ${draftStatus}`}><Save size={13}/>{draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Progress saved" : draftStatus === "error" ? "Save interrupted" : "Ready"}</span>} />
       <div className="onboarding-wizard">
         <aside className="card onboarding-steps" aria-label="Setup steps">{steps.map((item, index) => <button type="button" className={index === step ? "onboarding-step active" : index < step ? "onboarding-step complete" : "onboarding-step"} key={item.title} onClick={() => { if (index <= step) setStep(index); }}><span>{index < step ? <Check size={13}/> : index + 1}</span><div><strong>{item.title}</strong><small>{item.copy}</small></div></button>)}</aside>
         <section className="card onboarding-stage">
@@ -183,12 +184,12 @@ export default function OnboardingPage() {
           </div> : null}
 
           {step === 4 ? <div className="stack">
-            <div className="review-summary"><div><span>Programme</span><strong>{profile.name || "Not set"} · {profile.sport || "Sport not set"}</strong></div><div><span>Markets</span><strong>{profile.targetCountries.join(", ") || "Not set"}</strong></div><div><span>Automation</span><strong>{profile.outreachStrategy.replaceAll("_", " ")} · {profile.approvalMode.replaceAll("_", " ")}</strong></div><div><span>Strategy briefs</span><strong>{recommendations.length} prepared</strong></div></div>
+            <div className="review-summary"><div><span>Programme</span><strong>{profile.name || "Not set"} · {profile.sport || "Sport not set"}</strong></div><div><span>Markets</span><strong>{profile.targetCountries.join(", ") || "Not set"}</strong></div><div><span>Automation</span><strong>{formatLabel(profile.outreachStrategy)} · {formatLabel(profile.approvalMode)}</strong></div><div><span>Strategy briefs</span><strong>{recommendations.length} prepared</strong></div></div>
             <div className="ai-review-card">
-              <div><KeyRound size={19}/><div><strong>AI connection</strong><p>Gemini powers non-web drafting agents. Evidence research remains managed by GridFlow.</p></div></div>
-              {aiSetup === "loading" ? <div className="notice">Checking your plan and AI connection…</div> : null}
-              {aiSetup === "error" ? <div className="notice notice-error">AI setup could not be loaded. Refresh before finishing.</div> : null}
-              {aiSetup === "managed" ? <div className="notice notice-success"><CheckCircle2 size={15}/>Managed AI is included. No key is required.</div> : null}
+              <div><KeyRound size={19}/><div><strong>Intelligence provider</strong><p>Gemini supports non-web drafting. Evidence research remains managed by GridFlow.</p></div></div>
+              {aiSetup === "loading" ? <div className="notice">Checking your plan and provider connection…</div> : null}
+              {aiSetup === "error" ? <div className="notice notice-error">Provider setup could not be loaded. Refresh before finishing.</div> : null}
+              {aiSetup === "managed" ? <div className="notice notice-success"><CheckCircle2 size={15}/>A managed provider is included. No key is required.</div> : null}
               {aiSetup === "connected" ? <div className="notice notice-success"><CheckCircle2 size={15}/>Gemini is connected and encrypted.</div> : null}
               {aiSetup === "required" ? <div className="form-grid"><div className="field full"><a className="button button-secondary" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Create a free Gemini key<ExternalLink size={13}/></a></div><div className="field full"><label>Gemini API key</label><input aria-label="Gemini API key" type="password" autoComplete="off" value={geminiKey} onChange={(event) => setGeminiKey(event.target.value)} placeholder="Paste the key from Google AI Studio"/><small>Verified server-side, encrypted with AES-256-GCM and never displayed again.</small></div><label className="field full checkbox-row"><input type="checkbox" checked={acceptedGeminiTerms} onChange={(event) => setAcceptedGeminiTerms(event.target.checked)}/><span>I understand Google’s free-tier data terms and will not put confidential contracts or payment information into prompts.</span></label></div> : null}
             </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, CheckCircle2, ExternalLink, KeyRound, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { formatLabel } from "../../../lib/format";
 
 export interface AiSettingsData {
   gemini: {
@@ -69,7 +70,7 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
 
   async function remove() {
     const impact = data.entitlement.requiresGemini
-      ? "Core AI agents will pause until another key is connected."
+      ? "Core research and drafting tools will pause until another key is connected."
       : "GridFlow will continue using managed intelligence for this workspace.";
     if (!window.confirm(`Delete this organisation's encrypted Gemini key? ${impact}`)) return;
     setBusy(true); setMessage("");
@@ -91,7 +92,7 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
   return (
     <div className="stack">
       <div className="grid-4">
-        <article className="metric-card"><span>GridFlow access</span><strong>{data.entitlement.plan}</strong><small>{data.entitlement.ultraExpiresAt ? `Ultra ${data.entitlement.ultraStatus?.replaceAll("_", " ") ?? "active"}` : "Core permanent"}</small></article>
+        <article className="metric-card"><span>GridFlow access</span><strong>{formatLabel(data.entitlement.plan)}</strong><small>{data.entitlement.ultraExpiresAt ? `Ultra ${formatLabel(data.entitlement.ultraStatus, "active").toLowerCase()}` : "Core permanent"}</small></article>
         <article className="metric-card"><span>Gemini</span><strong>{geminiState}</strong><small>{geminiDetail}</small></article>
         <article className="metric-card"><span>Included credits</span><strong>{data.entitlement.researchCreditsUnlimited ? "∞" : data.entitlement.creditBalance.includedRemaining}</strong><small>{data.entitlement.creditBalance.usedThisPeriod} used this Ultra period</small></article>
         <article className="metric-card"><span>Purchased credits</span><strong>{data.entitlement.researchCreditsUnlimited ? "∞" : data.entitlement.creditBalance.purchasedRemaining}</strong><small>Remain after Ultra expires</small></article>
@@ -117,7 +118,7 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
       </section>
 
       <div className="grid-2 balanced">
-        <section className="card soft"><div className="section-header"><div><div className="eyebrow">Your key</div><h2>Gemini agents</h2></div><Bot size={19}/></div><p className="rich-copy">Echo drafts outreach, Sentinel classifies replies, Nova recommends responses, Orbit prepares and debriefs meetings, and Forge builds internal proposals. These tasks use information already inside GridFlow and do not perform open-web sponsor research.</p></section>
+        <section className="card soft"><div className="section-header"><div><div className="eyebrow">Your key</div><h2>Gemini tools</h2></div><Bot size={19}/></div><p className="rich-copy">Echo drafts outreach, Sentinel classifies replies, Nova recommends responses, Orbit prepares and debriefs meetings, and Forge builds internal proposals. These tasks use information already inside GridFlow and do not perform open-web sponsor research.</p></section>
         <section className="card soft"><div className="section-header"><div><div className="eyebrow">Included intelligence</div><h2>Managed research</h2></div><Search size={19}/></div><p className="rich-copy">Atlas, Sage and Relay require live evidence and verified sources. They use GridFlow-managed research credits, so racers never need to purchase or configure an OpenAI account. One credit is reserved per agent execution and returned if the job reaches a final failure without a usable result.</p></section>
       </div>
     </div>

@@ -28,11 +28,11 @@ export default async function SentinelPage() {
   }
 
   return (
-    <Shell title="Sentinel">
+    <Shell title="Reply Inbox">
       <PageHead
-        eyebrow="Inbound reply intelligence"
-        title="Every reply understood. Every relationship stays human."
-        description="Sentinel captures replies, classifies commercial intent and puts the evidence in one review inbox. It never sends a response, books a meeting or creates an opportunity. Explicit opt-outs are the only automatic business action."
+        eyebrow="Replies and intent"
+        title="Review inbound replies"
+        description="Confirm intent, review the conversation and choose the next action. Responses, meetings and opportunities always require approval."
       />
       {error ? <DataUnavailable message={error} /> : !data ? null : (
         <div className="stack">

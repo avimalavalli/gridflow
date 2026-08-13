@@ -48,8 +48,8 @@ export default async function AgentRunsPage() {
   const blocked = runs.filter((run) => run.qualityStatus === "FAIL").length;
   const failures = runs.filter((run) => run.status === "FAILED").length;
 
-  return <Shell title="Agent Runs">
-    <PageHead title="Automation and quality" description="Every Atlas, Sage, Relay and Echo job with evidence, automated gates, human decisions, retries, usage and cost." action={<Link className="button button-secondary" href="/operations">Open operations</Link>} />
+  return <Shell title="Research Runs">
+    <PageHead eyebrow="Quality and usage" title="Research runs" description="Review evidence, quality checks, human decisions, retries, provider usage and cost for each run." action={<Link className="button button-secondary" href="/operations">Open operations</Link>} />
     {!error ? <section className="metrics section-gap compact-metrics"><article className="metric-card"><span>Awaiting review</span><strong>{awaitingReview}</strong><small>completed results</small></article><article className="metric-card"><span>Quality blocked</span><strong>{blocked}</strong><small>must be rerun</small></article><article className="metric-card"><span>Run failures</span><strong>{failures}</strong><small>need attention</small></article><article className="metric-card"><span>Total runs</span><strong>{runs.length}</strong><small>latest 50 shown</small></article></section> : null}
     {error ? <DataUnavailable message={error} /> : <section className="card flush">
       {runs.length === 0 ? <div className="empty">No agent runs yet. Activate a Discovery Brief and queue Atlas.</div> :

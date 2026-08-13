@@ -6,6 +6,7 @@ import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 import { StatusBadge } from "../../components/status-badge";
 import { apiGet, ApiError } from "../../lib/server-api";
+import { formatLabel } from "../../lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
 
   return (
     <Shell title="Outreach">
-      <PageHead eyebrow="LinkedIn-first workbench" title="One queue. One safe next action." description="Echo writes the draft. You approve it and send on LinkedIn yourself. GridFlow handles order, timing, follow-up reminders, suppression and the audit trail." action={<Link className="button button-primary" href="/contacts"><Send size={14} /> Find eligible contacts</Link>} />
+      <PageHead eyebrow="Review and sending" title="Outreach workbench" description="Review drafts, perform LinkedIn actions and keep timing, suppression and history under control." action={<Link className="button button-primary" href="/contacts"><Send size={14} /> Find eligible contacts</Link>} />
       {error ? <DataUnavailable message={error} /> : outreach.length === 0 ? <section className="card"><EmptyState title="No outreach has been generated" copy="Run Echo on a primary or secondary contact at a qualified company." action={<Link className="button button-primary" href="/contacts">Open contacts</Link>} /></section> : (
         <div className="stack">
           <section className="metric-grid six-up">
@@ -74,7 +75,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
             <div className="queue">
               {operations.due.map((item) => <Link className="queue-item actionable" href={`/outreach/${item.outreachId}`} key={item.id}>
                 <span className={`channel-dot ${item.channel.toLowerCase()}`}>{item.channel === "EMAIL" ? <Mail size={14} /> : <Linkedin size={14} />}</span>
-                <div className="queue-main"><div className="queue-title">{item.contactName} · {item.companyName}</div><div className="queue-copy">{item.sequenceStep.replaceAll("_", " ")} · {item.dueAt ? dt(item.dueAt) : "Ready now"}{item.errorDetails ? ` · ${item.errorDetails}` : ""}</div></div>
+                <div className="queue-main"><div className="queue-title">{item.contactName} · {item.companyName}</div><div className="queue-copy">{formatLabel(item.sequenceStep)} · {item.dueAt ? dt(item.dueAt) : "Ready now"}{item.errorDetails ? ` · ${item.errorDetails}` : ""}</div></div>
                 <StatusBadge value={item.status} />
                 <ArrowUpRight size={14} />
               </Link>)}
@@ -91,10 +92,10 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
             {visibleOutreach.length === 0 ? <div style={{ padding: 18 }}><EmptyState title={`Nothing in ${selected.label.toLowerCase()}`} copy="GridFlow will place records here automatically when they reach this stage." /></div> : <div className="table-wrap"><table><thead><tr><th>Contact</th><th>Company</th><th>Draft</th><th>LinkedIn</th><th>Email</th><th>Next action</th><th>Channels</th><th></th></tr></thead><tbody>{visibleOutreach.map((item) => <tr key={item.id}>
               <td><Link className="table-link" href={`/outreach/${item.id}`}><div className="table-primary">{item.contactName}</div><div className="table-sub">{item.outreachName} · v{item.versionNumber ?? 0}</div></Link></td>
               <td><Link className="table-link" href={`/companies/${item.companyId}`}><div className="table-primary">{item.companyName}</div></Link></td>
-              <td><StatusBadge value={item.approvalStatus} /><div className="table-sub">{item.draftStatus.replaceAll("_", " ")}</div></td>
+              <td><StatusBadge value={item.approvalStatus} /><div className="table-sub">{formatLabel(item.draftStatus)}</div></td>
               <td><StatusBadge value={item.linkedinStatus} /></td><td><StatusBadge value={item.emailStatus} /></td>
-              <td>{item.nextFollowUpAt ? <><div className="table-primary">{dt(item.nextFollowUpAt)}</div><div className="table-sub">{item.workbenchStage.replaceAll("_", " ")}</div></> : <><div className="table-primary">{item.workbenchStage.replaceAll("_", " ")}</div><div className="table-sub">Open for guided action</div></>}</td>
-              <td><div className="row-actions" style={{ justifyContent: "flex-start" }}>{item.linkedinProfileUrl ? <Linkedin size={14} /> : null}{item.contactEmail ? <Mail size={14} /> : null}<span className="table-sub">{item.preferredChannel.replaceAll("_", " ")}</span></div></td>
+              <td>{item.nextFollowUpAt ? <><div className="table-primary">{dt(item.nextFollowUpAt)}</div><div className="table-sub">{formatLabel(item.workbenchStage)}</div></> : <><div className="table-primary">{formatLabel(item.workbenchStage)}</div><div className="table-sub">Open for guided action</div></>}</td>
+              <td><div className="row-actions" style={{ justifyContent: "flex-start" }}>{item.linkedinProfileUrl ? <Linkedin size={14} /> : null}{item.contactEmail ? <Mail size={14} /> : null}<span className="table-sub">{formatLabel(item.preferredChannel)}</span></div></td>
               <td><Link className="icon-button" href={`/outreach/${item.id}`}><ArrowUpRight size={14} /></Link></td>
             </tr>)}</tbody></table></div>}
           </section>

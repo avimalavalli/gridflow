@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatLabel } from "../../lib/format";
 
 interface InvitationInfo {
   email: string;
@@ -98,7 +99,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Organisation invitation</div>
         <h1>{challengeToken ? "Verify your invitation" : info ? `Join ${info.organisationName}` : "Join GridFlow"}</h1>
-        {challengeToken ? <p>Enter your authenticator code to finish joining this organisation.</p> : info ? <p>You were invited as <strong>{info.role.replaceAll("_", " ").toLowerCase()}</strong> using {info.email}.</p> : <p>Checking your secure invitation…</p>}
+        {challengeToken ? <p>Enter your authenticator code to finish joining this organisation.</p> : info ? <p>You were invited as <strong>{formatLabel(info.role).toLowerCase()}</strong> using {info.email}.</p> : <p>Checking your secure invitation…</p>}
         {challengeToken ? <form onSubmit={verifyMfa} className="auth-form"><label>Verification code<input required inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} /></label><button className="button button-primary button-large" type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and continue"}</button></form> : null}
         {info && !acceptedNeedsSignIn && !challengeToken ? <form onSubmit={submit} className="auth-form">
           <label>Your name<input required minLength={2} autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} /></label>

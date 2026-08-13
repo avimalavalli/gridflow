@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Handshake, ListTodo } from "lucide-react";
+import { formatLabel } from "../../lib/format";
 
 export type CalendarTask = { id: string; title: string; status: string; dueAt: string | null; companyName: string | null; opportunityName: string | null };
 export type CalendarMeeting = { id: string; title: string; status: string; startsAt: string; endsAt: string | null; companyName: string | null; opportunityName: string | null };
@@ -18,7 +19,7 @@ export function CalendarClient({ tasks, meetings, opportunities }: { tasks: Cale
   const now = new Date();
   const [cursor, setCursor] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const events = useMemo<CalendarEvent[]>(() => [
-    ...meetings.map((meeting) => ({ id: meeting.id, kind: "MEETING" as const, title: meeting.title, at: new Date(meeting.startsAt), href: "/meetings", meta: `${meeting.status.replaceAll("_", " ")} · ${meeting.companyName || meeting.opportunityName || "Meeting"}` })),
+    ...meetings.map((meeting) => ({ id: meeting.id, kind: "MEETING" as const, title: meeting.title, at: new Date(meeting.startsAt), href: "/meetings", meta: `${formatLabel(meeting.status)} · ${meeting.companyName || meeting.opportunityName || "Meeting"}` })),
     ...tasks.filter((task) => task.dueAt && !["COMPLETED", "CANCELLED"].includes(task.status)).map((task) => ({ id: task.id, kind: "TASK" as const, title: task.title, at: new Date(task.dueAt!), href: "/tasks", meta: task.opportunityName || task.companyName || "Task" })),
     ...opportunities.filter((opportunity) => opportunity.expectedCloseDate && !["WON", "LOST"].includes(opportunity.stage)).map((opportunity) => ({ id: opportunity.id, kind: "CLOSE" as const, title: opportunity.opportunityName, at: new Date(`${opportunity.expectedCloseDate!.slice(0, 10)}T12:00:00`), href: `/opportunities/${opportunity.id}`, meta: `Expected close · ${opportunity.companyName}` })),
   ], [meetings, opportunities, tasks]);

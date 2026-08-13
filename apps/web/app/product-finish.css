@@ -1124,6 +1124,12 @@ tbody tr:hover {
     width: min(320px, 88vw);
   }
 
+  .search-trigger {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
   .content {
     padding-left: 24px;
     padding-right: 24px;

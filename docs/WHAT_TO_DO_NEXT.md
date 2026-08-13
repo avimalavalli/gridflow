@@ -24,6 +24,16 @@ Phase 8A is built. GridFlow binds each acceptance result to real records created
 
 Implemented in `docs/PHASE_8B_COMMERCIAL_LAUNCH_LAYER.md`. The Ultra amount, credit-pack catalogue, support address and real Wise operating procedure remain release-owner acceptance inputs. Core is always individually quoted.
 
+## Phase 8B.2 — Research economics and margin assurance — built
+
+1. Record provider, model, token, web-search and other external usage for each successful Atlas, Sage and Relay run.
+2. Start a clean production evidence window; require at least 100 successful research operations, complete telemetry and meaningful representation of all three agents.
+3. Reconcile model, search and other provider spend against real provider statements in GBP so retries and paid failed calls are included.
+4. Calculate agent averages, medians, 90th percentiles, 100/500-credit cost, heavy-use exposure and projected Ultra gross margin.
+5. Allow only a platform owner to approve the captured economics; Launch Control blocks production release until that approval exists.
+
+The instrumentation and approval workflow are built in `/platform/economics`. The evidence window itself must be run with release-owned production providers before launch.
+
 ## Phase 8C — Acceptance and feature freeze
 
 1. Run internal test organisations through onboarding and the complete discover-to-renewal lifecycle, including Wise fulfilment and Ultra expiry.

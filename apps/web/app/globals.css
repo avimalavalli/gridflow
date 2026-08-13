@@ -1089,3 +1089,25 @@ tbody tr:last-child td { border-bottom: 0; }
 .focus-backlog{border-top:1px solid var(--line)}.focus-filter-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 20px}.focus-filter-row>div:first-child{display:grid;gap:3px}.focus-filter-row strong{font-size:11px}.focus-filter-row small{color:var(--muted);font-size:8px}.focus-filters{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--panel-subtle)}.focus-filters button{display:flex;align-items:center;gap:5px;padding:6px 8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:8px;font-weight:800;cursor:pointer}.focus-filters button span{min-width:16px;padding:2px 4px;border-radius:999px;background:#fff;color:var(--muted);font-size:7px}.focus-filters button.active{background:var(--nav);color:#fff}.focus-filter-empty{padding:18px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:9px;text-align:center}
 @media(max-width:1050px){.focus-three{grid-template-columns:1fr}.focus-card{min-height:0}}
 @media(max-width:760px){.focus-desk-head,.focus-filter-row{align-items:stretch;flex-direction:column}.focus-total{justify-content:start;width:max-content}.focus-total small{text-align:left}.focus-filters{overflow:auto}.away-status{grid-template-columns:auto minmax(0,1fr)}.away-status .button{grid-column:2;width:max-content}.away-mode-panel .form-actions{align-items:stretch;flex-direction:column}.away-mode-panel .button{width:100%}}
+
+/* Phase 8B.2 — research economics */
+.economics-hero { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:22px; border:1px solid #bdd9ff; border-radius:18px; background:linear-gradient(135deg,#edf6ff,#fff); }
+.economics-hero.approved { border-color:#a9dfc4; background:linear-gradient(135deg,#effbf5,#fff); }
+.economics-hero h2 { margin:4px 0 5px; }
+.economics-hero p { max-width:760px; margin:0; color:var(--muted); line-height:1.55; }
+.economics-hero-icon { display:grid; place-items:center; width:50px; height:50px; border-radius:15px; color:#1264c0; background:#dcecff; }
+.economics-hero.approved .economics-hero-icon { color:#147247; background:#d9f4e6; }
+.economics-progress-card .progress-track { height:10px; margin-top:14px; }
+.economics-projections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.economics-projections > div { padding:13px; border:1px solid var(--border); border-radius:12px; background:#f8fbff; }
+.economics-projections span,.economics-projections strong { display:block; }
+.economics-projections span { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+.economics-projections strong { margin-top:4px; font-size:17px; }
+.economics-gate.blocked { border-color:#efcf9c; background:linear-gradient(135deg,#fffaf0,#fff); }
+.economics-gate.ready { border-color:#a9dfc4; background:linear-gradient(135deg,#f1fbf6,#fff); }
+.economics-blockers { margin:14px 0 0; padding-left:20px; color:#78531c; line-height:1.7; }
+@media (max-width:760px) {
+  .economics-hero { grid-template-columns:auto minmax(0,1fr); }
+  .economics-hero > .button,.economics-hero > .badge { grid-column:1/-1; justify-self:stretch; }
+  .economics-projections { grid-template-columns:1fr; }
+}

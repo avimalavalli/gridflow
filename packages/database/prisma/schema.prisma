@@ -81,6 +81,12 @@ enum UltraReminderStage {
   EXPIRED
 }
 
+enum ResearchEconomicsValidationStatus {
+  COLLECTING
+  APPROVED
+  SUPERSEDED
+}
+
 enum AgentCredentialProvider {
   GEMINI
 }
@@ -757,6 +763,7 @@ model User {
   platformAuditEvents PlatformAuditEvent[]
   commercialPurchasesCreated CommercialPurchase[] @relation("CommercialPurchaseCreatedBy")
   commercialPurchasesReviewed CommercialPurchase[] @relation("CommercialPurchaseReviewedBy")
+  researchEconomicsApprovals ResearchEconomicsValidation[] @relation("ResearchEconomicsApprovedBy")
   productExperienceProgress ProductExperienceProgress[]
   automationPoliciesUpdated AutomationControlPolicy[] @relation("AutomationPolicyUpdatedBy")
   automationDecisionsMade AutomationDecision[] @relation("AutomationDecisionDecidedBy")
@@ -990,6 +997,29 @@ model PlatformAuditEvent {
 
   @@index([createdAt])
   @@index([entityType, entityId])
+}
+
+model ResearchEconomicsValidation {
+  id                    String                            @id @default(uuid()) @db.Uuid
+  status                ResearchEconomicsValidationStatus @default(COLLECTING)
+  startedAt             DateTime                          @default(now()) @db.Timestamptz(3)
+  endedAt               DateTime?                         @db.Timestamptz(3)
+  minimumRuns           Int                               @default(100)
+  minimumRunsPerAgent   Int                               @default(10)
+  ultraPriceMinor       Int
+  creditsPerPeriod      Int                               @default(500)
+  modelCostGbp          Decimal?                          @db.Decimal(12, 4)
+  webSearchCostGbp      Decimal?                          @db.Decimal(12, 4)
+  externalCostGbp       Decimal?                          @db.Decimal(12, 4)
+  reconciliationNotes   String?
+  metricsSnapshot       Json?
+  approvedAt            DateTime?                         @db.Timestamptz(3)
+  approvedByUserId      String?                           @db.Uuid
+  createdAt             DateTime                          @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                          @updatedAt @db.Timestamptz(3)
+  approvedBy            User?                             @relation("ResearchEconomicsApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, startedAt])
 }
 
 model OrganisationMembership {
@@ -2270,6 +2300,7 @@ model AgentRun {
   output           Json?
   promptVersion    String?
   modelUsed        String?
+  providerUsed     String?
   startedAt        DateTime?      @db.Timestamptz(3)
   completedAt      DateTime?      @db.Timestamptz(3)
   heartbeatAt      DateTime?      @db.Timestamptz(3)
@@ -2280,6 +2311,11 @@ model AgentRun {
   outputTokens     Int?
   totalTokens      Int?
   estimatedCostUsd Decimal?       @db.Decimal(12, 6)
+  modelCostUsd     Decimal?       @db.Decimal(12, 6)
+  webSearchCalls   Int?
+  webSearchCostUsd Decimal?       @db.Decimal(12, 6)
+  externalProviderUsage Json?
+  externalProviderCostUsd Decimal? @db.Decimal(12, 6)
   qualityStatus    String?
   qualityScore     Int?
   qualityReport    Json?

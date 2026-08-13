@@ -592,13 +592,18 @@ export class AgentEngine {
           );
         }
         await tx.query(
-          `UPDATE "AgentRun" SET "status"='SUCCEEDED', "output"=$2::jsonb, "modelUsed"=$3,
+          `UPDATE "AgentRun" SET "status"='SUCCEEDED', "output"=$2::jsonb, "modelUsed"=$3,"providerUsed"=$12,
              "inputTokens"=$4,"outputTokens"=$5,"totalTokens"=$6,"estimatedCostUsd"=$7,
+             "modelCostUsd"=$13,"webSearchCalls"=$14,"webSearchCostUsd"=$15,
+             "externalProviderUsage"=$16::jsonb,"externalProviderCostUsd"=$17,
              "qualityStatus"=$9,"qualityScore"=$10,"qualityReport"=$11::jsonb,
              "completedAt"=CURRENT_TIMESTAMP,"heartbeatAt"=CURRENT_TIMESTAMP,"errorCode"=NULL,"errorDetails"=NULL,
              "outreachRecordId"=COALESCE($8::uuid,"outreachRecordId"),"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
           [job.agentRunId, json(result.output), result.model, result.usage.inputTokens, result.usage.outputTokens,
-            result.usage.totalTokens, result.usage.estimatedCostUsd, outreachRecordId, quality.status, quality.score, json(quality)],
+            result.usage.totalTokens, result.usage.estimatedCostUsd, outreachRecordId, quality.status, quality.score, json(quality),
+            provider.name, result.usage.modelCostUsd ?? null, result.usage.webSearchCalls ?? null,
+            result.usage.webSearchCostUsd ?? null, json(result.usage.externalProviderUsage ?? {}),
+            result.usage.externalProviderCostUsd ?? null],
         );
         await tx.query(
           `UPDATE "AutomationJob" SET "status"='SUCCEEDED',"result"=$2::jsonb,"completedAt"=CURRENT_TIMESTAMP,
@@ -610,7 +615,16 @@ export class AgentEngine {
              "tenantId","provider","operation","agentName","inputUnits","outputUnits","estimatedCostUsd","metadata"
            ) VALUES ($1::uuid,$2,'agent_generation',$3::"AgentName",$4,$5,$6,$7::jsonb)`,
           [job.tenantId, provider.name, job.jobName, result.usage.inputTokens, result.usage.outputTokens,
-            result.usage.estimatedCostUsd, json({ agentRunId: job.agentRunId, providerResponseId: result.providerResponseId, qualityStatus: quality.status, qualityScore: quality.score })],
+            result.usage.estimatedCostUsd, json({
+              agentRunId: job.agentRunId, providerResponseId: result.providerResponseId,
+              qualityStatus: quality.status, qualityScore: quality.score,
+              model: result.model, modelCostUsd: result.usage.modelCostUsd ?? null,
+              webSearchCalls: result.usage.webSearchCalls ?? null,
+              webSearchCostUsd: result.usage.webSearchCostUsd ?? null,
+              externalProviderUsage: result.usage.externalProviderUsage ?? {},
+              externalProviderCostUsd: result.usage.externalProviderCostUsd ?? null,
+              researchCreditCharged: this.isResearchAgent(job.jobName) ? 1 : 0,
+            })],
         );
         await tx.query(
           `UPDATE "JobOutbox" SET "status"='SUCCEEDED',"result"=$3::jsonb,"updatedAt"=CURRENT_TIMESTAMP

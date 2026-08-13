@@ -26,6 +26,7 @@ const MIGRATIONS = [
   "20260812190000_phase_8a_live_integration_acceptance",
   "20260812220000_phase_8b_commercial_launch",
   "20260813150000_phase_8b1_wise_commercial_model",
+  "20260813190000_phase_8b2_research_economics",
 ] as const;
 
 export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {

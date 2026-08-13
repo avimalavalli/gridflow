@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 8B.1 commercial launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 8B.2 commercial launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, production research-cost telemetry and evidence-bound Ultra economics approval, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -25,6 +25,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Companies, Contacts, Outreach, Opportunities, Tasks, Interactions and Meetings.
 - Opportunity stage reasons, explicit closed-deal reopening, automatic next-action safeguards, immutable history and a unified meeting/task/close-date calendar.
 - Evidence-first agents with retries, recovery, versioning, tokens, cost and quality reports.
+- Owner-only Research Economics with provider/model/token/search telemetry, 100+ run sampling, median/P90 cost analysis, reconciled provider spend, 100/500-credit projections and guarded Ultra approval.
 - Orbit pre-meeting briefs and human-notes-only debriefs with idempotent task creation, explicit opportunity approval and follow-up drafts that cannot send themselves.
 - Forge proposal intelligence with human commercial briefs, grounded packages and pricing, immutable versions, editable approval, print/PDF views and explicit human-confirmed delivery records.
 - Seal contract operations with immutable checksummed terms, owner legal approval, externally verified signer states, signed-document evidence, exact payment schedules, overdue detection and explicit activation/deal-win controls.

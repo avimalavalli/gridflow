@@ -5,7 +5,52 @@ import { createOpaqueToken, hashOpaqueToken, normaliseEmail } from "../auth/auth
 import type { RequestIdentity } from "../context/tenant-context.service.js";
 import { apiConfig } from "../config.js";
 import { DatabaseService } from "../database/database.service.js";
-import type { CreateActivationGrantDto, MarkUltraPaymentPendingDto, OrganisationAccessDecisionDto } from "./platform.dto.js";
+import type {
+  ApproveResearchEconomicsDto,
+  CreateActivationGrantDto,
+  MarkUltraPaymentPendingDto,
+  OrganisationAccessDecisionDto,
+  ReconcileResearchEconomicsDto,
+} from "./platform.dto.js";
+
+interface EconomicsValidationRow extends Record<string, unknown> {
+  id: string;
+  status: "COLLECTING" | "APPROVED" | "SUPERSEDED";
+  startedAt: Date;
+  endedAt: Date | null;
+  minimumRuns: number;
+  minimumRunsPerAgent: number;
+  ultraPriceMinor: number;
+  creditsPerPeriod: number;
+  modelCostGbp: string | null;
+  webSearchCostGbp: string | null;
+  externalCostGbp: string | null;
+  reconciliationNotes: string | null;
+  metricsSnapshot: Record<string, unknown> | null;
+  approvedAt: Date | null;
+  approvedByName: string | null;
+}
+
+interface EconomicsSummaryRow extends Record<string, unknown> {
+  successfulRuns: number;
+  telemetryComplete: number;
+  failedRuns: number;
+  retryAttempts: number;
+  estimatedCostUsd: string;
+  totalTokens: number;
+  webSearchCalls: number;
+}
+
+interface EconomicsAgentRow extends Record<string, unknown> {
+  agentName: string;
+  successfulRuns: number;
+  telemetryComplete: number;
+  averageCostUsd: string;
+  medianCostUsd: string;
+  p90CostUsd: string;
+  averageWebSearchCalls: string;
+  averageTokens: string;
+}
 
 @Injectable()
 export class PlatformService {
@@ -101,6 +146,177 @@ export class PlatformService {
       ]);
       return { summary: summary.rows[0] ?? { pending: 0, active: 0, suspended: 0, core: 0, ultra: 0, purchasesPending: 0, purchasesReview: 0, purchasesFailed: 0, purchasesFulfilled: 0 }, organisations: organisations.rows, grants: grants.rows, audit: audit.rows, purchases: purchases.rows, reminders: reminders.rows };
     });
+  }
+
+  async economicsOverview() {
+    return this.database.transaction(async (tx) => {
+      const validation = await this.latestEconomicsValidation(tx);
+      return this.economicsSnapshot(tx, validation);
+    });
+  }
+
+  async startEconomicsValidation(identity: RequestIdentity, request: Request) {
+    return this.database.transaction(async (tx) => {
+      const ultraPriceMinor = Number(process.env.COMMERCE_ULTRA_PRICE_MINOR ?? "");
+      if (!Number.isInteger(ultraPriceMinor) || ultraPriceMinor < 1) {
+        throw new BadRequestException("Configure the GridFlow Ultra GBP amount before starting research-economics validation.");
+      }
+      const active = await tx.query<{ id: string }>(`SELECT "id" FROM "ResearchEconomicsValidation" WHERE "status"='COLLECTING' LIMIT 1`);
+      if (active.rows[0]) throw new BadRequestException("A research-economics validation window is already collecting evidence.");
+      await tx.query(`UPDATE "ResearchEconomicsValidation" SET "status"='SUPERSEDED',"updatedAt"=CURRENT_TIMESTAMP WHERE "status"='APPROVED'`);
+      const created = await tx.query<{ id: string }>(
+        `INSERT INTO "ResearchEconomicsValidation" (
+           "ultraPriceMinor","creditsPerPeriod","minimumRuns","minimumRunsPerAgent","updatedAt"
+         ) VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP) RETURNING "id"`,
+        [ultraPriceMinor, 500, 100, 10],
+      );
+      const id = created.rows[0]?.id;
+      if (!id) throw new Error("GridFlow could not start the research-economics validation window.");
+      await this.audit(tx, identity, request, "RESEARCH_ECONOMICS_STARTED", "ResearchEconomicsValidation", id, {
+        ultraPriceMinor,
+        creditsPerPeriod: 500,
+        minimumRuns: 100,
+        minimumRunsPerAgent: 10,
+      });
+      return this.economicsSnapshot(tx, await this.latestEconomicsValidation(tx, id));
+    });
+  }
+
+  async reconcileEconomicsValidation(identity: RequestIdentity, id: string, input: ReconcileResearchEconomicsDto, request: Request) {
+    return this.database.transaction(async (tx) => {
+      const validation = await this.latestEconomicsValidation(tx, id);
+      if (!validation || validation.status !== "COLLECTING") throw new BadRequestException("Only the active research-economics window can be reconciled.");
+      const evidence = await this.economicsSnapshot(tx, validation);
+      const evidenceBlockers = evidence.gate.blockers.filter((blocker) => !blocker.startsWith("Reconcile model"));
+      if (evidenceBlockers.length) {
+        throw new BadRequestException(`Provider spend cannot be reconciled until the evidence sample is complete: ${evidenceBlockers.join(" ")}`);
+      }
+      const updated = await tx.query<{ id: string; endedAt: Date }>(
+        `UPDATE "ResearchEconomicsValidation" SET
+           "modelCostGbp"=$2,"webSearchCostGbp"=$3,"externalCostGbp"=$4,
+           "reconciliationNotes"=$5,"endedAt"=COALESCE("endedAt",CURRENT_TIMESTAMP),"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "id"=$1::uuid AND "status"='COLLECTING' RETURNING "id","endedAt"`,
+        [id, input.modelCostGbp, input.webSearchCostGbp, input.externalCostGbp, input.notes.trim()],
+      );
+      if (!updated.rows[0]) throw new BadRequestException("Only the active research-economics window can be reconciled.");
+      await this.audit(tx, identity, request, "RESEARCH_ECONOMICS_RECONCILED", "ResearchEconomicsValidation", id, {
+        modelCostGbp: input.modelCostGbp,
+        webSearchCostGbp: input.webSearchCostGbp,
+        externalCostGbp: input.externalCostGbp,
+        notes: input.notes.trim(),
+        evidenceWindowEndedAt: updated.rows[0]!.endedAt.toISOString(),
+      });
+      return this.economicsSnapshot(tx, await this.latestEconomicsValidation(tx, id));
+    });
+  }
+
+  async approveEconomicsValidation(identity: RequestIdentity, id: string, input: ApproveResearchEconomicsDto, request: Request) {
+    if (!input.confirmComplete) throw new BadRequestException("Confirm that the reconciled provider costs match the validation window.");
+    return this.database.transaction(async (tx) => {
+      const validation = await this.latestEconomicsValidation(tx, id);
+      if (!validation || validation.status !== "COLLECTING") throw new BadRequestException("Only the active research-economics window can be approved.");
+      const snapshot = await this.economicsSnapshot(tx, validation);
+      if (!snapshot.gate.ready) throw new BadRequestException(`Research economics cannot be approved: ${snapshot.gate.blockers.join(" ")}`);
+      await tx.query(`UPDATE "ResearchEconomicsValidation" SET "status"='SUPERSEDED',"updatedAt"=CURRENT_TIMESTAMP WHERE "status"='APPROVED'`);
+      await tx.query(
+        `UPDATE "ResearchEconomicsValidation" SET "status"='APPROVED',"endedAt"=COALESCE("endedAt",CURRENT_TIMESTAMP),
+           "approvedAt"=CURRENT_TIMESTAMP,"approvedByUserId"=$2::uuid,"metricsSnapshot"=$3::jsonb,"updatedAt"=CURRENT_TIMESTAMP
+         WHERE "id"=$1::uuid`,
+        [id, identity.userId, JSON.stringify(snapshot.metrics)],
+      );
+      await this.audit(tx, identity, request, "RESEARCH_ECONOMICS_APPROVED", "ResearchEconomicsValidation", id, {
+        metrics: snapshot.metrics,
+        projections: snapshot.projections,
+      });
+      return this.economicsSnapshot(tx, await this.latestEconomicsValidation(tx, id));
+    });
+  }
+
+  private async latestEconomicsValidation(tx: SqlExecutor, id?: string): Promise<EconomicsValidationRow | null> {
+    const result = await tx.query<EconomicsValidationRow>(
+      `SELECT v."id",v."status"::text AS "status",v."startedAt",v."endedAt",v."minimumRuns",v."minimumRunsPerAgent",
+              v."ultraPriceMinor",v."creditsPerPeriod",v."modelCostGbp"::text AS "modelCostGbp",
+              v."webSearchCostGbp"::text AS "webSearchCostGbp",v."externalCostGbp"::text AS "externalCostGbp",
+              v."reconciliationNotes",v."metricsSnapshot",v."approvedAt",u."name" AS "approvedByName"
+       FROM "ResearchEconomicsValidation" v LEFT JOIN "User" u ON u."id"=v."approvedByUserId"
+       WHERE ($1::uuid IS NULL OR v."id"=$1::uuid)
+       ORDER BY CASE v."status" WHEN 'COLLECTING' THEN 0 WHEN 'APPROVED' THEN 1 ELSE 2 END,v."startedAt" DESC LIMIT 1`,
+      [id ?? null],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  private async economicsSnapshot(tx: SqlExecutor, validation: EconomicsValidationRow | null) {
+    const startedAt = validation?.startedAt ?? new Date(0);
+    const endedAt = validation?.endedAt ?? new Date("9999-12-31T23:59:59.999Z");
+    const [summaryResult, agentResult] = await Promise.all([
+      tx.query<EconomicsSummaryRow>(
+        `SELECT
+           COUNT(*) FILTER (WHERE "status"='SUCCEEDED')::int AS "successfulRuns",
+           COUNT(*) FILTER (WHERE "status"='SUCCEEDED' AND "providerUsed" IS NOT NULL AND "modelUsed" IS NOT NULL
+             AND "inputTokens" IS NOT NULL AND "outputTokens" IS NOT NULL AND "totalTokens" IS NOT NULL
+             AND "modelCostUsd" IS NOT NULL AND "webSearchCalls" IS NOT NULL AND "webSearchCostUsd" IS NOT NULL
+             AND "externalProviderCostUsd" IS NOT NULL AND "estimatedCostUsd" IS NOT NULL)::int AS "telemetryComplete",
+           COUNT(*) FILTER (WHERE "status"='FAILED')::int AS "failedRuns",
+           COALESCE(SUM("retryCount"),0)::int AS "retryAttempts",
+           COALESCE(SUM("estimatedCostUsd") FILTER (WHERE "status"='SUCCEEDED'),0)::text AS "estimatedCostUsd",
+           COALESCE(SUM("totalTokens") FILTER (WHERE "status"='SUCCEEDED'),0)::int AS "totalTokens",
+           COALESCE(SUM("webSearchCalls") FILTER (WHERE "status"='SUCCEEDED'),0)::int AS "webSearchCalls"
+         FROM "AgentRun" WHERE "agentName" IN ('ATLAS','SAGE','RELAY') AND "createdAt">=$1 AND "createdAt"<=$2`,
+        [startedAt.toISOString(), endedAt.toISOString()],
+      ),
+      tx.query<EconomicsAgentRow>(
+        `SELECT "agentName"::text AS "agentName",
+           COUNT(*)::int AS "successfulRuns",
+           COUNT(*) FILTER (WHERE "providerUsed" IS NOT NULL AND "modelUsed" IS NOT NULL
+             AND "inputTokens" IS NOT NULL AND "outputTokens" IS NOT NULL AND "totalTokens" IS NOT NULL
+             AND "modelCostUsd" IS NOT NULL AND "webSearchCalls" IS NOT NULL AND "webSearchCostUsd" IS NOT NULL
+             AND "externalProviderCostUsd" IS NOT NULL AND "estimatedCostUsd" IS NOT NULL)::int AS "telemetryComplete",
+           COALESCE(AVG("estimatedCostUsd"),0)::text AS "averageCostUsd",
+           COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY "estimatedCostUsd"),0)::text AS "medianCostUsd",
+           COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY "estimatedCostUsd"),0)::text AS "p90CostUsd",
+           COALESCE(AVG("webSearchCalls"),0)::text AS "averageWebSearchCalls",
+           COALESCE(AVG("totalTokens"),0)::text AS "averageTokens"
+         FROM "AgentRun" WHERE "agentName" IN ('ATLAS','SAGE','RELAY') AND "status"='SUCCEEDED'
+           AND "createdAt">=$1 AND "createdAt"<=$2 GROUP BY "agentName" ORDER BY "agentName"`,
+        [startedAt.toISOString(), endedAt.toISOString()],
+      ),
+    ]);
+    const summary = summaryResult.rows[0] ?? { successfulRuns: 0, telemetryComplete: 0, failedRuns: 0, retryAttempts: 0, estimatedCostUsd: "0", totalTokens: 0, webSearchCalls: 0 };
+    const byName = new Map(agentResult.rows.map((row) => [row.agentName, row]));
+    const agents = (["ATLAS", "SAGE", "RELAY"] as const).map((agentName) => byName.get(agentName) ?? {
+      agentName, successfulRuns: 0, telemetryComplete: 0, averageCostUsd: "0", medianCostUsd: "0", p90CostUsd: "0", averageWebSearchCalls: "0", averageTokens: "0",
+    });
+    const actualCostComplete = Boolean(validation && validation.modelCostGbp !== null && validation.webSearchCostGbp !== null && validation.externalCostGbp !== null && validation.reconciliationNotes);
+    const actualSampleCostGbp = actualCostComplete
+      ? Number(validation!.modelCostGbp) + Number(validation!.webSearchCostGbp) + Number(validation!.externalCostGbp)
+      : null;
+    const averageActualCostGbp = actualSampleCostGbp !== null && summary.successfulRuns ? actualSampleCostGbp / summary.successfulRuns : null;
+    const projected500CostGbp = averageActualCostGbp === null || !validation ? null : averageActualCostGbp * validation.creditsPerPeriod;
+    const ultraRevenueGbp = validation ? validation.ultraPriceMinor / 100 : null;
+    const blockers: string[] = [];
+    if (!validation) blockers.push("Start a validation window.");
+    if (validation && summary.successfulRuns < validation.minimumRuns) blockers.push(`${validation.minimumRuns - summary.successfulRuns} more successful research runs are required.`);
+    if (summary.telemetryComplete < summary.successfulRuns) blockers.push(`${summary.successfulRuns - summary.telemetryComplete} successful runs have incomplete cost telemetry.`);
+    for (const agent of agents) if (validation && agent.successfulRuns < validation.minimumRunsPerAgent) blockers.push(`${agent.agentName} needs ${validation.minimumRunsPerAgent - agent.successfulRuns} more runs.`);
+    if (validation && !actualCostComplete) blockers.push("Reconcile model, web-search and other provider spend in GBP.");
+    const metrics = { ...summary, agents };
+    return {
+      validation,
+      metrics,
+      projections: {
+        actualSampleCostGbp,
+        averageActualCostGbp,
+        cost100CreditsGbp: averageActualCostGbp === null ? null : averageActualCostGbp * 100,
+        cost500CreditsGbp: projected500CostGbp,
+        ultraRevenueGbp,
+        ultraGrossMarginGbp: projected500CostGbp === null || ultraRevenueGbp === null ? null : ultraRevenueGbp - projected500CostGbp,
+        ultraGrossMarginPercent: projected500CostGbp === null || !ultraRevenueGbp ? null : ((ultraRevenueGbp - projected500CostGbp) / ultraRevenueGbp) * 100,
+        heavyUser750CostGbp: averageActualCostGbp === null ? null : averageActualCostGbp * 750,
+        worstReasonable1000CostGbp: averageActualCostGbp === null ? null : averageActualCostGbp * 1000,
+      },
+      gate: { ready: Boolean(validation && validation.status === "COLLECTING" && blockers.length === 0), blockers },
+    };
   }
 
   async createGrant(identity: RequestIdentity, input: CreateActivationGrantDto, request: Request) {

@@ -75,7 +75,7 @@ export default function SignupPage() {
         <div className="auth-brand"><span>GRID</span>FLOW</div>
         <div className="eyebrow">Athlete-specific from day one</div>
         <h1>Create your GridFlow organisation</h1>
-        <p>Your companies, contacts, agents and costs remain isolated from every other athlete.</p>
+        <p>Your companies, contacts, research activity and commercial records remain isolated from every other athlete.</p>
         <form onSubmit={submit} className="auth-form auth-grid">
           <label>Your name<input required minLength={2} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
           <label>Email<input required readOnly={hasActivation} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /><small>{hasActivation ? "This purchase link is bound to this email." : "Use the email linked to your purchase."}</small></label>

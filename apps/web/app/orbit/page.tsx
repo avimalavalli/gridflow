@@ -28,11 +28,11 @@ export default async function OrbitPage() {
     error = cause instanceof ApiError ? cause.message : "Orbit could not load.";
   }
   return (
-    <Shell title="Orbit">
+    <Shell title="Meeting Intelligence">
       <PageHead
         eyebrow="Meeting intelligence"
-        title="Walk in prepared. Walk out with a controlled next move."
-        description="Orbit prepares a factual brief before a sponsor meeting and turns your real notes into reviewable tasks, pipeline recommendations and an unsent follow-up draft. It never invents the meeting, sends a message or changes a deal without approval."
+        title="Prepare and follow up on meetings"
+        description="Create factual meeting briefs, then turn real notes into reviewable tasks, pipeline recommendations and an unsent follow-up draft."
       />
       {error ? <DataUnavailable message={error} /> : !data ? null : <div className="stack">
         <section className="metric-grid">

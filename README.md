@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 8C product-acceptance launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, production research-cost telemetry, evidence-bound Ultra economics approval, an exact-commit Acceptance Lab and automatic feature-freeze revocation, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 8D professionally refined launch candidate: a database-backed, multi-organisation product with one consistent visual system, lifecycle-led navigation, plain-language workflows, public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, production research-cost telemetry, evidence-bound Ultra economics approval, an exact-commit Acceptance Lab and automatic feature-freeze revocation, two trusted devices per user, guided onboarding and help, policy-controlled automation, a unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, reply and meeting intelligence, proposal drafting/review, contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -17,6 +17,7 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 - Registration, secure sessions, password recovery, lockout and authenticator MFA.
 - Email-bound, expiring, one-use purchase activations with private owner approval, suspension and revocation.
 - Public product, pricing and support surfaces for individually quoted Core, configured Ultra periods and configured credit packs.
+- Consistent professional interface across public, authentication, onboarding, CRM, automation, delivery, renewal and administration screens, with lifecycle-led collapsible navigation and plain-language status labels.
 - Exact Wise Business verification with unique references, fixed product entitlements, private receipts, exception review and immutable audit history.
 - One-time-fee GridFlow Core entitlements and renewable 30-day GridFlow Ultra managed-service terms.
 - Encrypted customer Gemini keys for non-web agents; managed credits for evidence-first Atlas, Sage and Relay research.
@@ -77,6 +78,6 @@ npm run backup:restore-check -- /path/to/backup
 
 Never commit a populated `.env`, database backup, Airtable export or private credential.
 
-See `docs/PHASE_8C_ACCEPTANCE_FEATURE_FREEZE.md`, `docs/PHASE_8B_2_RESEARCH_ECONOMICS.md`, `docs/PHASE_8A_LIVE_INTEGRATION_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
+See `docs/PHASE_8D_PROFESSIONAL_PRODUCT_FINISH.md`, `docs/PHASE_8C_ACCEPTANCE_FEATURE_FREEZE.md`, `docs/PHASE_8B_2_RESEARCH_ECONOMICS.md`, `docs/PHASE_8A_LIVE_INTEGRATION_ACCEPTANCE.md`, `docs/VALIDATION_REPORT.md`, `docs/IMPLEMENTATION_STATUS.md` and `docs/RELEASE_RUNBOOK.md`.
 
 Railway deployment is documented in `docs/RAILWAY.md`; use its three checked-in service configuration files rather than relying on monorepo auto-detection.

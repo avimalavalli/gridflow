@@ -1,6 +1,11 @@
-# GridFlow implementation status — Phase 8C Acceptance and Feature Freeze
+# GridFlow implementation status — Phase 8D Professional Product Finish
 
 ## Built and verified
+
+- **Professional product system** with one restrained colour, spacing, typography, surface, control, table, state and responsive language across the full application.
+- **Lifecycle-led navigation** that keeps the core commercial workflow visible and separates commercial tools, planning records, learning and management into collapsible groups.
+- **Plain-language operational UI** with humanised status values, clearer form choices, functional page introductions and no user-facing build-phase labels.
+- **Simplified onboarding and tool orientation** that describes the job to be completed while retaining agent provenance and every existing human approval boundary.
 
 - **Public commercial experience** for individually quoted Core, configured Ultra periods, configurable credit packs, Wise-assisted purchase support and private receipts.
 - **Wise-only fulfilment** with exact GBP verification, unique payment references, system-controlled entitlements, exception review, token-bound receipts and immutable audits.
@@ -57,7 +62,7 @@
 - TypeScript, lint, API build, worker build and Next.js production build passed.
 - Commercial CRM, multi-athlete authentication and production web-auth smoke suites passed.
 - Production dependency audit reported 0 vulnerabilities.
-- The multi-profile browser specification covers Phase 7D refinement, Phase 8A evidence visibility, Phase 8B.1 public product/pricing/support/receipt behaviour, Phase 8B.2 Research Economics and the Phase 8C Acceptance Lab entry state, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
+- The multi-profile browser specification covers the Phase 8D navigation and professional language, Phase 8A evidence visibility, Phase 8B.1 public product/pricing/support/receipt behaviour, Phase 8B.2 Research Economics and the Phase 8C Acceptance Lab entry state, plus responsive overflow and WCAG checks. CI must provide browser acceptance evidence for the exact release commit.
 
 The Phase 6 release workflow completed the dependency audit, browser, responsive, accessibility, build and security checks. Production monitoring and the PostgreSQL 18 backup/clean-restore proof are running on schedule.
 
@@ -71,4 +76,4 @@ The Phase 6 release workflow completed the dependency audit, browser, responsive
 6. Completion of every required Launch Control check.
 7. Owner approval, closed production rehearsal and direct public deployment.
 
-The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application, Phase 8B.2 commercial instrumentation and Phase 8C acceptance enforcement are functionally closed for the agreed scope. The live 100+ run economics window, live provider acceptance, two real internal feature-freeze journeys, security, privacy/legal and production launch rehearsal remain before public launch.
+The Phase 8A evidence machinery is implemented, but Phase 8A is not operationally closed until release-owned providers produce all seven live evidence chains against the deployed commit. The authenticated V1 application, Phase 8B.2 commercial instrumentation, Phase 8C acceptance enforcement and Phase 8D product finish are functionally closed for the agreed scope. The live 100+ run economics window, live provider acceptance, refreshed internal feature-freeze journeys, security, privacy/legal and production launch rehearsal remain before public launch.

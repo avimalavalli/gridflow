@@ -52,9 +52,9 @@ export default function WelcomePage() {
     <Shell title="Welcome">
       <section className="welcome-hero">
         <div className="welcome-copy">
-          <span className="welcome-kicker"><Sparkles size={14}/> Your commercial operating system</span>
+          <span className="welcome-kicker"><Sparkles size={14}/> Your commercial workspace</span>
           <h1>Welcome to GridFlow, {name}.</h1>
-          <p>GridFlow turns sponsor discovery, research, outreach, replies, meetings, proposals, contracts and payments into one guided workflow. The repetitive work is automated; important commercial decisions stay yours.</p>
+          <p>GridFlow keeps sponsor research, relationships, proposals, contracts, delivery and renewals in one guided workflow. Routine preparation is automated; commercial decisions stay yours.</p>
           <div className="welcome-actions">
             <button className="button button-primary button-large" type="button" disabled={saving} onClick={begin}>{saving ? "Preparing your workspace…" : "Set up my GridFlow"}<ArrowRight size={16}/></button>
             <Link className="button button-secondary button-large" href="/help">Read the user manual</Link>
@@ -69,13 +69,13 @@ export default function WelcomePage() {
             <li><CheckCircle2 size={15}/>LinkedIn-first is the safe default.</li>
             <li><CheckCircle2 size={15}/>Messages wait for your approval.</li>
             <li><CheckCircle2 size={15}/>Replies stop follow-ups automatically.</li>
-            <li><CheckCircle2 size={15}/>The cockpit handles safe work within your budgets.</li>
+            <li><CheckCircle2 size={15}/>Safe internal work follows your limits.</li>
           </ul>
         </div>
       </section>
 
       <section className="welcome-section">
-        <div className="welcome-section-head"><span>01</span><div><h2>Your first automated pipeline</h2><p>One start button coordinates the core agents in order. You do not need to open each agent manually.</p></div></div>
+        <div className="welcome-section-head"><span>01</span><div><h2>Your first research workflow</h2><p>Start once and GridFlow coordinates the four research and drafting tools in the correct order.</p></div></div>
         <div className="agent-flow">
           {agents.map((agent, index) => <div className="agent-flow-card" key={agent.name}><span>{index + 1}</span><Bot size={18}/><strong>{agent.name}</strong><p>{agent.job}</p></div>)}
         </div>

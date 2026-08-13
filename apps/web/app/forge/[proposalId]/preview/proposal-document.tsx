@@ -1,4 +1,5 @@
 import type { ForgeContent } from "../../forge-types";
+import { formatLabel } from "../../../../lib/format";
 
 const money = (minor: number, currency: string) => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);
 
@@ -19,7 +20,7 @@ export function ProposalDocument({ content, companyName, athleteName }: { conten
 
     <section className="forge-document-packages"><div className="forge-document-kicker">Commercial options</div><h2>Partnership architecture</h2><div className={`forge-document-package-grid package-count-${content.package_options.length}`}>{content.package_options.map((option, index) => <article key={`${option.name}:${index}`}>
       <div className="forge-document-package-number">0{index + 1}</div><h3>{option.name}</h3><p>{option.positioning}</p>
-      <div className="forge-document-price">{option.investment_status === "NEEDS_INPUT" ? "Investment to be confirmed" : money(option.investment_minor, option.currency)}<small>{option.term_months ? `${option.term_months}-month term` : "Term to be confirmed"} · {option.investment_status.toLowerCase().replaceAll("_", " ")}</small></div>
+      <div className="forge-document-price">{option.investment_status === "NEEDS_INPUT" ? "Investment to be confirmed" : money(option.investment_minor, option.currency)}<small>{option.term_months ? `${option.term_months}-month term` : "Term to be confirmed"} · {formatLabel(option.investment_status).toLowerCase()}</small></div>
       <h4>Deliverables</h4><BulletList items={option.deliverables}/><h4>Activation ideas</h4><BulletList items={option.activation_ideas}/><h4>Measurement</h4><BulletList items={option.measurement_plan}/>
     </article>)}</div></section>
 

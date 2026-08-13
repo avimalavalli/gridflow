@@ -21,5 +21,5 @@ export default async function TasksPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown task error.";
   }
-  return <Shell title="Tasks"><PageHead eyebrow="Daily execution" title="Know the next action for every sponsor relationship" description="Follow-ups, approvals, LinkedIn actions, meeting preparation and manual work stay attached to the correct commercial record." />{error ? <DataUnavailable message={error} /> : <Suspense><TasksClient tasks={tasks} companies={companies} contacts={contacts} opportunities={opportunities} /></Suspense>}</Shell>;
+  return <Shell title="Tasks"><PageHead eyebrow="Daily work" title="Tasks and next actions" description="Keep follow-ups, approvals, outreach actions and meeting preparation attached to the right record." />{error ? <DataUnavailable message={error} /> : <Suspense><TasksClient tasks={tasks} companies={companies} contacts={contacts} opportunities={opportunities} /></Suspense>}</Shell>;
 }

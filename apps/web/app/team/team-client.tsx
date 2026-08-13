@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatLabel } from "../../lib/format";
 
 interface TeamData {
   organisation: { id: string; name: string; slug: string; currentUserRole: string };
@@ -89,12 +90,12 @@ export function TeamClient({ team, auth }: { team: TeamData; auth: AuthData }) {
   return <>
     <div className="grid-2 balanced">
       <section className="card">
-        <div className="card-head"><div><div className="eyebrow">Current organisation</div><h2>{team.organisation.name}</h2></div><span className="badge blue">{team.organisation.currentUserRole.replaceAll("_", " ")}</span></div>
-        <div className="queue">{team.members.map((member) => <div className="queue-item" key={member.membershipId}><div><div className="queue-title">{member.name}</div><div className="queue-copy">{member.email}</div></div><span className="badge">{member.role.replaceAll("_", " ")}</span></div>)}</div>
+        <div className="card-head"><div><div className="eyebrow">Current organisation</div><h2>{team.organisation.name}</h2></div><span className="badge blue">{formatLabel(team.organisation.currentUserRole)}</span></div>
+        <div className="queue">{team.members.map((member) => <div className="queue-item" key={member.membershipId}><div><div className="queue-title">{member.name}</div><div className="queue-copy">{member.email}</div></div><span className="badge">{formatLabel(member.role)}</span></div>)}</div>
       </section>
       <section className="card">
         <div className="card-head"><div><div className="eyebrow">Organisation switcher</div><h2>Your workspaces</h2></div><span className="badge">{auth.organisations.length}</span></div>
-        <div className="queue">{auth.organisations.map((organisation) => <div className="queue-item" key={organisation.organisationId}><div><div className="queue-title">{organisation.organisationName}</div><div className="queue-copy">{organisation.organisationType.replaceAll("_", " ")} · {organisation.role.replaceAll("_", " ")}</div></div>{organisation.organisationId === auth.activeOrganisation.organisationId ? <span className="badge green">Active</span> : <button className="mini-button" type="button" disabled={busy} onClick={() => switchOrganisation(organisation.organisationId)}>Switch</button>}</div>)}</div>
+        <div className="queue">{auth.organisations.map((organisation) => <div className="queue-item" key={organisation.organisationId}><div><div className="queue-title">{organisation.organisationName}</div><div className="queue-copy">{formatLabel(organisation.organisationType)} · {formatLabel(organisation.role)}</div></div>{organisation.organisationId === auth.activeOrganisation.organisationId ? <span className="badge green">Active</span> : <button className="mini-button" type="button" disabled={busy} onClick={() => switchOrganisation(organisation.organisationId)}>Switch</button>}</div>)}</div>
       </section>
     </div>
 
@@ -103,7 +104,7 @@ export function TeamClient({ team, auth }: { team: TeamData; auth: AuthData }) {
       {canInvite ? <form className="team-invite-form" onSubmit={invite}><label>Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>Role<select value={role} onChange={(event) => setRole(event.target.value)}><option value="ADMIN">Administrator</option><option value="COMMERCIAL_OPERATOR">Commercial operator</option><option value="REVIEWER">Reviewer</option><option value="READ_ONLY">Read only</option></select></label><button className="button button-primary" disabled={busy} type="submit">{busy ? "Working…" : "Create invitation"}</button></form> : <div className="empty">Only owners and administrators can invite people.</div>}
       {invitationUrl ? <div className="invitation-link"><input readOnly value={invitationUrl} /><button className="button" type="button" onClick={copyInvitation}>Copy link</button></div> : null}
       {message ? <div className="notice">{message}</div> : null}
-      <div className="table-wrap section-gap"><table><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody>{team.invitations.map((invitation) => <tr key={invitation.id}><td>{invitation.email}</td><td>{invitation.role.replaceAll("_", " ")}</td><td><span className="badge">{invitation.status}</span></td><td>{new Date(invitation.expiresAt).toLocaleDateString()}</td><td>{invitation.status === "PENDING" && canInvite ? <button className="mini-button danger" type="button" disabled={busy} onClick={() => revoke(invitation.id)}>Revoke</button> : null}</td></tr>)}</tbody></table></div>
+      <div className="table-wrap section-gap"><table><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody>{team.invitations.map((invitation) => <tr key={invitation.id}><td>{invitation.email}</td><td>{formatLabel(invitation.role)}</td><td><span className="badge">{formatLabel(invitation.status)}</span></td><td>{new Date(invitation.expiresAt).toLocaleDateString()}</td><td>{invitation.status === "PENDING" && canInvite ? <button className="mini-button danger" type="button" disabled={busy} onClick={() => revoke(invitation.id)}>Revoke</button> : null}</td></tr>)}</tbody></table></div>
     </section>
   </>;
 }

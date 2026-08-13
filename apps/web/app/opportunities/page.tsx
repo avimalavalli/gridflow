@@ -19,5 +19,5 @@ export default async function OpportunitiesPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown opportunity error.";
   }
-  return <Shell title="Opportunities"><PageHead eyebrow="Commercial pipeline" title="Move sponsor interest towards signed value" description="Track every live deal by stage, probability, expected value, primary contact and next action." />{error ? <DataUnavailable message={error} /> : <Suspense><OpportunityBoard opportunities={opportunities} companies={companies} contacts={contacts} /></Suspense>}</Shell>;
+  return <Shell title="Opportunities"><PageHead eyebrow="Commercial pipeline" title="Opportunity pipeline" description="Track each live deal by stage, probability, expected value, primary contact and next action." />{error ? <DataUnavailable message={error} /> : <Suspense><OpportunityBoard opportunities={opportunities} companies={companies} contacts={contacts} /></Suspense>}</Shell>;
 }

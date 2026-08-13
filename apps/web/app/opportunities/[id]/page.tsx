@@ -6,6 +6,7 @@ import { EmptyState } from "../../../components/empty-state";
 import { Shell } from "../../../components/shell";
 import { StatusBadge } from "../../../components/status-badge";
 import { ApiError, apiGet } from "../../../lib/server-api";
+import { formatLabel } from "../../../lib/format";
 import { OpportunityEditor, type EditableOpportunity } from "./opportunity-editor";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         <section className="card"><div className="section-header"><div><div className="eyebrow">Commercial controls</div><h2>Opportunity details</h2></div></div><OpportunityEditor opportunity={opportunity}/></section>
         <section className="card soft">
           <div className="section-header"><div><div className="eyebrow">Immutable stage trail</div><h2>Stage history</h2></div><Clock3 size={17}/></div>
-          {data.history.length === 0 ? <EmptyState title="No stage history" copy="The next stage change will appear here with its reason and actor."/> : <div className="timeline">{data.history.map((entry) => <div className="timeline-item" key={entry.id}><span className="timeline-dot"/><div><div className="timeline-title">{entry.oldValue ? `${entry.oldValue.replaceAll("_", " ")} → ` : "Created in "}{entry.newValue?.replaceAll("_", " ")}</div><div className="timeline-copy">{entry.reason}</div><div className="timeline-time">{entry.actorName || "GridFlow system"} · {dateTime(entry.createdAt)}</div></div></div>)}</div>}
+          {data.history.length === 0 ? <EmptyState title="No stage history" copy="The next stage change will appear here with its reason and actor."/> : <div className="timeline">{data.history.map((entry) => <div className="timeline-item" key={entry.id}><span className="timeline-dot"/><div><div className="timeline-title">{entry.oldValue ? `${formatLabel(entry.oldValue)} → ` : "Created in "}{formatLabel(entry.newValue)}</div><div className="timeline-copy">{entry.reason}</div><div className="timeline-time">{entry.actorName || "GridFlow system"} · {dateTime(entry.createdAt)}</div></div></div>)}</div>}
         </section>
         <section className="card">
           <div className="section-header"><div><div className="eyebrow">Proposal lineage</div><h2>Forge proposals</h2></div><Hammer size={17}/></div>

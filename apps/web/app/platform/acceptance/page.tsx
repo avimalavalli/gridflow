@@ -11,7 +11,7 @@ export default async function AcceptanceLabPage() {
     const data = await apiGet<AcceptanceLabData>("/platform/acceptance");
     return <Shell title="Acceptance Lab">
       <PageHead
-        eyebrow="Phase 8C"
+        eyebrow="Product acceptance"
         title="Acceptance Lab"
         description="Run the real Core and Ultra journeys, capture every friction point and freeze the exact release commit only when the product evidence is complete."
       />

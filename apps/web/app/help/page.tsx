@@ -9,11 +9,11 @@ import { Shell } from "../../components/shell";
 const chapters = [
   { id: "start", title: "Start here", summary: "The shortest safe path from a new account to a useful sponsor pipeline.", route: "/guide", sections: [
     ["1. Finish your profile", "Open onboarding and describe the athlete, programme, story, target markets, preferred industries and commercial range. GridFlow uses these facts across every agent."],
-    ["2. Confirm AI", "Core accounts connect a Gemini key in AI Setup when requested. Ultra or managed accounts may not need a personal key. Keys are verified server-side, encrypted and never displayed again."],
+    ["2. Confirm the provider", "Core accounts connect a Gemini key in Intelligence Setup when requested. Ultra or managed accounts may not need a personal key. Keys are verified server-side, encrypted and never displayed again."],
     ["3. Activate one brief", "Choose one focused Discovery Brief. Start small: one region, a few realistic industries and ten companies. Then use Run full pipeline once."],
     ["4. Review before outreach", "Open the companies, evidence and contacts created by the pipeline. Approve or edit Echo’s draft before performing the LinkedIn action."],
   ]},
-  { id: "agents", title: "The GridFlow agents", summary: "What Atlas, Sage, Relay, Echo, Pulse, Sentinel, Nova, Orbit, Forge and Seal actually do.", route: "/agent-runs", sections: [
+  { id: "agents", title: "Research and workflow tools", summary: "What Atlas, Sage, Relay, Echo, Pulse, Sentinel, Nova, Orbit, Forge and Seal actually do.", route: "/agent-runs", sections: [
     ["Atlas → Sage → Relay → Echo", "Atlas discovers companies. Sage researches and scores evidence. Relay finds decision-makers. Echo prepares personalised drafts. A full pipeline coordinates all four automatically; manual agent buttons are for recovery and expert use."],
     ["Pulse", "Pulse monitors follow-up timing and creates the next safe action. It stops when a reply, meeting, opt-out or suppression is recorded."],
     ["Sentinel + Nova", "Sentinel classifies inbound replies and safety signals. Nova recommends a response strategy, draft and opportunity action. You review the result."],
@@ -41,7 +41,7 @@ const chapters = [
   ]},
   { id: "replies", title: "Replies, Pulse and Nova", summary: "Keep follow-ups moving while stopping the wrong ones automatically.", route: "/sentinel", sections: [
     ["Reply triage", "Sentinel identifies positive interest, questions, objections, referrals, not-now responses and opt-outs. Review uncertain classifications."],
-    ["Follow-up stops", "A reply, meeting, suppression or opt-out should stop the sequence. Failed automations appear in Agent Runs and Operations."],
+    ["Follow-up stops", "A reply, meeting, suppression or opt-out should stop the sequence. Failed automations appear in Research Runs and Operations."],
     ["Nova recommendations", "Nova proposes the next commercial move and can create a response draft. Approve it only after checking the original reply and opportunity context."],
   ]},
   { id: "pipeline", title: "Opportunities", summary: "Track real conversations as commercial deals.", route: "/opportunities", sections: [
@@ -78,10 +78,10 @@ const chapters = [
     ["Opportunity handoff", "Approved commercial cases create exactly one internal Opportunity OS record and one next action. Nothing is sent. Forge, Seal and the existing stage controls manage the deal from there."],
     ["Final outcome", "Marking the linked opportunity won or lost synchronises the renewal outcome. Reopening the deal reopens the renewal case. Every transition is audited."],
   ]},
-  { id: "ai", title: "AI Setup and keys", summary: "Connect AI safely and know which agents use which provider.", route: "/settings/ai", sections: [
-    ["Where to put a key", "Open Settings → AI Setup. Paste the key only into that secure form. Never send an API key through chat, email, screenshots or support messages."],
+  { id: "ai", title: "Intelligence setup and keys", summary: "Connect the provider safely and know which tools use it.", route: "/settings/ai", sections: [
+    ["Where to put a key", "Open Settings → Intelligence Setup. Paste the key only into that secure form. Never send an API key through chat, email, screenshots or support messages."],
     ["What the key powers", "Gemini powers non-web drafting and intelligence such as Echo, Sentinel, Nova, Orbit and Forge. Managed evidence research powers Atlas, Sage and Relay."],
-    ["Rotate or remove", "If a key is exposed, revoke it at the provider, then replace it in AI Setup. Removing a key pauses features that require it but preserves CRM data."],
+    ["Rotate or remove", "If a key is exposed, revoke it at the provider, then replace it in Intelligence Setup. Removing a key pauses features that require it but preserves CRM data."],
   ]},
   { id: "team", title: "Team, approval and devices", summary: "Control who can enter a workspace and where an account can be used.", route: "/team", sections: [
     ["Account approval", "New customer organisations remain pending until a platform administrator activates the correct entitlement. Invitations add people only to an existing organisation."],
@@ -90,7 +90,7 @@ const chapters = [
   ]},
   { id: "operations", title: "Operations and troubleshooting", summary: "Find failures quickly and distinguish an app problem from a setup task.", route: "/operations", sections: [
     ["First checks", "Refresh once, confirm you are online, and open Operations. A failed agent run includes its stage and retry controls; an unavailable API shows a clear login or health error."],
-    ["Agent Runs", "Use Agent Runs to inspect queued, running, succeeded and failed work. Retry the failed stage only after correcting its cause."],
+    ["Research Runs", "Use Research Runs to inspect queued, running, succeeded and failed work. Retry the failed stage only after correcting its cause."],
     ["Production health", "Owners and admins can inspect readiness and release evidence. Deferred optional services should be labelled; core database, API, worker and web failures are launch blockers."],
   ]},
   { id: "live-acceptance", title: "Live integration acceptance", summary: "Prove real agents, Gmail, password recovery and MFA before launch.", route: "/launch", sections: [
@@ -100,7 +100,7 @@ const chapters = [
     ["Account recovery and MFA", "Request and consume one real password-reset email, then verify old sessions and devices are revoked. Complete an authenticator login and consume one saved recovery code. GridFlow detects the audit events without storing the codes."],
     ["No secret evidence", "Provider keys, OAuth tokens, reset tokens and recovery codes never belong in notes or evidence links. Launch Control records safe event metadata and internal record references only."],
   ]},
-  { id: "automation", title: "Automation Cockpit", summary: "Let GridFlow handle routine internal work while keeping consequential decisions human.", route: "/automation", sections: [
+  { id: "automation", title: "Automation", summary: "Let GridFlow handle routine internal work while keeping consequential decisions human.", route: "/automation", sections: [
     ["Three operating modes", "Guided explains and asks. Assisted creates safe internal tasks and briefs. Controlled may also schedule the Atlas → Sage → Relay → Echo chain and retry eligible failed runs inside configured budgets."],
     ["Approval Inbox", "All meaningful decisions appear in one inbox with a plain-English reason. Only low-risk internal task creation can be batched; relationship, sending, booking, money, legal and deal decisions open individually."],
     ["Policies and quiet hours", "Owners and admins set the timezone, working days, quiet hours, agent-run limit, research-credit limit, cost ceiling, concurrency, stale-deal threshold and discovery schedule."],
@@ -139,7 +139,7 @@ export default function HelpPage() {
 
   return (
     <Shell title="Help Centre">
-      <PageHead eyebrow="Permanent user manual" title="Everything you need to run GridFlow safely" description="Search the manual, revisit any workflow, and jump directly to the screen where the work happens." action={<Link className="button button-primary" href="/guide"><BookOpen size={15}/>Open guided tutorial</Link>} />
+      <PageHead eyebrow="Reference and support" title="Help Centre" description="Search the manual, revisit a workflow and open the relevant workspace directly." action={<Link className="button button-primary" href="/guide"><BookOpen size={15}/>Open guided tutorial</Link>} />
       <div className="help-search"><Search size={18}/><input aria-label="Search the GridFlow manual" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents, API keys, outreach, devices, proposals…"/></div>
       <div className="help-layout">
         <aside className="card help-index" aria-label="Manual chapters">

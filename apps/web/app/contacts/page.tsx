@@ -17,5 +17,5 @@ export default async function ContactsPage() {
     contacts = contactPayload.contacts;
     companies = companyPayload.companies.map(({ id, companyName }) => ({ id, companyName }));
   } catch (cause) { error = cause instanceof ApiError ? cause.message : "Unknown contact-data error."; }
-  return <Shell title="Contacts"><PageHead eyebrow="Relationship CRM" title="Reach the people who can move a partnership forward" description="Verified decision-makers, channel readiness, outreach status and every follow-up in one connected workspace." action={<ContactCreate companies={companies}/>}/>{error ? <DataUnavailable message={error}/> : <ContactsTable contacts={contacts}/>}</Shell>;
+  return <Shell title="Contacts"><PageHead eyebrow="Relationship records" title="Contacts and decision-makers" description="Review contact details, channel readiness, outreach status and follow-ups in one place." action={<ContactCreate companies={companies}/>}/>{error ? <DataUnavailable message={error}/> : <ContactsTable contacts={contacts}/>}</Shell>;
 }

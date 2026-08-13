@@ -22,5 +22,5 @@ export default async function MeetingsPage() {
   } catch (errorCause) {
     error = errorCause instanceof ApiError ? errorCause.message : "Unknown meeting error.";
   }
-  return <Shell title="Meetings"><PageHead eyebrow="Conversation management" title="Prepare better sponsor meetings and preserve the outcome" description="Every agenda, preparation note, commercial outcome and next action stays attached to the right company, contact and opportunity." action={<Link className="button button-primary" href="/orbit">Open Orbit</Link>} />{error ? <DataUnavailable message={error} /> : <Suspense><MeetingsClient meetings={meetings} companies={companies} contacts={contacts} opportunities={opportunities} /></Suspense>}</Shell>;
+  return <Shell title="Meetings"><PageHead eyebrow="Conversation record" title="Meetings" description="Prepare the agenda, record the outcome and keep next actions attached to the correct relationship." action={<Link className="button button-primary" href="/orbit">Open meeting intelligence</Link>} />{error ? <DataUnavailable message={error} /> : <Suspense><MeetingsClient meetings={meetings} companies={companies} contacts={contacts} opportunities={opportunities} /></Suspense>}</Shell>;
 }

@@ -37,11 +37,11 @@ export default async function NovaPage() {
   }
 
   return (
-    <Shell title="Nova">
+    <Shell title="Response Strategy">
       <PageHead
-        eyebrow="Reply strategy desk"
-        title="The next move, prepared—not presumed."
-        description="Nova reads the reviewed reply, full conversation and sponsor context, then prepares a response and commercial recommendation for your approval. Nothing is sent, booked or created before you approve it."
+        eyebrow="Reply planning"
+        title="Prepare the right response"
+        description="Use the reviewed reply and relationship history to prepare a response and commercial recommendation for approval."
       />
       {error ? <DataUnavailable message={error} /> : !data ? null : (
         <div className="stack">

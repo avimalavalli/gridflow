@@ -15,11 +15,11 @@ export default async function ForgePage() {
   } catch (cause) {
     error = cause instanceof ApiError ? cause.message : "Forge could not load proposal intelligence.";
   }
-  return <Shell title="Forge">
+  return <Shell title="Proposals">
     <PageHead
-      eyebrow="Proposal intelligence"
-      title="Turn qualified interest into a controlled commercial proposal"
-      description="Forge combines the opportunity, sponsor evidence, athlete inventory and real meeting history into a versioned proposal draft. Every price, right and promise remains grounded—and nothing leaves GridFlow without you."
+      eyebrow="Commercial proposal"
+      title="Build and review proposals"
+      description="Create versioned proposal drafts from the opportunity, supporting evidence, available rights and meeting history."
     />
     <div className="grid-2 balanced forge-principles">
       <div className="system-chip"><Hammer size={15}/><span><strong>Evidence forged into value</strong><small>Packages, activations and measurement</small></span></div>

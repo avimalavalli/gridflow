@@ -1,6 +1,6 @@
 # What happens next
 
-Phase 7D closes the main authenticated V1 product scope. The remaining path should increase real-world confidence and launchability, not restart feature expansion.
+Phase 8D closes the main pre-security product scope. The remaining path should increase real-world confidence and launchability, not restart feature expansion.
 
 ## Phase 8A — Live integration acceptance — built
 
@@ -43,6 +43,16 @@ The instrumentation and approval workflow are built in `/platform/economics`. Th
 5. Freeze the exact release commit only after Phase 8B.2 economics approval and all independent acceptance gates pass.
 
 The Acceptance Lab, structured finding workflow and fail-closed Launch Control integration are built. The real internal journeys and physical-device evidence remain operational release work. See `docs/PHASE_8C_ACCEPTANCE_FEATURE_FREEZE.md`.
+
+## Phase 8D — Professional product finish — built
+
+1. Apply one restrained visual system to the full public and authenticated application.
+2. Reorder navigation around the sponsor lifecycle and collapse secondary tool groups.
+3. Replace internal codes, build-phase labels and over-written page copy with plain operational language.
+4. Standardise forms, tables, statuses, empty/error states, onboarding and responsive behaviour without changing commercial safeguards.
+5. Re-run exact-commit acceptance after the final refinement commit; an earlier feature freeze must not silently carry forward.
+
+Implemented in `docs/PHASE_8D_PROFESSIONAL_PRODUCT_FINISH.md`. Phase 9 has not started.
 
 ## Phase 9 — Security hardening
 

@@ -22,9 +22,9 @@ export default async function TeamPage() {
   return (
     <Shell title="Team & Access">
       <PageHead
-        eyebrow="Multi-athlete foundation"
-        title="People and organisations"
-        description="Each athlete, team or agency operates in an isolated workspace. Invite collaborators without exposing another athlete's data."
+        eyebrow="Access control"
+        title="Team and workspace access"
+        description="Manage collaborators, roles and isolated athlete, team or agency workspaces."
       />
       <TeamClient team={team} auth={auth} />
     </Shell>

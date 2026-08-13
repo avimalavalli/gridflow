@@ -2,7 +2,7 @@
 
 GridFlow is a sponsorship Commercial Operating System for athletes, racing drivers, teams, agencies and commercial organisations.
 
-This repository contains the Phase 8B commercial launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable paid fulfilment, owner approval, Core and Ultra entitlements, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
+This repository contains the Phase 8B.1 commercial launch candidate: a database-backed, multi-organisation product with public product and pricing surfaces, auditable Wise Business fulfilment, owner approval, permanent Core and optional 30-day Ultra entitlements, separate included and purchased research-credit balances, two trusted devices per user, guided onboarding and help, a policy-controlled Automation Cockpit, unified Approval Inbox, scheduled Atlas → Sage → Relay → Echo orchestration, bounded self-healing, Sentinel and Nova reply intelligence, Orbit meeting preparation/debrief, Forge proposal drafting/review, Seal contract versioning/signature/payment control, Delivery and Renewals, controlled opportunity/task/calendar workflows, human AI-quality acceptance and a hard Launch Control gate.
 
 It is not yet the public V1. Live agent tuning, real integration acceptance, real-device QA and production infrastructure remain owner-controlled release tasks.
 
@@ -16,8 +16,8 @@ No athlete identity, nationality, championship, sponsor market or outreach strat
 
 - Registration, secure sessions, password recovery, lockout and authenticator MFA.
 - Email-bound, expiring, one-use purchase activations with private owner approval, suspension and revocation.
-- Public product, pricing and support surfaces backed by an owner-configured commercial catalogue.
-- Signed, replay-safe payment confirmation with exact order matching, private receipts, exception review and manual provider-outage fulfilment.
+- Public product, pricing and support surfaces for individually quoted Core, configured Ultra periods and configured credit packs.
+- Exact Wise Business verification with unique references, fixed product entitlements, private receipts, exception review and immutable audit history.
 - One-time-fee GridFlow Core entitlements and renewable 30-day GridFlow Ultra managed-service terms.
 - Encrypted customer Gemini keys for non-web agents; managed credits for evidence-first Atlas, Sage and Relay research.
 - Separate athlete/team organisations, roles, invitations and organisation switching.

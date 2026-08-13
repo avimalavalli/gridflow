@@ -1,55 +1,65 @@
-# Phase 8B — Commercial launch layer
+# Phase 8B.1 — Wise commercial model and credit lifecycle
 
-Phase 8B wraps the finished GridFlow application in a public, auditable route from product evaluation to paid activation. It does not choose a payment provider, price or currency on the owner’s behalf.
+Phase 8B.1 replaces the provider-agnostic Phase 8B draft with the commercial model GridFlow will actually operate. AM Motorsports Ltd receives GBP payments through Wise Business. There is no public payment form, automatic renewal or recurring charge.
 
-## Public experience
+## Products
 
-- `/` is a public product home when no valid session exists and remains the authenticated routing entry when a customer is signed in.
-- `/product` explains the complete sponsor lifecycle without promising autonomous external actions.
-- `/pricing` distinguishes permanent Core access from the renewable 30-day Ultra managed service.
-- `/support` separates purchase, activation and existing-account help and warns customers never to disclose secrets.
-- `/receipt` resolves a payment receipt only from its private number-and-token link. The raw token remains in the URL fragment, is removed before lookup and is stored only as a hash.
+- **GridFlow Core** is permanent access for one named driver on up to two devices. Its one-time onboarding amount is individually quoted and deliberately has no fixed price in source code or configuration. Each verified Core purchase creates 500 starter research credits, an email-bound single-use activation and a private receipt.
+- **GridFlow Ultra** is an optional 30-day managed period for an existing active Core customer. Its configurable public GBP amount is stored in `COMMERCE_ULTRA_PRICE_MINOR`. Each verified period adds 500 Ultra-included credits. It never renews automatically.
+- **Research packs** are optional configurable, non-expiring purchased credits for an existing active Core customer. Codes, credits and exact GBP amounts come from `COMMERCE_RESEARCH_PACKS_JSON`.
 
-No amount or currency is rendered until the owner configures a complete offer. An incomplete offer shows an assisted-purchase route instead of an invented price or broken checkout.
+Core remains after Ultra expires. Unused purchased credits also remain. An early Ultra renewal starts at the current expiry rather than discarding paid time, and its included credits become available at the start of the extended period.
 
-## Purchase lifecycle
+## Wise fulfilment
 
-1. GridFlow creates an immutable order snapshot containing email, plan, amount, currency, provider, research credits and seat limit.
-2. The configured checkout URL receives the GridFlow order reference and optional activation email.
-3. A provider adapter posts the exact confirmation contract to `POST /api/v1/commerce/payment-events` with:
-   - `X-GridFlow-Payment-Timestamp`: Unix seconds;
-   - `X-GridFlow-Payment-Signature`: `sha256=<hex HMAC>` over `<timestamp>.<raw JSON body>` using `PAYMENT_CONFIRMATION_SECRET`;
-   - a stable provider event ID, GridFlow order reference, email, plan, amount, currency, provider and payment reference.
-4. GridFlow rejects stale or invalid signatures. Replayed event IDs return the existing outcome.
-5. Fulfilment happens only when every confirmation field exactly matches the order. Unknown orders, missing references and mismatches enter `MANUAL_REVIEW` and issue no access.
-6. A valid confirmation creates exactly one activation grant, receipt and `PURCHASE_FULFILMENT` email outbox record in one database transaction.
-7. The activation remains email-bound, expiring and single-use. Registration still creates a locked `PENDING_APPROVAL` organisation for owner review.
+1. An authorised platform admin selects the exact product.
+2. For Core, the admin enters the named driver email and individually agreed amount. For an add-on, GridFlow supplies the configured amount and requires an active Core organisation.
+3. The admin enters the exact Wise payment reference and confirms that the GBP record was checked in AM Motorsports Ltd's Wise Business account.
+4. GridFlow rejects missing confirmation, duplicate Wise references, invalid products and mismatched add-on amounts.
+5. A single database transaction records the immutable purchase, applies the fixed product entitlement, issues a token-bound receipt, queues email delivery and records the platform audit event.
 
-Supported event types are `PAYMENT_CONFIRMED`, `PAYMENT_FAILED` and `PAYMENT_REVIEW_REQUIRED`. GridFlow stores the payload SHA-256 digest rather than the raw provider payload.
+The public API cannot create orders or confirm payments. Seats, allowances, provider and currency cannot be supplied by the customer or altered in the admin form.
 
-## Provider outage and manual review
+## Credit accounting
 
-Platform Admin contains two controlled paths:
+Credits live in immutable-purpose buckets:
 
-- **Record and fulfil a verified payment** creates the order, receipt and activation after an owner explicitly confirms the external payment record.
-- **Purchase exception resolution** confirms a quarantined payment from a verified reference or marks it failed. Failed payments never create activation grants.
+- `CORE_STARTER` for Core's original included allowance;
+- `ULTRA_INCLUDED` for the current or scheduled Ultra period;
+- `PURCHASED` for non-expiring packs.
 
-The pre-existing raw activation-grant control remains available as an emergency access operation, but it does not create a payment receipt and is separated from paid fulfilment.
+Atlas, Sage and Relay each reserve one credit before execution. GridFlow consumes Ultra-included credits first, then Core starter credits, then purchased credits. A final failed research run returns the exact reservation to its original bucket. Successful runs convert the reservation to consumed usage. The default rolling 24-hour safety ceiling is 30 research executions and remains admin-adjustable in Automation Cockpit.
 
-## Receipt and delivery
+The customer AI dashboard shows included remaining, purchased remaining, total remaining, used in the current Ultra period, scheduled credits and the next refresh time.
 
-The receipt records the product, amount, currency, activation email, GridFlow order reference, provider reference and UTC issue time. It confirms the recorded payment; it does not claim workspace approval has completed.
+## Ultra lifecycle
 
-Delivery uses the existing retrying email outbox and stable provider idempotency key. Platform Admin displays queued, sent and failed delivery state and exposes each newly created activation and receipt link once for manual recovery.
+The worker reconciles `ACTIVE → RENEWAL_DUE → PAYMENT_PENDING → ACTIVE` or `EXPIRED`:
 
-## Configuration checklist
+- at seven days remaining, customer and admin reminders are queued;
+- at three days remaining, the next reminder is queued;
+- a payment-pending mark pauses pre-expiry reminders without extending access;
+- at expiry, the final reminder is queued, Ultra ends, and the organisation returns to permanent Core with bring-your-own Gemini for non-web agents.
 
-For each published plan, set the price in minor units, ISO 4217 currency, provider label, HTTPS checkout URL template, research allowance and seat limit. The template must contain `{ORDER_REFERENCE}` and may contain `{EMAIL}`. Also configure `COMMERCE_SUPPORT_EMAIL` and a random `PAYMENT_CONFIRMATION_SECRET` of at least 32 characters.
+Every reminder is unique per organisation, expiry and stage, so retries cannot create duplicates.
 
-Provider account creation, checkout-product configuration, adapter deployment and final commercial values remain release-owner actions. Secrets never belong in source control, support tickets or acceptance evidence.
+## Public and private surfaces
 
-Production readiness and release preflight remain blocked until both plan offers, support email and the signed confirmation secret are complete. This prevents a build from being labelled launch-ready while checkout is unpublished or confirmations cannot be trusted.
+- `/pricing` explains individually quoted Core, configured Ultra and configured packs without collecting payment details.
+- `/support` provides the configured purchase-support address and warns customers to wait for correct Wise instructions.
+- `/receipt` resolves only from a private receipt number and opaque token. The raw token is removed from the browser address before lookup and stored only as a hash.
+- Platform Admin exposes exact Wise verification, purchase exceptions, customer credit balances, Ultra status and reminder delivery.
 
-## Verification
+## Required configuration
 
-Automated acceptance covers idempotent migrations, catalogue fail-closed behaviour, exact order creation, HMAC verification, replay handling, one-time fulfilment, mismatch quarantine, manual fulfilment, token-bound receipt lookup, fulfilment email generation, and public pricing/receipt browser paths.
+```text
+COMMERCE_ULTRA_PRICE_MINOR=<positive GBP minor-unit amount>
+COMMERCE_RESEARCH_PACKS_JSON=[{"code":"PACK_CODE","credits":100,"amountMinor":1199}]
+COMMERCE_SUPPORT_EMAIL=<valid support address>
+```
+
+Core has no price variable. Wise credentials are not stored in GridFlow because verification is performed by an authorised admin against the external Wise Business record. Production readiness fails closed until the Ultra amount, at least one unique valid pack and the support email are configured.
+
+## Acceptance coverage
+
+Automated acceptance covers individually quoted Core, fixed Core allowances, exact Wise-reference uniqueness, private receipts, add-on eligibility, amount matching, early Ultra extension, future included credits, non-expiring packs, bucket priority, final-failure refunds, the adjustable daily ceiling, lifecycle reconciliation, reminder idempotency, email copy, production readiness and responsive public pricing.

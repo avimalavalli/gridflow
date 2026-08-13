@@ -189,7 +189,8 @@ describe("GridFlow core agent engine", () => {
       const userId = user.rows[0]!.id; const tenantId = org.rows[0]!.id;
       await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`, [tenantId, userId]);
       await setTenantContext(tx, tenantId);
-      await tx.query(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsGranted","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',1,false,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, [tenantId]);
+      const entitlement = await tx.query<{ id: string }>(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsGranted","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',1,false,10,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId]);
+      await tx.query(`INSERT INTO "ResearchCreditBucket" ("tenantId","entitlementId","type","label","granted","updatedAt") VALUES ($1::uuid,$2::uuid,'CORE_STARTER','Core starter credits',1,CURRENT_TIMESTAMP)`, [tenantId, entitlement.rows[0]!.id]);
       await tx.query(`INSERT INTO "DriverProfile" ("tenantId","athleteName","sport","countryOfResidence","currentProgramme","futureGoals","onboardingStatus","updatedAt") VALUES ($1::uuid,'Stale Athlete','GT racing','United Kingdom','UK GT programme','European endurance racing','COMPLETED',CURRENT_TIMESTAMP)`, [tenantId]);
       const brief = await tx.query<{ id: string }>(`INSERT INTO "DiscoveryBrief" ("tenantId","briefName","active","region","industryFocus","searchTheme","companiesPerRun","updatedAt") VALUES ($1::uuid,'UK Engineering','true','United Kingdom','Engineering','Find realistic UK engineering SMEs.',5,CURRENT_TIMESTAMP) RETURNING "id"`, [tenantId]);
       return { tenantId, userId, briefId: brief.rows[0]!.id };
@@ -362,6 +363,29 @@ describe("GridFlow core agent engine", () => {
     });
     await expect(engine.resolveFailedRun(tenantId, userId, run.rows[0]!.id, "Try again later"))
       .rejects.toThrow(/only failed/i);
+  });
+
+  it("uses Ultra, then Core, then purchased credits and enforces the adjustable daily safety ceiling", async () => {
+    database = await createDatabase("pglite://memory");
+    await migrateDatabase(database);
+    const identity = await database.transaction(async (tx) => {
+      const user = await tx.query<{id:string}>(`INSERT INTO "User" ("email","passwordHash","name","updatedAt") VALUES ('credit-priority@example.test','x','Credit Driver',CURRENT_TIMESTAMP) RETURNING "id"`);
+      const organisation = await tx.query<{id:string}>(`INSERT INTO "Organisation" ("name","slug","type","accessStatus","updatedAt") VALUES ('Credit Motorsport','credit-motorsport','DRIVER','ACTIVE',CURRENT_TIMESTAMP) RETURNING "id"`);
+      const tenantId=organisation.rows[0]!.id; const userId=user.rows[0]!.id;
+      await tx.query(`INSERT INTO "OrganisationMembership" ("organisationId","userId","role") VALUES ($1::uuid,$2::uuid,'OWNER')`,[tenantId,userId]);
+      await setTenantContext(tx,tenantId);
+      const entitlement=await tx.query<{id:string}>(`INSERT INTO "ProductEntitlement" ("tenantId","plan","status","agentExecutionMode","researchCreditsGranted","seatLimit","startsAt","approvedAt","updatedAt") VALUES ($1::uuid,'ULTRA','ACTIVE','MANAGED',4,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING "id"`,[tenantId]);
+      await tx.query(`INSERT INTO "ResearchCreditBucket" ("tenantId","entitlementId","type","label","granted","expiresAt","updatedAt") VALUES ($1::uuid,$2::uuid,'ULTRA_INCLUDED','Current Ultra credits',1,CURRENT_TIMESTAMP+INTERVAL '30 days',CURRENT_TIMESTAMP),($1::uuid,$2::uuid,'CORE_STARTER','Core starter credits',1,NULL,CURRENT_TIMESTAMP),($1::uuid,$2::uuid,'PURCHASED','Purchased credits',2,NULL,CURRENT_TIMESTAMP)`,[tenantId,entitlement.rows[0]!.id]);
+      await tx.query(`INSERT INTO "AutomationControlPolicy" ("tenantId","dailyResearchCreditLimit","updatedAt") VALUES ($1::uuid,3,CURRENT_TIMESTAMP)`,[tenantId]);
+      await tx.query(`INSERT INTO "DriverProfile" ("tenantId","athleteName","sport","countryOfResidence","currentProgramme","futureGoals","onboardingStatus","updatedAt") VALUES ($1::uuid,'Credit Driver','GT racing','United Kingdom','National GT','European endurance','COMPLETED',CURRENT_TIMESTAMP)`,[tenantId]);
+      const briefs=await tx.query<{id:string}>(`INSERT INTO "DiscoveryBrief" ("tenantId","briefName","active","region","industryFocus","searchTheme","companiesPerRun","updatedAt") VALUES ($1::uuid,'Brief 1',true,'United Kingdom','Engineering','Target one',5,CURRENT_TIMESTAMP),($1::uuid,'Brief 2',true,'United Kingdom','Technology','Target two',5,CURRENT_TIMESTAMP),($1::uuid,'Brief 3',true,'United Kingdom','Finance','Target three',5,CURRENT_TIMESTAMP),($1::uuid,'Brief 4',true,'United Kingdom','Energy','Target four',5,CURRENT_TIMESTAMP) RETURNING "id"`,[tenantId]);
+      return {tenantId,userId,briefIds:briefs.rows.map((row)=>row.id)};
+    });
+    const engine=new AgentEngine(database);
+    for(const briefId of identity.briefIds.slice(0,3)) await engine.enqueue(identity.tenantId,identity.userId,{agentName:"ATLAS",discoveryBriefId:briefId});
+    await expect(engine.enqueue(identity.tenantId,identity.userId,{agentName:"ATLAS",discoveryBriefId:identity.briefIds[3]})).rejects.toThrow(/daily research safety ceiling of 3/i);
+    const allocation=await database.query<{type:string;reserved:number}>(`SELECT b."type"::text AS "type",b."reserved" FROM "ResearchCreditBucket" b WHERE b."tenantId"=$1::uuid ORDER BY CASE b."type" WHEN 'ULTRA_INCLUDED' THEN 0 WHEN 'CORE_STARTER' THEN 1 ELSE 2 END`,[identity.tenantId]);
+    expect(allocation.rows).toEqual([{type:"ULTRA_INCLUDED",reserved:1},{type:"CORE_STARTER",reserved:1},{type:"PURCHASED",reserved:1}]);
   });
 
 

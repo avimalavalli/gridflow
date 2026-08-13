@@ -12,6 +12,7 @@ import { NovaProcessor } from "./nova.js";
 import { OrbitProcessor } from "./orbit.js";
 import { ForgeProcessor } from "./forge.js";
 import { TenantAgentProviderResolver } from "./tenant-agent-provider.js";
+import { CommercialLifecycleProcessor } from "./commercial-lifecycle.js";
 import { startWorkerHealthServer, stopWorkerHealthServer } from "./health-server.js";
 import { logWorkerEvent, reportWorkerError } from "./observability.js";
 
@@ -39,9 +40,17 @@ if (initialAutomation && (initialAutomation.tasksCreated || initialAutomation.de
 const emailProcessor = new EmailAutomationProcessor(database);
 const gmailSync = new GmailSyncProcessor(database);
 const authEmailProcessor = new AuthEmailProcessor(database);
+const commercialLifecycle = new CommercialLifecycleProcessor(database);
 const pulse = new PulseProcessor(database);
 const recoveredAuthEmails = await authEmailProcessor.recoverStale(Number(process.env.AUTH_EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredAuthEmails) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: recoveredAuthEmails } });
+const initialCommercialLifecycle = await commercialLifecycle.reconcile().catch((error) => {
+  reportWorkerError("commercial-lifecycle-initial-reconciliation-failed", error);
+  return null;
+});
+if (initialCommercialLifecycle && (initialCommercialLifecycle.lifecycleUpdates || initialCommercialLifecycle.remindersQueued)) {
+  logWorkerEvent({ event: "commercial-lifecycle-reconciled", level: "info", details: initialCommercialLifecycle });
+}
 const recoveredEmails = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10));
 if (recoveredEmails) logWorkerEvent({ event: "stale-email-actions-recovered", level: "warning", details: { count: recoveredEmails } });
 const initialPulse = await pulse.reconcile();
@@ -160,6 +169,13 @@ if (once) {
         return 0;
       });
       if (authRecovered) logWorkerEvent({ event: "stale-auth-emails-recovered", level: "warning", details: { count: authRecovered } });
+      const commercialResult = await commercialLifecycle.reconcile().catch((error) => {
+        reportWorkerError("commercial-lifecycle-reconciliation-failed", error);
+        return null;
+      });
+      if (commercialResult && (commercialResult.lifecycleUpdates || commercialResult.remindersQueued)) {
+        logWorkerEvent({ event: "commercial-lifecycle-reconciled", level: "info", details: commercialResult });
+      }
       const emailRecovered = await emailProcessor.recoverStale(Number(process.env.EMAIL_STALE_AFTER_MINUTES ?? 10)).catch((error) => {
         reportWorkerError("stale-email-recovery-failed", error);
         return 0;

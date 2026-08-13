@@ -150,7 +150,7 @@ export class AuthService {
         [organisationId, userId],
       );
 
-      await tx.query(
+      const entitlement = await tx.query<{ id: string }>(
         `INSERT INTO "ProductEntitlement" (
            "tenantId","plan","status","agentExecutionMode","researchCreditsGranted",
            "researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt"
@@ -158,7 +158,7 @@ export class AuthService {
            $1::uuid,$2::"ProductPlan",$3::"EntitlementStatus",$4::"AgentExecutionMode",$5,$6,$7,
            CASE WHEN $3='ACTIVE' THEN CURRENT_TIMESTAMP ELSE NULL END,
            CASE WHEN $3='ACTIVE' THEN CURRENT_TIMESTAMP ELSE NULL END,CURRENT_TIMESTAMP
-         )`,
+         ) RETURNING "id"`,
         [
           organisationId,
           activation?.plan ?? "CORE",
@@ -169,13 +169,26 @@ export class AuthService {
           activation?.seatLimit ?? 10,
         ],
       );
+      const entitlementId = entitlement.rows[0]?.id;
+      if (!entitlementId) throw new Error("GridFlow could not create the product entitlement.");
 
       if (activation) {
+        if (activation.researchCreditsGranted > 0) {
+          await tx.query(
+            `INSERT INTO "ResearchCreditBucket" ("tenantId","entitlementId","type","label","granted","availableFrom","updatedAt")
+             VALUES ($1::uuid,$2::uuid,'CORE_STARTER','GridFlow Core starter credits',$3,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+            [organisationId, entitlementId, activation.researchCreditsGranted],
+          );
+        }
         await tx.query(
           `UPDATE "ActivationGrant" SET "status"='REDEEMED',"organisationId"=$2::uuid,
              "redeemedByUserId"=$3::uuid,"redeemedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP
            WHERE "id"=$1::uuid`,
           [activation.id, organisationId, userId],
+        );
+        await tx.query(
+          `UPDATE "CommercialPurchase" SET "tenantId"=$2::uuid,"updatedAt"=CURRENT_TIMESTAMP WHERE "activationGrantId"=$1::uuid`,
+          [activation.id, organisationId],
         );
       }
 
@@ -694,9 +707,8 @@ export class AuthService {
            o."type" AS "organisationType",
            o."accessStatus"::text AS "organisationAccessStatus",
            o."accessStatusReason",
-           pe."plan"::text AS "productPlan",
-           CASE WHEN pe."expiresAt" IS NOT NULL AND pe."expiresAt"<=CURRENT_TIMESTAMP
-             THEN 'EXPIRED' ELSE pe."status"::text END AS "entitlementStatus",
+           CASE WHEN pe."ultraExpiresAt">CURRENT_TIMESTAMP THEN 'ULTRA' ELSE 'CORE' END AS "productPlan",
+           pe."status"::text AS "entitlementStatus",
            pe."researchCreditsGranted",
            pe."researchCreditsUsed",
            pe."researchCreditsUnlimited",
@@ -705,8 +717,7 @@ export class AuthService {
          JOIN "Organisation" o ON o."id" = m."organisationId"
          LEFT JOIN "ProductEntitlement" pe ON pe."tenantId"=m."organisationId"
          WHERE m."userId" = $1::uuid
-         ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE'
-                    AND (pe."expiresAt" IS NULL OR pe."expiresAt">CURRENT_TIMESTAMP) THEN 0 ELSE 1 END,
+         ORDER BY CASE WHEN o."accessStatus"='ACTIVE' AND pe."status"='ACTIVE' THEN 0 ELSE 1 END,
                   m."createdAt" ASC`,
         [userId],
       ),

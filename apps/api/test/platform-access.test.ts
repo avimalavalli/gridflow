@@ -107,15 +107,12 @@ describe("GridFlow paid activation and owner approval", () => {
     const platform = new PlatformService(db as never);
     const grant = await platform.createGrant(identity, {
       email: "racer@example.test",
-      plan: "ULTRA",
-      researchCreditsGranted: 2,
-      seatLimit: 1,
       expiresInDays: 7,
     }, request());
     const token = new URLSearchParams(new URL(grant.activationUrl).hash.replace(/^#/, "")).get("activation");
     expect(token).toBeTruthy();
     await expect(platform.overview()).resolves.toMatchObject({
-      grants: [expect.objectContaining({ email: "racer@example.test", plan: "ULTRA", status: "ISSUED" })],
+      grants: [expect.objectContaining({ email: "racer@example.test", plan: "CORE", status: "ISSUED" })],
     });
 
     const registrationResponse = response();
@@ -129,9 +126,9 @@ describe("GridFlow paid activation and owner approval", () => {
     }, request(), registrationResponse.response);
     expect(registered.activeOrganisation).toMatchObject({
       organisationAccessStatus: "PENDING_APPROVAL",
-      productPlan: "ULTRA",
+      productPlan: "CORE",
       entitlementStatus: "PENDING",
-      researchCreditsGranted: 2,
+      researchCreditsGranted: 500,
     });
     await expect(auth.register({
       email: "second-racer@example.test",
@@ -150,14 +147,6 @@ describe("GridFlow paid activation and owner approval", () => {
       organisationAccessStatus: "ACTIVE",
       entitlementStatus: "ACTIVE",
     });
-    const initialUltraExpiry = await database.query<{ expiresAt: Date | string }>(
-      `SELECT "expiresAt" FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid`,
-      [customerTenantId],
-    ).then((result) => new Date(result.rows[0]!.expiresAt).getTime());
-    expect(initialUltraExpiry).toBeGreaterThan(Date.now() + 29 * 86_400_000);
-    const renewed = await platform.renewUltra(identity, customerTenantId, { days: 30, reason: "Test monthly renewal" }, request());
-    expect(new Date(renewed.expiresAt).getTime()).toBeGreaterThan(Date.now() + 59 * 86_400_000);
-
     await database.transaction(async (tx) => {
       await setTenantContext(tx, customerTenantId);
       const run = await tx.query<{ id: string }>(
@@ -166,9 +155,16 @@ describe("GridFlow paid activation and owner approval", () => {
         [customerTenantId],
       );
       await tx.query(`UPDATE "ProductEntitlement" SET "researchCreditsUsed"=1 WHERE "tenantId"=$1::uuid`, [customerTenantId]);
-      await tx.query(
-        `INSERT INTO "ResearchCreditReservation" ("tenantId","agentRunId","amount","status") VALUES ($1::uuid,$2::uuid,1,'RESERVED')`,
+      const bucket = await tx.query<{ id: string }>(
+        `UPDATE "ResearchCreditBucket" SET "reserved"=1,"updatedAt"=CURRENT_TIMESTAMP WHERE "tenantId"=$1::uuid AND "type"='CORE_STARTER' RETURNING "id"`, [customerTenantId],
+      );
+      const reservation = await tx.query<{ id: string }>(
+        `INSERT INTO "ResearchCreditReservation" ("tenantId","agentRunId","amount","status") VALUES ($1::uuid,$2::uuid,1,'RESERVED') RETURNING "id"`,
         [customerTenantId, run.rows[0]!.id],
+      );
+      await tx.query(
+        `INSERT INTO "ResearchCreditReservationAllocation" ("reservationId","bucketId","amount","status","updatedAt") VALUES ($1::uuid,$2::uuid,1,'RESERVED',CURRENT_TIMESTAMP)`,
+        [reservation.rows[0]!.id, bucket.rows[0]!.id],
       );
       await tx.query(
         `INSERT INTO "AutomationJob" ("tenantId","agentRunId","queueName","jobName","idempotencyKey","payload","status","updatedAt")

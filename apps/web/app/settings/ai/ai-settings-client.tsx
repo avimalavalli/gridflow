@@ -23,6 +23,17 @@ export interface AiSettingsData {
     researchCreditsRemaining: number | null;
     researchCreditsUnlimited: boolean;
     seatLimit: number;
+    ultraStatus: string | null;
+    ultraStartsAt: string | null;
+    ultraExpiresAt: string | null;
+    creditBalance: {
+      includedRemaining: number;
+      purchasedRemaining: number;
+      totalRemaining: number | null;
+      scheduledIncludedCredits: number;
+      usedThisPeriod: number;
+      nextRefreshAt: string | null;
+    };
     requiresGemini: boolean;
   };
 }
@@ -71,7 +82,6 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
     finally { setBusy(false); }
   }
 
-  const credits = data.entitlement.researchCreditsUnlimited ? "Unlimited grandfathered research" : `${data.entitlement.researchCreditsRemaining ?? 0} of ${data.entitlement.researchCreditsGranted} remaining`;
   const geminiState = data.gemini.connected ? "Connected" : data.entitlement.requiresGemini ? "Required" : "Managed";
   const geminiDetail = data.gemini.model ?? (data.entitlement.requiresGemini ? "No key saved" : "GridFlow-managed intelligence active");
   const setupTitle = data.entitlement.requiresGemini ? "Connect the free Gemini key" : "Optional Gemini key";
@@ -80,11 +90,14 @@ export function AiSettingsClient({ data }: { data: AiSettingsData }) {
     : "This grandfathered managed workspace already has AI access. Connect Gemini only if you want this organisation to use its own key for non-web agents.";
   return (
     <div className="stack">
-      <div className="grid-3">
-        <article className="metric-card"><span>GridFlow plan</span><strong>{data.entitlement.plan}</strong><small>{data.entitlement.status}</small></article>
+      <div className="grid-4">
+        <article className="metric-card"><span>GridFlow access</span><strong>{data.entitlement.plan}</strong><small>{data.entitlement.ultraExpiresAt ? `Ultra ${data.entitlement.ultraStatus?.replaceAll("_", " ") ?? "active"}` : "Core permanent"}</small></article>
         <article className="metric-card"><span>Gemini</span><strong>{geminiState}</strong><small>{geminiDetail}</small></article>
-        <article className="metric-card"><span>Research credits</span><strong>{data.entitlement.researchCreditsUnlimited ? "∞" : data.entitlement.researchCreditsRemaining ?? 0}</strong><small>{credits}</small></article>
+        <article className="metric-card"><span>Included credits</span><strong>{data.entitlement.researchCreditsUnlimited ? "∞" : data.entitlement.creditBalance.includedRemaining}</strong><small>{data.entitlement.creditBalance.usedThisPeriod} used this Ultra period</small></article>
+        <article className="metric-card"><span>Purchased credits</span><strong>{data.entitlement.researchCreditsUnlimited ? "∞" : data.entitlement.creditBalance.purchasedRemaining}</strong><small>Remain after Ultra expires</small></article>
       </div>
+
+      <div className="safety-strip"><span>Total remaining {data.entitlement.researchCreditsUnlimited ? "Unlimited" : data.entitlement.creditBalance.totalRemaining ?? 0}</span><span>Next Ultra credit refresh {time(data.entitlement.creditBalance.nextRefreshAt)}</span>{data.entitlement.creditBalance.scheduledIncludedCredits > 0 ? <span>{data.entitlement.creditBalance.scheduledIncludedCredits} credits scheduled</span> : null}{data.entitlement.ultraExpiresAt ? <span>Ultra expires {time(data.entitlement.ultraExpiresAt)} · no automatic renewal</span> : <span>Core access does not expire</span>}</div>
 
       <section className="card">
         <div className="section-header"><div><div className="eyebrow">Five-minute setup</div><h2>{setupTitle}</h2><p>{setupCopy}</p></div><KeyRound size={22} /></div>

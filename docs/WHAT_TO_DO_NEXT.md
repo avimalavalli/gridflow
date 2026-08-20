@@ -17,7 +17,7 @@ Phase 8A is built. GridFlow binds each acceptance result to real records created
 ## Phase 8B.1 — Wise commercial model — built
 
 1. Publish permanent, individually quoted Core without storing or displaying a fixed onboarding amount.
-2. Verify exact GBP payments against AM Motorsports Ltd's Wise Business record and apply only system-controlled products.
+2. Verify exact GBP payments against the corresponding Wise Business record and apply only system-controlled products.
 3. Separate Core starter, Ultra-included and purchased credits, including exact failure refunds and customer balance visibility.
 4. Automate the Ultra renewal-due, payment-pending and expiry lifecycle without recurring billing.
 5. Add private receipts, exception review and customer/admin renewal reminders.

@@ -1,7 +1,7 @@
 # GridFlow Security & Privacy Launch Assurance
 
 Status: implementation release candidate — external launch sign-offs still required  
-Operator: AM Motorsports Ltd, company 17031503  
+Service identity: GridFlow
 Scope: web, API, worker, PostgreSQL, Railway, Gmail, OpenAI/Gemini, Resend transactional email, Wise-led manual commerce  
 Security rule: no open Critical or High finding may be accepted for launch.
 

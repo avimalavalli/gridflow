@@ -18,5 +18,5 @@ export function LegalPage({ eyebrow, title, summary, children }: { eyebrow: stri
 }
 
 export function LegalContact() {
-  return <section><h2>Contact</h2><p><strong>{GRIDFLOW_LEGAL.operatorName}</strong> (company number {GRIDFLOW_LEGAL.companyNumber})<br/>{GRIDFLOW_LEGAL.registeredOffice}<br/><a href={`mailto:${GRIDFLOW_LEGAL.supportEmail}`}>{GRIDFLOW_LEGAL.supportEmail}</a></p></section>;
+  return <section><h2>Contact</h2><p><strong>GridFlow Support</strong><br/><a href={`mailto:${GRIDFLOW_LEGAL.supportEmail}`}>{GRIDFLOW_LEGAL.supportEmail}</a></p></section>;
 }

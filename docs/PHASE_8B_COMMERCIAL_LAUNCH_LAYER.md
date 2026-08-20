@@ -1,6 +1,6 @@
 # Phase 8B.1 — Wise commercial model and credit lifecycle
 
-Phase 8B.1 replaces the provider-agnostic Phase 8B draft with the commercial model GridFlow will actually operate. AM Motorsports Ltd receives GBP payments through Wise Business. There is no public payment form, automatic renewal or recurring charge.
+Phase 8B.1 replaces the provider-agnostic Phase 8B draft with the commercial model GridFlow will actually operate. GridFlow receives GBP payments through Wise Business. There is no public payment form, automatic renewal or recurring charge.
 
 ## Products
 
@@ -14,7 +14,7 @@ Core remains after Ultra expires. Unused purchased credits also remain. An early
 
 1. An authorised platform admin selects the exact product.
 2. For Core, the admin enters the named driver email and individually agreed amount. For an add-on, GridFlow supplies the configured amount and requires an active Core organisation.
-3. The admin enters the exact Wise payment reference and confirms that the GBP record was checked in AM Motorsports Ltd's Wise Business account.
+3. The admin enters the exact Wise payment reference and confirms that the GBP record was checked in the corresponding Wise Business account.
 4. GridFlow rejects missing confirmation, duplicate Wise references, invalid products and mismatched add-on amounts.
 5. A single database transaction records the immutable purchase, applies the fixed product entitlement, issues a token-bound receipt, queues email delivery and records the platform audit event.
 

@@ -17,7 +17,7 @@
 
 ## Privacy/regulatory handling
 
-Notify affected customer controllers without undue delay when GridFlow is processor. When AM Motorsports Ltd is controller, assess whether the incident is a personal-data breach and record the decision. If it is likely to risk people’s rights/freedoms, seek legal/DPO advice and notify the ICO within the applicable 72-hour window; if high risk, communicate to affected people without undue delay unless a lawful exception applies. Do not delay containment while facts are refined.
+Notify affected customer controllers without undue delay when GridFlow is processor. When GridFlow is controller, assess whether the incident is a personal-data breach and record the decision. If it is likely to risk people’s rights/freedoms, seek legal/DPO advice and notify the ICO within the applicable 72-hour window; if high risk, communicate to affected people without undue delay unless a lawful exception applies. Do not delay containment while facts are refined.
 
 ## Communications
 

@@ -217,7 +217,7 @@ export class CommerceService {
     if (!row) throw new NotFoundException("Receipt not found or access token invalid.");
     return {
       ...row,
-      seller: "AM Motorsports Ltd",
+      seller: "GridFlow",
       paymentMethod: "Wise Business",
       documentType: "PAYMENT_RECEIPT",
       accessNotice: row.productType === "CORE_ONBOARDING"

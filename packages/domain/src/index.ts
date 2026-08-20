@@ -13,9 +13,6 @@ export const GRIDFLOW_LEGAL = {
   cookiesVersion: "2026-08-13",
   minimumAge: 18,
   supportEmail: "gridflowsupport@gmail.com",
-  operatorName: "AM Motorsports Ltd",
-  companyNumber: "17031503",
-  registeredOffice: "128 City Road, London, United Kingdom, EC1V 2NX",
   governingLaw: "England and Wales",
   reviewStatus: "DRAFT_FOR_SOLICITOR_REVIEW",
 } as const;

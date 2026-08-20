@@ -39,7 +39,7 @@ The command search uses plain destinations, records and tool names. Internal age
 ## Commercial constraints preserved
 
 - Core is individually quoted for each driver. No fixed onboarding amount is stored or displayed.
-- AM Motorsports Ltd receives verified GBP payments through Wise Business; no public checkout, card collection or recurring billing was introduced.
+- GridFlow receives verified GBP payments through Wise Business; no public checkout, card collection or recurring billing was introduced.
 - Core remains permanent with 500 starter research credits, one named driver and at most two trusted devices.
 - Ultra remains an optional configured 30-day period with included credits, no automatic renewal and extension from the existing expiry when renewed early.
 - LinkedIn actions remain user-performed. External messages, relationships, meetings, opportunity changes, prices, legal terms and financial records retain their existing human-control boundaries.

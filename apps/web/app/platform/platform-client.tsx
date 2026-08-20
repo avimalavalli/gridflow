@@ -540,8 +540,8 @@ export function PlatformClient({ data }: { data: PlatformData }) {
               onChange={(event) => setVerified(event.target.checked)}
             />
             <span>
-              I verified this exact GBP amount and reference in AM Motorsports
-              Ltd’s Wise Business record.
+              I verified this exact GBP amount and reference against the
+              corresponding Wise Business record.
             </span>
           </label>
           <div className="form-action full">

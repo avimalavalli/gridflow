@@ -100,7 +100,7 @@ describe("GridFlow Wise commercial fulfilment", () => {
     const email = await database.query<{ payload: { receiptUrl: string } }>(`SELECT "payload" FROM "AuthEmailOutbox" WHERE "template"='PURCHASE_FULFILMENT'`);
     const params = new URLSearchParams(new URL(email.rows[0]!.payload.receiptUrl).hash.replace(/^#/, ""));
     await expect(commerce.receipt({ receiptNumber: params.get("number")!, token: params.get("token")! })).resolves.toMatchObject({
-      productType: "CORE_ONBOARDING", amountMinor: 9876, currency: "GBP", seller: "AM Motorsports Ltd", paymentMethod: "Wise Business",
+      productType: "CORE_ONBOARDING", amountMinor: 9876, currency: "GBP", seller: "GridFlow", paymentMethod: "Wise Business",
     });
     await expect(commerce.receipt({ receiptNumber: params.get("number")!, token: "not-the-private-receipt-token" })).rejects.toThrow(/not found/i);
   });

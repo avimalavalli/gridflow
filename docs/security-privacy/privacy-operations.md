@@ -2,7 +2,7 @@
 
 ## Role map
 
-- AM Motorsports Ltd is controller for account/security, commerce/entitlements, support, service telemetry, legal acceptance, privacy requests and its own business-contact processing.
+- GridFlow is controller for account/security, commerce/entitlements, support, service telemetry, legal acceptance, privacy requests and its own business-contact processing.
 - The customer is controller and GridFlow processor for personal data the customer places in its workspace and asks GridFlow to host/operate.
 - Wise is normally an independent payment controller. Railway, Google APIs/Gemini, OpenAI and configured transactional-email delivery are processors/subprocessors for the relevant function.
 

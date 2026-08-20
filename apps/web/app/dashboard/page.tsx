@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ArrowUpRight, Bot, Building2, CalendarDays, ContactRound, Handshake, Send } from "lucide-react";
+import { Activity, ArrowRight, ArrowUpRight, Bot, Building2, CalendarDays, ContactRound, Handshake, ScanSearch, Send } from "lucide-react";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 import { DataUnavailable } from "../../components/data-unavailable";
@@ -39,6 +39,7 @@ export default async function DashboardPage() {
     <Shell title="Command Centre">
       <PageHead eyebrow="Today’s workspace" title="Commercial command centre" description="Review priorities, pipeline health and the next action for every active relationship." action={<Link className="button button-primary" href={snapshot?.focusActions[0]?.href ?? "/discovery-briefs"}>{snapshot?.focusActions.length ? <ArrowUpRight size={15}/> : <Building2 size={15}/>} {snapshot?.focusActions.length ? "Open next action" : "Discover companies"}</Link>} />
       <SetupChecklist />
+      <Link className="dashboard-quickfind" href="/quickfind"><span><ScanSearch size={21}/></span><div><div className="eyebrow">QuickFind</div><strong>Need the right person at a company?</strong><p>Type a company name and get the strongest verified contact from your workspace in seconds.</p></div><span className="dashboard-quickfind-action">Find a contact<ArrowRight size={15}/></span></Link>
       {!snapshot ? <DataUnavailable message={error} /> : <>
         <section className="metrics metrics-six">
           <div className="metric"><span className="metric-icon"><Building2 size={17}/></span><div className="metric-label">Companies</div><div className="metric-value">{snapshot.metrics.companiesDiscovered}</div><div className="metric-foot">{snapshot.metrics.companiesResearched} fully researched</div></div>

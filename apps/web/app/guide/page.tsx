@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Check, CheckCircle2, Circle, Compass, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, CheckCircle2, Circle, Compass, ExternalLink, FileDown, Linkedin, ScanSearch } from "lucide-react";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 
@@ -10,6 +10,8 @@ interface SetupStep { key: string; label: string; description: string; href: str
 interface Experience { progress: { tutorialStep: number; tutorialCompletedAt: string | null }; setup: { completed: number; total: number; steps: SetupStep[]; next: SetupStep | null } }
 
 const chapters = [
+  { title: "Build your professional front door", eyebrow: "LinkedIn foundation", copy: "Your LinkedIn profile is the identity layer for GridFlow's LinkedIn-first workflow. Complete the photo, headline, About, racing experience, Featured proof, skills, public URL and two-factor authentication before approaching sponsors.", automatic: "GridFlow stores your public profile URL and gives you tailored, editable positioning drafts and a permanent setup checklist.", yours: "Create and secure the LinkedIn account, keep every claim accurate, choose what is public and perform every LinkedIn action yourself.", href: "/help", action: "Open the LinkedIn playbook" },
+  { title: "Ask for a decision-maker instantly", eyebrow: "QuickFind", copy: "Enter a company name and QuickFind ranks the strongest contact already researched inside your workspace. It shows role, priority, verification and available channels in one answer.", automatic: "Private workspace matching, contact ranking and transparent missing-data handling.", yours: "Check the record, open LinkedIn yourself and decide whether the person and timing are appropriate.", href: "/quickfind", action: "Try QuickFind" },
   { title: "Choose the mission", eyebrow: "Discovery Briefs", copy: "A brief tells Atlas which region, industries and company profile to investigate. Activate one brief, then start the full pipeline once—GridFlow coordinates Atlas, Sage, Relay and Echo for you.", automatic: "Company discovery, evidence research, scoring, contact search and message drafting.", yours: "The market, industries, company volume and whether the brief is active.", href: "/discovery-briefs", action: "Open Discovery Briefs" },
   { title: "Trust the evidence, not a guess", eyebrow: "Companies", copy: "Every researched company carries fit scores, commercial context and sources. High scores help prioritise work; they never replace your judgement.", automatic: "Evidence collection, fit analysis and prioritisation.", yours: "Review the sources and decide whether the company belongs in your target list.", href: "/companies", action: "Review companies" },
   { title: "Keep outreach human", eyebrow: "Outreach", copy: "Echo creates a relevant first draft from the approved research. GridFlow defaults to LinkedIn first and holds outbound messages for review.", automatic: "Personalisation, draft creation and safe follow-up scheduling.", yours: "Edit, approve and perform LinkedIn actions. Nothing should impersonate you without approval.", href: "/outreach", action: "Open outreach desk" },
@@ -56,7 +58,7 @@ export default function GuidePage() {
 
   return (
     <Shell title="Guided start">
-      <PageHead eyebrow="Guided start" title="Learn the workflow in ten steps" description="Follow the work from discovery to renewal, with clear boundaries between automated preparation and human decisions." action={<Link className="button button-secondary" href="/help">Open full manual <ExternalLink size={14}/></Link>} />
+      <PageHead eyebrow="GridFlow Academy" title="Learn the complete workflow interactively" description="Move from a sponsor-ready LinkedIn profile to discovery, outreach, agreements and renewal—with clear boundaries between automated preparation and human decisions." action={<Link className="button button-secondary" href="/help">Open full manual <ExternalLink size={14}/></Link>} />
       {error ? <div className="notice notice-error">{error}</div> : null}
       <div className="guide-layout">
         <aside className="card guide-rail" aria-label="Tutorial chapters">
@@ -83,6 +85,15 @@ export default function GuidePage() {
           </div>
         </section>
       </div>
+
+      <section className="academy-downloads">
+        <div className="academy-downloads-head"><div><div className="eyebrow">Offline playbooks</div><h2>Keep the important steps beside you</h2><p>Download the practical guides for profile building, first launch and the full commercial workflow.</p></div><FileDown size={24}/></div>
+        <div className="academy-download-grid">
+          <a href="/guides/gridflow-linkedin-playbook.pdf" target="_blank" rel="noreferrer"><span><Linkedin size={18}/></span><div><strong>LinkedIn Profile Playbook</strong><small>Account creation, every profile section, security and first-week actions</small></div><FileDown size={16}/></a>
+          <a href="/guides/gridflow-launch-checklist.pdf" target="_blank" rel="noreferrer"><span><CheckCircle2 size={18}/></span><div><strong>GridFlow Launch Checklist</strong><small>From first sign-in to a reviewed company and outreach draft</small></div><FileDown size={16}/></a>
+          <a href="/guides/gridflow-workflow-handbook.pdf" target="_blank" rel="noreferrer"><span><ScanSearch size={18}/></span><div><strong>Commercial Workflow Handbook</strong><small>QuickFind and the full research-to-renewal operating model</small></div><FileDown size={16}/></a>
+        </div>
+      </section>
 
       {experience ? <section className="card setup-checklist-full">
         <div className="section-header"><div><div className="eyebrow">Live setup checklist</div><h2>{experience.setup.completed} of {experience.setup.total} foundations complete</h2><p>This is calculated from your actual workspace. You never need to tick boxes that GridFlow can verify itself.</p></div></div>

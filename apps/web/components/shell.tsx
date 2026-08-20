@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -30,6 +31,7 @@ import {
   Rocket,
   Repeat2,
   Search,
+  ScanSearch,
   Sparkles,
   Send,
   Settings,
@@ -44,6 +46,7 @@ import {
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { formatLabel } from "../lib/format";
+import gridFlowMark from "./assets/gridflow-mark.png";
 
 type NavigationItem = { label: string; href: string; icon: LucideIcon; keywords: string; roles?: readonly string[]; platformAdminOnly?: boolean };
 
@@ -52,6 +55,7 @@ const navigation: readonly { label: string; items: readonly NavigationItem[] }[]
     label: "Core workflow",
     items: [
       { label: "Command Centre", href: "/dashboard", icon: LayoutDashboard, keywords: "home actions overview dashboard" },
+      { label: "QuickFind", href: "/quickfind", icon: ScanSearch, keywords: "instant company contact decision maker lookup answer" },
       { label: "Discovery Briefs", href: "/discovery-briefs", icon: Radar, keywords: "atlas target market search strategy" },
       { label: "Companies", href: "/companies", icon: Building2, keywords: "brands prospects sponsors organisations" },
       { label: "Contacts", href: "/contacts", icon: ContactRound, keywords: "people decision makers leads" },
@@ -249,7 +253,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
       <aside className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-brand-row">
           <Link className="brand" href="/dashboard" onClick={() => setMobileOpen(false)}>
-            <span className="brand-mark">GF</span>
+            <span className="brand-mark"><Image src={gridFlowMark} alt="" priority/></span>
             <span className="brand-word"><strong>Grid</strong>Flow</span>
           </Link>
           <button className="icon-button sidebar-close" type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation"><X size={18} /></button>
@@ -302,6 +306,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
           </div>
           <div className="topbar-actions">
             <Link className="icon-button topbar-help" href="/help" aria-label="Open Help Centre" title="Help Centre"><LifeBuoy size={17} /></Link>
+            <Link className="quickfind-trigger" href="/quickfind"><ScanSearch size={16}/><span>QuickFind</span></Link>
             <button className="search-trigger" type="button" aria-label="Search GridFlow" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search GridFlow</span><kbd>⌘ K</kbd></button>
             <Link className="avatar" href="/team" title={auth?.user.name ?? "Current account"}>{accountInitials}</Link>
           </div>

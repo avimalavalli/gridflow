@@ -12,6 +12,51 @@ export interface SearchResult extends Record<string, unknown> {
   rank: number;
 }
 
+export interface QuickFindContact extends Record<string, unknown> {
+  id: string;
+  contactName: string;
+  jobTitle: string;
+  department: string;
+  email: string | null;
+  phone: string | null;
+  linkedinProfileUrl: string | null;
+  verificationStatus: string;
+  contactPriority: string;
+  preferredChannel: string;
+  confidence: number | null;
+  lastVerifiedAt: Date | null;
+}
+
+interface QuickFindRow extends QuickFindContact {
+  companyId: string;
+  companyName: string;
+  industries: string | null;
+  country: string | null;
+  website: string;
+  companyDomain: string;
+  linkedinCompanyUrl: string | null;
+  currentStage: string;
+  researchStatus: string;
+  companyConfidence: number | null;
+  evidenceCompleteness: number | null;
+  matchRank: number;
+}
+
+export interface QuickFindCompany extends Record<string, unknown> {
+  id: string;
+  companyName: string;
+  industries: string | null;
+  country: string | null;
+  website: string;
+  companyDomain: string;
+  linkedinCompanyUrl: string | null;
+  currentStage: string;
+  researchStatus: string;
+  confidence: number | null;
+  evidenceCompleteness: number | null;
+  contacts: QuickFindContact[];
+}
+
 @Injectable()
 export class SearchService {
   constructor(private readonly database: DatabaseService) {}
@@ -70,6 +115,89 @@ export class SearchService {
         [tenantId, pattern],
       );
       return { query, results: result.rows };
+    });
+  }
+
+  async quickFind(tenantId: string, rawCompany: string | undefined): Promise<{ query: string; companies: QuickFindCompany[]; sourceNotice: string }> {
+    const query = (rawCompany ?? "").trim().replace(/\s+/g, " ");
+    if (query.length < 2) return { query, companies: [], sourceNotice: "Results come only from researched records in this GridFlow workspace." };
+    if (query.length > 80) throw new BadRequestException("Company names must be 80 characters or fewer.");
+    const pattern = query.replace(/[\\%_]/g, (character) => `\\${character}`);
+
+    return this.database.tenantTransaction(tenantId, async (tx) => {
+      const result = await tx.query<QuickFindRow>(
+        `WITH matched AS (
+           SELECT c.*,
+             CASE
+               WHEN LOWER(c."companyName")=LOWER($2) THEN 0
+               WHEN c."companyName" ILIKE $2||'%' THEN 1
+               WHEN c."companyName" ILIKE '%'||$2||'%' THEN 2
+               ELSE 3
+             END AS "matchRank"
+           FROM "Company" c
+           WHERE c."tenantId"=$1::uuid
+             AND (c."companyName" ILIKE '%'||$2||'%' OR c."companyDomain" ILIKE '%'||$2||'%')
+           ORDER BY "matchRank", COALESCE(c."confidence",0) DESC, LOWER(c."companyName")
+           LIMIT 8
+         )
+         SELECT m."id" AS "companyId",m."companyName",m."industries",m."country",m."website",m."companyDomain",
+                m."linkedinCompanyUrl",m."currentStage"::text,m."researchStatus"::text,
+                m."confidence" AS "companyConfidence",m."evidenceCompleteness",m."matchRank",
+                ct."id",ct."contactName",ct."jobTitle",ct."department"::text,ct."email",ct."phone",
+                ct."linkedinProfileUrl",ct."verificationStatus"::text,ct."contactPriority"::text,
+                ct."preferredChannel"::text,ct."confidence",ct."lastVerifiedAt"
+         FROM matched m
+         LEFT JOIN "Contact" ct ON ct."companyId"=m."id" AND ct."tenantId"=$1::uuid
+         ORDER BY m."matchRank",LOWER(m."companyName"),
+           CASE ct."contactPriority" WHEN 'PRIMARY' THEN 0 WHEN 'SECONDARY' THEN 1 ELSE 2 END,
+           CASE ct."verificationStatus" WHEN 'EMAIL_VERIFIED' THEN 0 WHEN 'PUBLICLY_LISTED' THEN 1 ELSE 2 END,
+           COALESCE(ct."confidence",0) DESC,LOWER(ct."contactName")
+         LIMIT 48`,
+        [tenantId, pattern],
+      );
+
+      const companies = new Map<string, QuickFindCompany>();
+      for (const row of result.rows) {
+        let company = companies.get(row.companyId);
+        if (!company) {
+          company = {
+            id: row.companyId,
+            companyName: row.companyName,
+            industries: row.industries,
+            country: row.country,
+            website: row.website,
+            companyDomain: row.companyDomain,
+            linkedinCompanyUrl: row.linkedinCompanyUrl,
+            currentStage: row.currentStage,
+            researchStatus: row.researchStatus,
+            confidence: row.companyConfidence,
+            evidenceCompleteness: row.evidenceCompleteness,
+            contacts: [],
+          };
+          companies.set(row.companyId, company);
+        }
+        if (row.id) {
+          company.contacts.push({
+            id: row.id,
+            contactName: row.contactName,
+            jobTitle: row.jobTitle,
+            department: row.department,
+            email: row.email,
+            phone: row.phone,
+            linkedinProfileUrl: row.linkedinProfileUrl,
+            verificationStatus: row.verificationStatus,
+            contactPriority: row.contactPriority,
+            preferredChannel: row.preferredChannel,
+            confidence: row.confidence,
+            lastVerifiedAt: row.lastVerifiedAt,
+          });
+        }
+      }
+      return {
+        query,
+        companies: [...companies.values()],
+        sourceNotice: "Results come only from researched records in this GridFlow workspace. Missing details stay unknown until verified.",
+      };
     });
   }
 }

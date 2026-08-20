@@ -1,20 +1,68 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Bot, CheckCircle2, Hand, ShieldCheck, Sparkles } from "lucide-react";
-import { Shell } from "../../components/shell";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, CheckCircle2, Fingerprint, Hand, Radar, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { OnboardingFrame } from "../../components/onboarding-frame";
 
-const agents = [
-  { name: "Atlas", job: "finds realistic sponsor companies" },
-  { name: "Sage", job: "scores fit and commercial evidence" },
-  { name: "Relay", job: "finds the right decision-makers" },
-  { name: "Echo", job: "prepares personal outreach drafts" },
-] as const;
+type Slide = {
+  eyebrow: string;
+  title: string;
+  copy: string;
+  icon: LucideIcon;
+  points: readonly string[];
+  visual: "system" | "agents" | "control" | "setup";
+};
+
+const slides: readonly Slide[] = [
+  {
+    eyebrow: "GridFlow // system introduction",
+    title: "Your commercial operation, connected.",
+    copy: "GridFlow turns scattered sponsor research, contacts, conversations and agreements into one controlled workflow built around your racing programme.",
+    icon: Sparkles,
+    points: ["One record from first research to renewal", "Next actions stay visible", "Your evidence and history remain connected"],
+    visual: "system",
+  },
+  {
+    eyebrow: "Intelligence layer",
+    title: "A coordinated team works behind the interface.",
+    copy: "Atlas discovers. Sage verifies. Relay identifies decision-makers. Echo prepares outreach. Later tools help with replies, meetings, proposals, contracts and delivery.",
+    icon: Bot,
+    points: ["Tools run in the correct order", "Unknown facts remain unknown", "Every useful output returns to the workspace"],
+    visual: "agents",
+  },
+  {
+    eyebrow: "Human authority",
+    title: "Automation prepares. You decide.",
+    copy: "GridFlow is designed to remove repetitive coordination without impersonating you or making commercial commitments on your behalf.",
+    icon: Hand,
+    points: ["LinkedIn actions stay user-performed", "Outbound drafts wait for review", "Pricing, meetings, contracts and payments stay human-controlled"],
+    visual: "control",
+  },
+  {
+    eyebrow: "Evidence standard",
+    title: "Useful answers, without invented certainty.",
+    copy: "Company and contact work is grounded in records and sources. Confidence, verification and missing information are visible so you can act with judgement.",
+    icon: ShieldCheck,
+    points: ["Research provenance is retained", "Contact details are labelled by verification", "QuickFind answers only from your workspace"],
+    visual: "system",
+  },
+  {
+    eyebrow: "Personal calibration",
+    title: "Now GridFlow gets to know your programme.",
+    copy: "The next guided sequence builds your athlete profile, creates or strengthens your LinkedIn presence, sets commercial targets and confirms your operating controls.",
+    icon: Fingerprint,
+    points: ["Progress saves automatically", "Every setup choice can be refined later", "You enter the workspace with a usable starting strategy"],
+    visual: "setup",
+  },
+];
+
+const agents = ["ATLAS", "SAGE", "RELAY", "ECHO"] as const;
 
 export default function WelcomePage() {
   const router = useRouter();
+  const [slide, setSlide] = useState(0);
   const [name, setName] = useState("there");
   const [profileReady, setProfileReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,7 +88,7 @@ export default function WelcomePage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ welcomeCompleted: true, tutorialStep: 0 }),
       });
-      if (!response.ok) throw new Error("Your progress could not be saved.");
+      if (!response.ok) throw new Error("Your introduction progress could not be saved.");
       router.push(profileReady ? "/guide" : "/onboarding");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "GridFlow could not continue.");
@@ -48,43 +96,38 @@ export default function WelcomePage() {
     }
   }
 
+  const current = slides[slide];
+  const Icon = current.icon;
+
   return (
-    <Shell title="Welcome">
-      <section className="welcome-hero">
-        <div className="welcome-copy">
-          <span className="welcome-kicker"><Sparkles size={14}/> Your commercial workspace</span>
-          <h1>Welcome to GridFlow, {name}.</h1>
-          <p>GridFlow keeps sponsor research, relationships, proposals, contracts, delivery and renewals in one guided workflow. Routine preparation is automated; commercial decisions stay yours.</p>
-          <div className="welcome-actions">
-            <button className="button button-primary button-large" type="button" disabled={saving} onClick={begin}>{saving ? "Preparing your workspace…" : "Set up my GridFlow"}<ArrowRight size={16}/></button>
-            <Link className="button button-secondary button-large" href="/help">Read the user manual</Link>
-          </div>
-          {error ? <div className="notice notice-error">{error}</div> : null}
+    <OnboardingFrame step={slide + 1} total={slides.length} status={`System introduction · ${slide + 1} of ${slides.length}`}>
+      <section className="intro-stage">
+        <div className="intro-copy">
+          <span className="intro-icon"><Icon size={23}/></span>
+          <div className="eyebrow">{current.eyebrow}</div>
+          <h1>{slide === 0 ? `Welcome, ${name}. ` : ""}{current.title}</h1>
+          <p className="intro-lead">{current.copy}</p>
+          <div className="intro-points">{current.points.map((point) => <div key={point}><CheckCircle2 size={16}/><span>{point}</span></div>)}</div>
+          {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
         </div>
-        <div className="welcome-promise card">
-          <div className="welcome-promise-icon"><ShieldCheck size={22}/></div>
-          <h2>Automation without losing control</h2>
-          <ul>
-            <li><CheckCircle2 size={15}/>Evidence is attached to research.</li>
-            <li><CheckCircle2 size={15}/>LinkedIn-first is the safe default.</li>
-            <li><CheckCircle2 size={15}/>Messages wait for your approval.</li>
-            <li><CheckCircle2 size={15}/>Replies stop follow-ups automatically.</li>
-            <li><CheckCircle2 size={15}/>Safe internal work follows your limits.</li>
-          </ul>
+
+        <div className={`intro-visual intro-visual-${current.visual}`} aria-hidden="true">
+          <div className="system-orbit orbit-one"/><div className="system-orbit orbit-two"/>
+          <div className="system-core"><span>GF</span><small>COMMERCIAL OS</small></div>
+          {current.visual === "agents" ? <div className="intro-agent-grid">{agents.map((agent, index) => <div key={agent}><span>{String(index + 1).padStart(2, "0")}</span><strong>{agent}</strong></div>)}</div> : null}
+          {current.visual === "control" ? <div className="control-signal"><ShieldCheck size={24}/><strong>HUMAN APPROVAL</strong><span>ACTIVE</span></div> : null}
+          {current.visual === "setup" ? <div className="setup-signal"><Fingerprint size={25}/><div><strong>PERSONAL CALIBRATION</strong><span>READY TO BEGIN</span></div></div> : null}
+          {current.visual === "system" ? <><div className="system-node node-a"><Radar size={16}/></div><div className="system-node node-b"><Workflow size={16}/></div><div className="system-node node-c"><ShieldCheck size={16}/></div></> : null}
         </div>
       </section>
 
-      <section className="welcome-section">
-        <div className="welcome-section-head"><span>01</span><div><h2>Your first research workflow</h2><p>Start once and GridFlow coordinates the four research and drafting tools in the correct order.</p></div></div>
-        <div className="agent-flow">
-          {agents.map((agent, index) => <div className="agent-flow-card" key={agent.name}><span>{index + 1}</span><Bot size={18}/><strong>{agent.name}</strong><p>{agent.job}</p></div>)}
+      <footer className="first-run-actions">
+        <div className="first-run-dots" aria-label="Introduction slides">{slides.map((item, index) => <button key={item.title} type="button" aria-label={`Open slide ${index + 1}`} aria-current={index === slide ? "step" : undefined} onClick={() => setSlide(index)}/>)}</div>
+        <div>
+          {slide === 0 ? <span className="first-run-caption">Five short slides · about two minutes</span> : <button className="button button-ghost" type="button" onClick={() => setSlide((value) => value - 1)}><ArrowLeft size={15}/>Back</button>}
+          {slide < slides.length - 1 ? <button className="button button-primary button-large" type="button" onClick={() => setSlide((value) => value + 1)}>Continue<ArrowRight size={15}/></button> : <button className="button button-primary button-large" type="button" disabled={saving} onClick={() => void begin()}>{saving ? "Calibrating workspace…" : "Build my GridFlow"}<ArrowRight size={15}/></button>}
         </div>
-      </section>
-
-      <section className="welcome-grid">
-        <article className="card welcome-detail"><span className="welcome-detail-icon auto"><Bot size={19}/></span><h3>GridFlow handles</h3><p>Research orchestration, scoring, contact discovery, first drafts, follow-up timing, reply classification, meeting preparation, proposal preparation and safe internal automation.</p></article>
-        <article className="card welcome-detail"><span className="welcome-detail-icon human"><Hand size={19}/></span><h3>You decide</h3><p>Which markets to pursue, which companies are worth contacting, what leaves the business, and every legal, signature, payment or deal-stage decision.</p></article>
-      </section>
-    </Shell>
+      </footer>
+    </OnboardingFrame>
   );
 }

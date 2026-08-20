@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import {
   recommendDiscoveryBriefs,
   type DiscoveryBriefRecommendation,
@@ -29,6 +29,7 @@ interface DriverProfileView extends Record<string, unknown> {
   currency: string;
   audienceSummary: string | null;
   audienceGeography: string[] | null;
+  socialProfiles: Record<string, unknown> | null;
   tone: string | null;
   onboardingStatus: string;
   profileVersion: number;
@@ -85,6 +86,18 @@ export class OnboardingService {
     profileVersion: number;
     recommendations: DiscoveryBriefRecommendation[];
   }> {
+    const linkedInUrl = input.linkedinProfileUrl.trim();
+    if (!/^https:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/in\/[a-z0-9_-]+\/?(?:[?#].*)?$/i.test(linkedInUrl)) {
+      throw new BadRequestException("Add the public URL for your personal LinkedIn profile, such as https://www.linkedin.com/in/your-name.");
+    }
+    const linkedinChecklist = unique(input.linkedinChecklist);
+    const requiredLinkedinSteps = ["account", "photo", "headline", "about", "experience", "featured", "skills", "security"];
+    if (!input.linkedinSetupConfirmed || requiredLinkedinSteps.some((step) => !linkedinChecklist.includes(step))) {
+      throw new BadRequestException("Complete and confirm every required LinkedIn foundation before finishing setup.");
+    }
+    if (input.linkedinHeadline.trim().length < 20 || input.linkedinAbout.trim().length < 80) {
+      throw new BadRequestException("Finish the LinkedIn headline and About drafts before continuing.");
+    }
     const recommendations = recommendDiscoveryBriefs(input);
     const audienceCountries = unique(input.audienceCountries);
     const competitionCountries = unique(input.competitionCountries);
@@ -98,10 +111,10 @@ export class OnboardingService {
            "nationality", "countryOfResidence", "achievements", "currentProgramme",
            "futureGoals", "personalStory", "differentiators", "sponsorshipTargetMinor",
            "minimumDealMinor", "maximumDealMinor", "currency", "audienceSummary",
-           "audienceGeography", "tone", "onboardingStatus", "source", "updatedAt"
+           "audienceGeography", "socialProfiles", "tone", "onboardingStatus", "source", "updatedAt"
          ) VALUES (
            $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-           $13, $14, $15, $16, $17, $18::jsonb, $19, 'COMPLETED', 'MANUAL', CURRENT_TIMESTAMP
+           $13, $14, $15, $16, $17, $18::jsonb, $19::jsonb, $20, 'COMPLETED', 'MANUAL', CURRENT_TIMESTAMP
          )
          ON CONFLICT ("tenantId") DO UPDATE SET
            "athleteName" = EXCLUDED."athleteName",
@@ -121,6 +134,7 @@ export class OnboardingService {
            "currency" = EXCLUDED."currency",
            "audienceSummary" = EXCLUDED."audienceSummary",
            "audienceGeography" = EXCLUDED."audienceGeography",
+           "socialProfiles" = EXCLUDED."socialProfiles",
            "tone" = EXCLUDED."tone",
            "onboardingStatus" = 'COMPLETED',
            "profileVersion" = "DriverProfile"."profileVersion" + 1,
@@ -145,6 +159,16 @@ export class OnboardingService {
           (input.currency ?? "GBP").trim().toUpperCase(),
           input.audienceSummary?.trim() || null,
           JSON.stringify(audienceCountries),
+          JSON.stringify({
+            linkedin: {
+              url: linkedInUrl,
+              readiness: input.linkedinReadiness,
+              headline: input.linkedinHeadline.trim(),
+              about: input.linkedinAbout.trim(),
+              checklist: linkedinChecklist,
+              confirmedAt: new Date().toISOString(),
+            },
+          }),
           input.tone?.trim() || null,
         ],
       );
@@ -286,10 +310,11 @@ export class OnboardingService {
       await tx.query(
         `INSERT INTO "ProductExperienceProgress" (
            "tenantId","userId","experienceVersion","welcomeCompletedAt","onboardingStep","updatedAt"
-         ) VALUES ($1::uuid,$2::uuid,1,CURRENT_TIMESTAMP,4,CURRENT_TIMESTAMP)
+         ) VALUES ($1::uuid,$2::uuid,2,CURRENT_TIMESTAMP,6,CURRENT_TIMESTAMP)
          ON CONFLICT ("tenantId","userId") DO UPDATE SET
            "welcomeCompletedAt"=COALESCE("ProductExperienceProgress"."welcomeCompletedAt",CURRENT_TIMESTAMP),
-           "onboardingStep"=4,
+           "experienceVersion"=GREATEST("ProductExperienceProgress"."experienceVersion",2),
+           "onboardingStep"=6,
            "onboardingDraft"=NULL,
            "onboardingSavedAt"=NULL,
            "updatedAt"=CURRENT_TIMESTAMP`,
@@ -326,7 +351,7 @@ export class OnboardingService {
           `SELECT "athleteName", "sport", "nationality", "countryOfResidence",
                   "currentSeries", "currentTeam", "currentProgramme", "futureGoals",
                   "achievements", "personalStory", "differentiators", "minimumDealMinor", "maximumDealMinor",
-                  "currency", "audienceSummary", "audienceGeography", "tone", "onboardingStatus", "profileVersion"
+                  "currency", "audienceSummary", "audienceGeography", "socialProfiles", "tone", "onboardingStatus", "profileVersion"
            FROM "DriverProfile" WHERE "tenantId" = $1::uuid`,
           [identity.tenantId],
         ),

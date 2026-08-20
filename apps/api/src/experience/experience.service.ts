@@ -3,7 +3,7 @@ import type { RequestIdentity } from "../context/tenant-context.service.js";
 import { DatabaseService } from "../database/database.service.js";
 import type { UpdateExperienceDto } from "./experience.dto.js";
 
-const EXPERIENCE_VERSION = 1;
+const EXPERIENCE_VERSION = 2;
 
 interface ProgressRow extends Record<string, unknown> {
   experienceVersion: number;
@@ -20,6 +20,7 @@ interface ProgressRow extends Record<string, unknown> {
 
 interface SetupRow extends Record<string, unknown> {
   profileReady: boolean;
+  linkedinReady: boolean;
   aiReady: boolean;
   briefReady: boolean;
   pipelineStarted: boolean;
@@ -30,6 +31,7 @@ interface SetupRow extends Record<string, unknown> {
 const setupDefinitions = [
   { key: "welcome", label: "Meet GridFlow", description: "Understand what is automated and what remains under your control.", href: "/welcome" },
   { key: "profile", label: "Build your commercial profile", description: "Give the agents the facts, markets and guardrails they need.", href: "/onboarding" },
+  { key: "linkedin", label: "Complete LinkedIn foundations", description: "Confirm a public athlete profile, sponsor-ready positioning and account security.", href: "/guide" },
   { key: "ai", label: "Confirm AI is ready", description: "Use managed AI or connect your encrypted Gemini key.", href: "/settings/ai" },
   { key: "brief", label: "Activate a Discovery Brief", description: "Choose the market and company profile Atlas should research.", href: "/discovery-briefs" },
   { key: "pipeline", label: "Start your first pipeline", description: "Run Atlas, Sage, Relay and Echo as one controlled workflow.", href: "/discovery-briefs" },
@@ -55,6 +57,13 @@ export class ExperienceService {
       const setup = await tx.query<SetupRow>(
         `SELECT
            EXISTS(SELECT 1 FROM "DriverProfile" WHERE "tenantId"=$1::uuid AND "onboardingStatus"='COMPLETED') AS "profileReady",
+           EXISTS(
+             SELECT 1 FROM "DriverProfile"
+             WHERE "tenantId"=$1::uuid
+               AND COALESCE("socialProfiles"->'linkedin'->>'url','') LIKE 'https://%linkedin.com/in/%'
+               AND CASE WHEN jsonb_typeof("socialProfiles"->'linkedin'->'checklist')='array'
+                 THEN jsonb_array_length("socialProfiles"->'linkedin'->'checklist') ELSE 0 END >= 8
+           ) AS "linkedinReady",
            (
              NOT EXISTS(SELECT 1 FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid)
              OR EXISTS(SELECT 1 FROM "ProductEntitlement" WHERE "tenantId"=$1::uuid AND "agentExecutionMode"<>'BYO_GEMINI')
@@ -124,6 +133,7 @@ export class ExperienceService {
     const completedByKey: Record<(typeof setupDefinitions)[number]["key"], boolean> = {
       welcome: Boolean(progress.welcomeCompletedAt),
       profile: setup.profileReady,
+      linkedin: setup.linkedinReady,
       ai: setup.aiReady,
       brief: setup.briefReady,
       pipeline: setup.pipelineStarted,

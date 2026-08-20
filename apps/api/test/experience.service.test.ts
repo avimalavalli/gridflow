@@ -32,7 +32,7 @@ describe("guided product experience", () => {
     const service = new ExperienceService(new TestDatabaseService(database) as never);
     const initial = await service.get(identity);
     expect(initial.progress).toMatchObject({ welcomeCompletedAt: null, tutorialStep: 0, onboardingStep: 0, onboardingDraft: null, setupDismissedAt: null });
-    expect(initial.setup).toMatchObject({ completed: 1, total: 7, next: { key: "welcome" } });
+    expect(initial.setup).toMatchObject({ completed: 1, total: 8, next: { key: "welcome" } });
     expect(initial.setup.steps.find((step) => step.key === "ai")?.completed).toBe(true);
 
     await service.update(identity, { welcomeCompleted: true, tutorialStep: 2, onboardingStep: 1, onboardingDraft: { name: "Guide Owner", sport: "Racing" } });

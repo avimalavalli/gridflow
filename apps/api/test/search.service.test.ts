@@ -23,7 +23,7 @@ describe("global commercial search", () => {
       [tenant.rows[0]!.id],
     );
     const contact = await database!.query<{ id: string }>(
-      `INSERT INTO "Contact" ("tenantId","companyId","contactName","jobTitle","contactKey","updatedAt") VALUES ($1::uuid,$2::uuid,'Maya Singh','Partnerships Director','maya-singh',CURRENT_TIMESTAMP) RETURNING "id"`,
+      `INSERT INTO "Contact" ("tenantId","companyId","contactName","jobTitle","contactKey","email","linkedinProfileUrl","contactPriority","verificationStatus","confidence","updatedAt") VALUES ($1::uuid,$2::uuid,'Maya Singh','Partnerships Director','maya-singh','maya@apex.test','https://www.linkedin.com/in/maya-singh','PRIMARY','PUBLICLY_LISTED',0.91,CURRENT_TIMESTAMP) RETURNING "id"`,
       [tenant.rows[0]!.id, company.rows[0]!.id],
     );
     const opportunity = await database!.query<{ id: string }>(
@@ -48,5 +48,13 @@ describe("global commercial search", () => {
     expect(person.results.map((item) => item.kind)).toEqual(["CONTACT"]);
     expect((await service.search(tenant.rows[0]!.id, "a")).results).toEqual([]);
     expect((await service.search(tenant.rows[0]!.id, "%_")).results).toEqual([]);
+
+    const quick = await service.quickFind(tenant.rows[0]!.id, "Apex Mobility");
+    expect(quick.companies).toHaveLength(1);
+    expect(quick.companies[0]).toMatchObject({ companyName: "Apex Mobility", contacts: [expect.objectContaining({
+      contactName: "Maya Singh", contactPriority: "PRIMARY", verificationStatus: "PUBLICLY_LISTED", email: "maya@apex.test",
+    })] });
+    expect(quick.companies.some((item) => item.companyName === "Apex Private")).toBe(false);
+    expect((await service.quickFind(tenant.rows[0]!.id, "a")).companies).toEqual([]);
   });
 });

@@ -1,18 +1,40 @@
 import { Type } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   Min,
 } from "class-validator";
 import { RecommendDiscoveryBriefsDto } from "../discovery/discovery.dto.js";
 
 const approvalModes = ["EVERY_MESSAGE", "INITIAL_ONLY", "HIGH_VALUE_ONLY", "NONE"] as const;
+const linkedinReadiness = ["EXISTING", "CREATED_DURING_SETUP"] as const;
 
 export class CompleteOnboardingDto extends RecommendDiscoveryBriefsDto {
+  @IsIn(linkedinReadiness)
+  linkedinReadiness!: (typeof linkedinReadiness)[number];
+
+  @IsUrl({ protocols: ["https"], require_protocol: true, require_tld: true })
+  linkedinProfileUrl!: string;
+
+  @IsString()
+  linkedinHeadline!: string;
+
+  @IsString()
+  linkedinAbout!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  linkedinChecklist!: string[];
+
+  @IsBoolean()
+  linkedinSetupConfirmed!: boolean;
+
   @IsOptional()
   @IsString()
   currentSeries?: string;

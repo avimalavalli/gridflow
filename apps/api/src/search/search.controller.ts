@@ -12,4 +12,10 @@ export class SearchController {
     const identity = await this.context.resolve(request);
     return this.searchService.search(identity.tenantId, query);
   }
+
+  @Get("quickfind")
+  async quickFind(@Req() request: Request, @Query("company") company?: string) {
+    const identity = await this.context.resolve(request);
+    return this.searchService.quickFind(identity.tenantId, company);
+  }
 }

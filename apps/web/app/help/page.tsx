@@ -2,11 +2,27 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BookOpen, Search } from "lucide-react";
+import { ArrowRight, BookOpen, FileDown, Linkedin, ScanSearch, Search } from "lucide-react";
 import { PageHead } from "../../components/page-head";
 import { Shell } from "../../components/shell";
 
 const chapters = [
+  { id: "linkedin", title: "LinkedIn: create and complete your profile", summary: "A field-by-field build guide for the professional identity behind LinkedIn-first outreach.", route: "/guide", sections: [
+    ["1. Create the account safely", "Open LinkedIn's official sign-up page. Use your real name, an email you control and a unique password. Complete LinkedIn's own verification. GridFlow will never ask for your LinkedIn password, verification code or session."],
+    ["2. Add the visual identity", "Use a clear recent headshot, an accurate location and a clean motorsport banner you are permitted to use. Avoid old sponsor marks or imagery you cannot lawfully publish."],
+    ["3. Write the headline", "State what you do, your current championship or ambition and the credible commercial themes you support. A useful pattern is: Driver or series | programme or ambition | performance, partnerships and relevant brand themes."],
+    ["4. Write About in first person", "Use short paragraphs: current programme; evidence-backed journey; audience, access or content value; partnership principles; simple invitation to connect. Remove generic claims and anything you could not prove."],
+    ["5. Add professional proof", "Create an Experience entry for your current driver role and programme. Add real dates, responsibilities and verified results. Use Featured for a race reel, media kit, official results, press coverage, website or sponsor case study."],
+    ["6. Add skills and a clean URL", "Prioritise commercially relevant skills and ask trusted people for honest recommendations. Set a short custom public URL based on your name or professional brand, then paste the linkedin.com/in/... address into GridFlow."],
+    ["7. Review visibility and security", "Choose what should appear publicly, add a recovery method and enable two-factor authentication—preferably with an authenticator app. Never send a code to GridFlow support."],
+    ["8. First-week routine", "Connect only with people you genuinely know first. Follow relevant companies and decision-makers, publish or feature credible programme proof, then use GridFlow research to prepare personalised connection notes. You still send every LinkedIn action yourself."],
+  ]},
+  { id: "quickfind", title: "QuickFind", summary: "Get the strongest researched contact for a company without searching through the CRM.", route: "/quickfind", sections: [
+    ["What QuickFind answers", "Enter part or all of a company name. GridFlow returns matching companies and ranks primary, secondary and backup contacts using the evidence, verification, priority and confidence already stored in your workspace."],
+    ["What the labels mean", "Best match is the highest-ranked stored contact, not a guarantee that they own the decision. Publicly listed and email verified are stronger than unverified. Unknown means GridFlow does not have a reliable value."],
+    ["If no company appears", "The company has not been researched in this workspace. Open Discovery Briefs and run the Atlas → Sage → Relay → Echo pipeline with a realistic market and company profile."],
+    ["If the company has no contact", "Open the company and inspect contact-discovery status. Run or retry Relay only through the controlled workflow. Do not create guessed names, titles or email patterns."],
+  ]},
   { id: "start", title: "Start here", summary: "The shortest safe path from a new account to a useful sponsor pipeline.", route: "/guide", sections: [
     ["1. Finish your profile", "Open onboarding and describe the athlete, programme, story, target markets, preferred industries and commercial range. GridFlow uses these facts across every agent."],
     ["2. Confirm the provider", "Core accounts connect a Gemini key in Intelligence Setup when requested. Ultra or managed accounts may not need a personal key. Keys are verified server-side, encrypted and never displayed again."],
@@ -140,6 +156,7 @@ export default function HelpPage() {
   return (
     <Shell title="Help Centre">
       <PageHead eyebrow="Reference and support" title="Help Centre" description="Search the manual, revisit a workflow and open the relevant workspace directly." action={<Link className="button button-primary" href="/guide"><BookOpen size={15}/>Open guided tutorial</Link>} />
+      <div className="help-downloads" aria-label="Downloadable guides"><a href="/guides/gridflow-linkedin-playbook.pdf" target="_blank" rel="noreferrer"><Linkedin size={15}/><span>LinkedIn playbook</span><FileDown size={13}/></a><a href="/guides/gridflow-launch-checklist.pdf" target="_blank" rel="noreferrer"><BookOpen size={15}/><span>Launch checklist</span><FileDown size={13}/></a><a href="/guides/gridflow-workflow-handbook.pdf" target="_blank" rel="noreferrer"><ScanSearch size={15}/><span>Workflow handbook</span><FileDown size={13}/></a></div>
       <div className="help-search"><Search size={18}/><input aria-label="Search the GridFlow manual" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents, API keys, outreach, devices, proposals…"/></div>
       <div className="help-layout">
         <aside className="card help-index" aria-label="Manual chapters">

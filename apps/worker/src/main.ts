@@ -1,6 +1,6 @@
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
-import { closeDatabase, getDatabase, migrateDatabase } from "@gridflow/database";
+import { closeDatabase, getDatabase, migrateConfiguredDatabase } from "@gridflow/database";
 import { AgentEngine, AutomationControlEngine } from "@gridflow/engine";
 import { OpenAIAgentProvider } from "@gridflow/integrations";
 import { EmailAutomationProcessor } from "./email-automation.js";
@@ -22,7 +22,7 @@ loadEnv({ path: resolve(process.cwd(), ".env"), quiet: true });
 const once = process.argv.includes("--once");
 const pollMs = Math.max(500, Number(process.env.AGENT_WORKER_POLL_MS ?? 2_000));
 const database = await getDatabase();
-await migrateDatabase(database);
+await migrateConfiguredDatabase(database);
 
 const recoveryEngine = new AgentEngine(database);
 const automationControl = new AutomationControlEngine(database);

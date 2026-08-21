@@ -38,8 +38,11 @@ AUTH_DEVICE_COOKIE_NAME=gridflow_device
 NODE_ENV=production
 PORT=3001
 WEB_ORIGIN=https://<gridflow-web-public-domain>
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-DATABASE_SSL=false
+DATABASE_URL=<TLS runtime URL for a non-superuser, non-BYPASSRLS role>
+DATABASE_MIGRATION_URL=${{Postgres.DATABASE_URL}}
+DATABASE_SSL=true
+DATABASE_SSL_CA=<output of: openssl x509 -in /var/lib/postgresql/data/certs/root.crt -outform PEM | base64 -w0>
+DATABASE_SSL_SERVERNAME=localhost
 DATABASE_POOL_MAX=10
 GRIDFLOW_DEV_BOOTSTRAP=false
 AUTH_SIGNUP_MODE=ACTIVATION
@@ -55,7 +58,7 @@ AUTH_FROM_EMAIL=GridFlow <no-reply@your-verified-domain>
 RESEND_API_KEY=<secret>
 ```
 
-Add the OpenAI, Google OAuth, integration encryption, release, alerting and backup variables from `.env.example` before enabling those modules. `INTEGRATION_ENCRYPTION_KEY` is mandatory for customer Gemini keys and must be identical on the API and worker. Use the private PostgreSQL reference from the PostgreSQL service in the same Railway environment. Railway private database traffic does not require application-level SSL, so `DATABASE_SSL=false` avoids a TLS mismatch on the internal address.
+Add the OpenAI, Google OAuth, integration encryption, release, alerting and backup variables from `.env.example` before enabling those modules. `INTEGRATION_ENCRYPTION_KEY` is mandatory for customer Gemini keys and must be identical on the API and worker. Use a dedicated login role for `DATABASE_URL`; grant only connect, schema usage, required table DML, sequence usage and function execution. Keep the PostgreSQL administrator URL only in `DATABASE_MIGRATION_URL`. GridFlow closes that connection after migrations and serves normal traffic through the restricted role. Verify Railway PostgreSQL's private certificate authority through `DATABASE_SSL_CA`; never replace verification with `rejectUnauthorized=false`.
 
 Phase 5.1 also requires `OPERATIONS_PROBE_TOKEN` on the API. Use the same 32+-character value for the GitHub Actions secret of that name. Production monitoring and backup acceptance gates are proof-backed: a URL or checkbox alone cannot mark them ready.
 
@@ -65,8 +68,11 @@ Use the same values as the API for:
 
 ```bash
 NODE_ENV=production
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-DATABASE_SSL=false
+DATABASE_URL=<same restricted TLS runtime URL as API>
+DATABASE_MIGRATION_URL=${{Postgres.DATABASE_URL}}
+DATABASE_SSL=true
+DATABASE_SSL_CA=<same base64 Railway PostgreSQL root CA as API>
+DATABASE_SSL_SERVERNAME=localhost
 DATABASE_POOL_MAX=10
 AUTH_ENCRYPTION_KEY=<same-value-as-api>
 INTEGRATION_ENCRYPTION_KEY=<same-value-as-api>

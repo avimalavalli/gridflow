@@ -1,6 +1,7 @@
 import { config as loadDotEnv } from "dotenv";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { checkServerIdentity, type ConnectionOptions } from "node:tls";
 import { fileURLToPath } from "node:url";
 import { PGlite, type Transaction as PGliteTransaction } from "@electric-sql/pglite";
 import { Pool, type PoolClient, type QueryResult as PgQueryResult } from "pg";
@@ -114,7 +115,7 @@ class PostgresDatabase implements GridFlowDatabase {
       max: Number(process.env.DATABASE_POOL_MAX ?? 10),
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 10_000,
-      ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: true } : undefined,
+      ssl: databaseSslOptions(),
     });
   }
 
@@ -147,6 +148,24 @@ class PostgresDatabase implements GridFlowDatabase {
   async close(): Promise<void> {
     await this.pool.end();
   }
+}
+
+export function databaseSslOptions(): ConnectionOptions | undefined {
+  if (process.env.DATABASE_SSL !== "true") return undefined;
+  const configuredCa = process.env.DATABASE_SSL_CA?.trim();
+  const expectedServerName = process.env.DATABASE_SSL_SERVERNAME?.trim();
+  const identityCheck = expectedServerName
+    ? { checkServerIdentity: (_host: string, certificate: Parameters<typeof checkServerIdentity>[1]) => checkServerIdentity(expectedServerName, certificate) }
+    : {};
+  if (!configuredCa) return { rejectUnauthorized: true, ...identityCheck };
+
+  const ca = configuredCa.includes("BEGIN CERTIFICATE")
+    ? configuredCa.replace(/\\n/g, "\n")
+    : Buffer.from(configuredCa, "base64").toString("utf8");
+  if (!ca.includes("-----BEGIN CERTIFICATE-----") || !ca.includes("-----END CERTIFICATE-----")) {
+    throw new Error("DATABASE_SSL_CA must be a PEM certificate or its base64 encoding.");
+  }
+  return { rejectUnauthorized: true, ca, ...identityCheck };
 }
 
 export function databaseUrl(): string {

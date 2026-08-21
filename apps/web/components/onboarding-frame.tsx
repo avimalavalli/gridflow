@@ -11,7 +11,15 @@ export function OnboardingFrame({ children, step, total, status = "Private works
         <Image className="first-run-logo" src={gridFlowLogo} alt="GridFlow" priority />
         <div className="first-run-status"><ShieldCheck size={14}/><span>{status}</span></div>
       </header>
-      <div className="first-run-progress" aria-label={`Setup progress: ${progress}%`}><span style={{ width: `${progress}%` }}/></div>
+      <div
+        className="first-run-progress"
+        role="progressbar"
+        aria-label="Setup progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-valuetext={`${progress}% complete`}
+      ><span style={{ width: `${progress}%` }}/></div>
       {children}
     </main>
   );

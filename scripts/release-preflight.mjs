@@ -1,5 +1,8 @@
 const required = [
   "DATABASE_URL",
+  "DATABASE_MIGRATION_URL",
+  "DATABASE_SSL_CA",
+  "DATABASE_SSL_SERVERNAME",
   "WEB_ORIGIN",
   "AUTH_ENCRYPTION_KEY",
   "AUTH_FROM_EMAIL",
@@ -31,6 +34,7 @@ if (process.env.NODE_ENV !== "production") failures.push("NODE_ENV must be produ
 if (process.env.GRIDFLOW_DEV_BOOTSTRAP !== "false") failures.push("GRIDFLOW_DEV_BOOTSTRAP must be false.");
 if (process.env.AUTH_SECURE_COOKIES !== "true") failures.push("AUTH_SECURE_COOKIES must be true.");
 if (process.env.DATABASE_SSL !== "true") failures.push("DATABASE_SSL must be true with certificate verification in production.");
+if (process.env.DATABASE_URL?.trim() === process.env.DATABASE_MIGRATION_URL?.trim()) failures.push("DATABASE_URL must use a restricted runtime role, not the migration administrator connection.");
 if ((process.env.AUTH_MAIL_PROVIDER ?? "").toUpperCase() !== "RESEND") failures.push("AUTH_MAIL_PROVIDER must be RESEND.");
 if ((process.env.AUTH_ENCRYPTION_KEY ?? "").length < 32) failures.push("AUTH_ENCRYPTION_KEY must contain at least 32 characters.");
 if ((process.env.INTEGRATION_ENCRYPTION_KEY ?? "").length < 32) failures.push("INTEGRATION_ENCRYPTION_KEY must contain at least 32 characters.");

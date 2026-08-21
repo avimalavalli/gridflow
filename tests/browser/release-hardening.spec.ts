@@ -90,18 +90,58 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   await page.waitForURL(/\/(welcome|onboarding|pending-approval)/);
   await expect(page.locator("main")).toBeVisible();
   if (page.url().endsWith("/welcome")) {
-    await expect(page.getByRole("heading", { name: new RegExp(`Welcome to GridFlow, Release`, "i") })).toBeVisible();
-    await expect(page.getByText("Atlas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome, Release\. Your commercial operation, connected\./i })).toBeVisible();
+    await expect(page.getByText(/Five short slides · about two minutes/i)).toBeVisible();
+    await expect(page.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute("aria-valuenow", "20");
     await expectNoWcagViolations(page);
-    await page.getByRole("button", { name: /Set up my GridFlow/i }).click();
+    const introductionHeadings = [
+      "A coordinated team works behind the interface.",
+      "Automation prepares. You decide.",
+      "Useful answers, without invented certainty.",
+      "Now GridFlow gets to know your programme.",
+    ];
+    for (const [index, heading] of introductionHeadings.entries()) {
+      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      await expect(page.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute("aria-valuenow", String((index + 2) * 20));
+      if (index === 0) await expect(page.getByText(/Atlas discovers\. Sage verifies\. Relay identifies decision-makers\./i)).toBeVisible();
+    }
+    await expect(page.getByRole("button", { name: /Build my GridFlow/i })).toBeEnabled();
+    await expectNoWcagViolations(page);
+    await page.getByRole("button", { name: /Build my GridFlow/i }).click();
     await page.waitForURL(/\/onboarding/);
   }
   if (page.url().endsWith("/onboarding")) {
-    await expect(page.getByRole("heading", { name: "Set up your commercial profile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Build your GridFlow foundation" })).toBeVisible();
     await expect(page.getByText(/progress saves automatically/i)).toBeVisible();
+    for (const field of ["Your name", "Sport / racing category", "Nationality", "Country you are based in", "Current series", "Current team", "Current programme", "Countries you compete in"]) {
+      await expect(page.getByLabel(field, { exact: true })).toBeVisible();
+    }
     await expectNoWcagViolations(page);
+    const onboardingResponse = await page.request.post("/backend/onboarding/complete", {
+      data: {
+        name: `Release ${suffix}`,
+        sport: "GT racing",
+        nationality: "British",
+        residenceCountry: "United Kingdom",
+        competitionCountries: ["United Kingdom"],
+        targetCountries: ["United Kingdom"],
+        preferredIndustries: ["Technology"],
+        excludedIndustries: [],
+        outreachStrategy: "LINKEDIN_FIRST",
+        emailAutomationMode: "DRAFT_ONLY",
+        linkedinReadiness: "EXISTING",
+        linkedinProfileUrl: `https://www.linkedin.com/in/release-${suffix}`,
+        linkedinHeadline: `Release ${suffix} | GT racing and commercial partnerships`,
+        linkedinAbout: `Release ${suffix} competes in GT racing and develops credible commercial partnerships through measurable performance, technical insight and shared long-term growth.`,
+        linkedinChecklist: ["account", "photo", "headline", "about", "experience", "featured", "skills", "security"],
+        linkedinSetupConfirmed: true,
+      },
+      headers: { Origin: "http://localhost:3000" },
+    });
+    expect(onboardingResponse.ok()).toBe(true);
     await page.goto("/guide");
-    await expect(page.getByRole("heading", { name: "Learn the workflow in ten steps" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Learn the complete workflow interactively" })).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/help");
     await expect(page.getByRole("heading", { name: "Help Centre", exact: true })).toBeVisible();

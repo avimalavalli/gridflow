@@ -2,7 +2,7 @@ import { Injectable, OnApplicationShutdown, OnModuleInit } from "@nestjs/common"
 import {
   closeDatabase,
   getDatabase,
-  migrateDatabase,
+  migrateConfiguredDatabase,
   setPlatformContext,
   setTenantContext,
   type GridFlowDatabase,
@@ -15,7 +15,7 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
 
   async onModuleInit(): Promise<void> {
     this.database = await getDatabase();
-    await migrateDatabase(this.database);
+    await migrateConfiguredDatabase(this.database);
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -25,7 +25,7 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
   private async db(): Promise<GridFlowDatabase> {
     if (!this.database) {
       this.database = await getDatabase();
-      await migrateDatabase(this.database);
+      await migrateConfiguredDatabase(this.database);
     }
     return this.database;
   }

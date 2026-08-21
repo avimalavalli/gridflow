@@ -90,10 +90,23 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   await page.waitForURL(/\/(welcome|onboarding|pending-approval)/);
   await expect(page.locator("main")).toBeVisible();
   if (page.url().endsWith("/welcome")) {
-    await expect(page.getByRole("heading", { name: new RegExp(`Welcome to GridFlow, Release`, "i") })).toBeVisible();
-    await expect(page.getByText("Atlas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome, Release\. Your commercial operation, connected\./i })).toBeVisible();
+    await expect(page.getByText(/Five short slides · about two minutes/i)).toBeVisible();
     await expectNoWcagViolations(page);
-    await page.getByRole("button", { name: /Set up my GridFlow/i }).click();
+    const introductionHeadings = [
+      "A coordinated team works behind the interface.",
+      "Automation prepares. You decide.",
+      "Useful answers, without invented certainty.",
+      "Now GridFlow gets to know your programme.",
+    ];
+    for (const [index, heading] of introductionHeadings.entries()) {
+      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      if (index === 0) await expect(page.getByText(/Atlas discovers\. Sage verifies\. Relay identifies decision-makers\./i)).toBeVisible();
+    }
+    await expect(page.getByRole("button", { name: /Build my GridFlow/i })).toBeEnabled();
+    await expectNoWcagViolations(page);
+    await page.getByRole("button", { name: /Build my GridFlow/i }).click();
     await page.waitForURL(/\/onboarding/);
   }
   if (page.url().endsWith("/onboarding")) {

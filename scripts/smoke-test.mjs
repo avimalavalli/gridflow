@@ -238,3 +238,14 @@ try {
   assert(opportunities.opportunities.some((item) => item.id === opportunity.id), "Opportunity pipeline omitted the created deal.");
   assert(tasks.tasks.some((item) => item.id === task.id && item.status === "COMPLETED"), "Task update was not persisted.");
   assert(interactions.interactions.some((item) => item.id === interaction.id), "Interaction timeline omitted the created interaction.");
+  assert(meetings.meetings.some((item) => item.id === meeting.id), "Meeting workspace omitted the created meeting.");
+
+  console.log("GridFlow smoke test passed: onboarding, personalised briefs, commercial CRM workspaces, pipeline, tasks, interactions, meetings and dashboard queues.");
+} finally {
+  child.kill("SIGTERM");
+  await new Promise((resolveExit) => {
+    child.once("exit", resolveExit);
+    setTimeout(resolveExit, 2_000);
+  });
+  await rm(dataDirectory, { recursive: true, force: true });
+}

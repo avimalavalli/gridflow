@@ -112,11 +112,11 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     await page.waitForURL(/\/onboarding/);
   }
   if (page.url().endsWith("/onboarding")) {
-    await expect(page.getByRole("heading", { name: "Set up your commercial profile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Build your GridFlow foundation" })).toBeVisible();
     await expect(page.getByText(/progress saves automatically/i)).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/guide");
-    await expect(page.getByRole("heading", { name: "Learn the workflow in ten steps" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Learn the complete workflow interactively" })).toBeVisible();
     await expectNoWcagViolations(page);
     await page.goto("/help");
     await expect(page.getByRole("heading", { name: "Help Centre", exact: true })).toBeVisible();

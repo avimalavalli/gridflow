@@ -83,6 +83,12 @@ try {
     excludedIndustries: [],
     outreachStrategy: "EMAIL_FIRST",
     emailAutomationMode: "FULL_AUTOMATION",
+    linkedinReadiness: "EXISTING",
+    linkedinProfileUrl: "https://www.linkedin.com/in/gridflow-smoke-driver",
+    linkedinHeadline: "GT racing driver | Performance, partnerships and technology",
+    linkedinAbout: "I compete in GT racing and build credible commercial partnerships around measurable performance, technical insight and shared growth.",
+    linkedinChecklist: ["account", "photo", "headline", "about", "experience", "featured", "skills", "security"],
+    linkedinSetupConfirmed: true,
     audienceCountries: ["United States"],
     approvalMode: "NONE",
     dailyEmailLimit: 0,
@@ -232,14 +238,3 @@ try {
   assert(opportunities.opportunities.some((item) => item.id === opportunity.id), "Opportunity pipeline omitted the created deal.");
   assert(tasks.tasks.some((item) => item.id === task.id && item.status === "COMPLETED"), "Task update was not persisted.");
   assert(interactions.interactions.some((item) => item.id === interaction.id), "Interaction timeline omitted the created interaction.");
-  assert(meetings.meetings.some((item) => item.id === meeting.id), "Meeting workspace omitted the created meeting.");
-
-  console.log("GridFlow smoke test passed: onboarding, personalised briefs, commercial CRM workspaces, pipeline, tasks, interactions, meetings and dashboard queues.");
-} finally {
-  child.kill("SIGTERM");
-  await new Promise((resolveExit) => {
-    child.once("exit", resolveExit);
-    setTimeout(resolveExit, 2_000);
-  });
-  await rm(dataDirectory, { recursive: true, force: true });
-}

@@ -114,6 +114,9 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   if (page.url().endsWith("/onboarding")) {
     await expect(page.getByRole("heading", { name: "Build your GridFlow foundation" })).toBeVisible();
     await expect(page.getByText(/progress saves automatically/i)).toBeVisible();
+    for (const field of ["Your name", "Sport / racing category", "Nationality", "Country you are based in", "Current series", "Current team", "Current programme", "Countries you compete in"]) {
+      await expect(page.getByLabel(field, { exact: true })).toBeVisible();
+    }
     await expectNoWcagViolations(page);
     await page.goto("/guide");
     await expect(page.getByRole("heading", { name: "Learn the complete workflow interactively" })).toBeVisible();

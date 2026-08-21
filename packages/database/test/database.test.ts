@@ -56,7 +56,7 @@ describe("GridFlow database", () => {
     const migrations = await database.query<{ count: number }>(
       `SELECT COUNT(*)::int AS "count" FROM "_GridFlowMigration"`,
     );
-    expect(migrations.rows[0]?.count).toBe(28);
+    expect(migrations.rows[0]?.count).toBe(29);
   });
 
   it("enforces tenant-scoped company keys at database level", async () => {
@@ -96,7 +96,12 @@ describe("GridFlow database", () => {
     );
     const [tenantA, tenantB] = organisations.rows.map((row) => row.id);
     expect(tenantA).toBeTruthy(); expect(tenantB).toBeTruthy();
-    await database.exec(`CREATE ROLE gridflow_runtime_test NOLOGIN; GRANT USAGE ON SCHEMA public TO gridflow_runtime_test; GRANT SELECT,INSERT,UPDATE,DELETE ON "Company" TO gridflow_runtime_test;`);
+    await database.query(
+      `INSERT INTO "ProductEntitlement" ("tenantId","status","updatedAt") VALUES
+         ($1::uuid,'ACTIVE',CURRENT_TIMESTAMP),($2::uuid,'ACTIVE',CURRENT_TIMESTAMP)`,
+      [tenantA, tenantB],
+    );
+    await database.exec(`CREATE ROLE gridflow_runtime_test NOLOGIN; GRANT USAGE ON SCHEMA public TO gridflow_runtime_test; GRANT SELECT,INSERT,UPDATE,DELETE ON "Company" TO gridflow_runtime_test; GRANT SELECT ON "ProductEntitlement" TO gridflow_runtime_test;`);
 
     await database.transaction(async (tx) => {
       await tx.exec(`SET LOCAL ROLE gridflow_runtime_test`);
@@ -107,9 +112,13 @@ describe("GridFlow database", () => {
       );
       const visibleA = await tx.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "Company"`);
       expect(visibleA.rows[0]?.count).toBe(1);
+      const entitlementA = await tx.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "ProductEntitlement"`);
+      expect(entitlementA.rows[0]?.count).toBe(1);
       await setTenantContext(tx, tenantB!);
       const visibleB = await tx.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "Company"`);
       expect(visibleB.rows[0]?.count).toBe(0);
+      const entitlementB = await tx.query<{ count: number }>(`SELECT COUNT(*)::int AS "count" FROM "ProductEntitlement"`);
+      expect(entitlementB.rows[0]?.count).toBe(1);
       expect((await tx.query(`UPDATE "Company" SET "companyName"='Cross tenant' WHERE "tenantId"=$1::uuid`, [tenantA])).rowCount).toBe(0);
       expect((await tx.query(`DELETE FROM "Company" WHERE "tenantId"=$1::uuid`, [tenantA])).rowCount).toBe(0);
       await expect(tx.query(
@@ -137,5 +146,14 @@ describe("GridFlow database", () => {
     expect(coverage.rows).toHaveLength(50);
     expect(coverage.rows.every((row) => row.forced && row.policy.includes("gridflow_current_tenant_id") && row.policy.includes("gridflow_platform_operation"))).toBe(true);
     expect(JSON.stringify(coverage.rows)).not.toMatch(/app\.tenant_id|app\.current_tenant[^_]/);
+
+    const entitlementPolicy = await database.query<{ forced: boolean; policy: string }>(
+      `SELECT c.relforcerowsecurity AS "forced",pg_get_expr(p.polqual,p.polrelid) AS "policy"
+       FROM pg_class c JOIN pg_policy p ON p.polrelid=c.oid WHERE c.relname='ProductEntitlement'`,
+    );
+    expect(entitlementPolicy.rows[0]?.forced).toBe(true);
+    expect(entitlementPolicy.rows[0]?.policy).toContain("gridflow_current_tenant_id");
+    expect(entitlementPolicy.rows[0]?.policy).toContain("gridflow_platform_operation");
+    expect(entitlementPolicy.rows[0]?.policy).not.toMatch(/app\.tenant_id|app\.current_tenant[^_]/);
   });
 });

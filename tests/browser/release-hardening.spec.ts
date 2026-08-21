@@ -118,6 +118,28 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
       await expect(page.getByLabel(field, { exact: true })).toBeVisible();
     }
     await expectNoWcagViolations(page);
+    const onboardingResponse = await page.request.post("/backend/onboarding/complete", {
+      data: {
+        name: `Release ${suffix}`,
+        sport: "GT racing",
+        nationality: "British",
+        residenceCountry: "United Kingdom",
+        competitionCountries: ["United Kingdom"],
+        targetCountries: ["United Kingdom"],
+        preferredIndustries: ["Technology"],
+        excludedIndustries: [],
+        outreachStrategy: "LINKEDIN_FIRST",
+        emailAutomationMode: "DRAFT_ONLY",
+        linkedinReadiness: "EXISTING",
+        linkedinProfileUrl: `https://www.linkedin.com/in/release-${suffix}`,
+        linkedinHeadline: `Release ${suffix} | GT racing and commercial partnerships`,
+        linkedinAbout: `Release ${suffix} competes in GT racing and develops credible commercial partnerships through measurable performance, technical insight and shared long-term growth.`,
+        linkedinChecklist: ["account", "photo", "headline", "about", "experience", "featured", "skills", "security"],
+        linkedinSetupConfirmed: true,
+      },
+      headers: { Origin: "http://localhost:3000" },
+    });
+    expect(onboardingResponse.ok()).toBe(true);
     await page.goto("/guide");
     await expect(page.getByRole("heading", { name: "Learn the complete workflow interactively" })).toBeVisible();
     await expectNoWcagViolations(page);

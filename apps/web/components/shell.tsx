@@ -306,7 +306,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
           </div>
           <div className="topbar-actions">
             <Link className="icon-button topbar-help" href="/help" aria-label="Open Help Centre" title="Help Centre"><LifeBuoy size={17} /></Link>
-            <Link className="quickfind-trigger" href="/quickfind"><ScanSearch size={16}/><span>QuickFind</span></Link>
+            <Link className="quickfind-trigger" href="/quickfind" aria-label="Open QuickFind" title="QuickFind"><ScanSearch size={16}/><span>QuickFind</span></Link>
             <button className="search-trigger" type="button" aria-label="Search GridFlow" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Search GridFlow</span><kbd>⌘ K</kbd></button>
             <Link className="avatar" href="/team" title={auth?.user.name ?? "Current account"}>{accountInitials}</Link>
           </div>

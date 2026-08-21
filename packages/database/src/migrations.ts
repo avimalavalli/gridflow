@@ -30,6 +30,7 @@ const MIGRATIONS = [
   "20260813230000_phase_8c_acceptance_freeze",
   "20260814010000_security_privacy_launch_assurance",
   "20260820143000_interactive_onboarding_quickfind",
+  "20260821113000_product_entitlement_rls",
 ] as const;
 
 async function applyMigrations(database: SqlExecutor, kind: GridFlowDatabase["kind"]): Promise<void> {

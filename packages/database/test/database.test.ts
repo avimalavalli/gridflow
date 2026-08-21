@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDatabase, migrateDatabase, setTenantContext, type GridFlowDatabase } from "../src/index.js";
+import { createDatabase, databaseSslOptions, migrateDatabase, setTenantContext, type GridFlowDatabase } from "../src/index.js";
 
 const openDatabases: GridFlowDatabase[] = [];
 const tempDirectories: string[] = [];
@@ -13,6 +13,30 @@ afterEach(async () => {
 });
 
 describe("GridFlow database", () => {
+  it("verifies TLS and accepts a pinned Railway certificate authority", () => {
+    const originalSsl = process.env.DATABASE_SSL;
+    const originalCa = process.env.DATABASE_SSL_CA;
+    const originalServerName = process.env.DATABASE_SSL_SERVERNAME;
+    try {
+      process.env.DATABASE_SSL = "true";
+      process.env.DATABASE_SSL_SERVERNAME = "localhost";
+      const pem = "-----BEGIN CERTIFICATE-----\ntest-ca\n-----END CERTIFICATE-----";
+      process.env.DATABASE_SSL_CA = Buffer.from(pem, "utf8").toString("base64");
+      const options = databaseSslOptions();
+      expect(options).toMatchObject({ rejectUnauthorized: true, ca: pem });
+      expect(options?.checkServerIdentity).toBeTypeOf("function");
+      process.env.DATABASE_SSL_CA = "not-a-certificate";
+      expect(() => databaseSslOptions()).toThrow(/PEM certificate/i);
+    } finally {
+      if (originalSsl === undefined) delete process.env.DATABASE_SSL;
+      else process.env.DATABASE_SSL = originalSsl;
+      if (originalCa === undefined) delete process.env.DATABASE_SSL_CA;
+      else process.env.DATABASE_SSL_CA = originalCa;
+      if (originalServerName === undefined) delete process.env.DATABASE_SSL_SERVERNAME;
+      else process.env.DATABASE_SSL_SERVERNAME = originalServerName;
+    }
+  });
+
   it("applies all PostgreSQL migrations idempotently", async () => {
     const directory = await mkdtemp(join(tmpdir(), "gridflow-db-"));
     tempDirectories.push(directory);

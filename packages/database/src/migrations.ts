@@ -1,4 +1,4 @@
-import type { GridFlowDatabase } from "./database.js";
+import { createDatabase, databaseUrl, type GridFlowDatabase, type SqlExecutor } from "./database.js";
 import { readMigrationSql } from "./database.js";
 
 const MIGRATIONS = [
@@ -32,7 +32,7 @@ const MIGRATIONS = [
   "20260820143000_interactive_onboarding_quickfind",
 ] as const;
 
-export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {
+async function applyMigrations(database: SqlExecutor, kind: GridFlowDatabase["kind"]): Promise<void> {
   await database.exec(`
     CREATE TABLE IF NOT EXISTS "_GridFlowMigration" (
       "name" TEXT PRIMARY KEY,
@@ -48,16 +48,37 @@ export async function migrateDatabase(database: GridFlowDatabase): Promise<void>
     if (applied.rows.length > 0) continue;
 
     let sql = await readMigrationSql(migration);
-    if (database.kind === "pglite") {
+    if (kind === "pglite") {
       sql = sql.replace('CREATE EXTENSION IF NOT EXISTS "pgcrypto";', "");
     }
+    await database.exec(sql);
+    await database.query(
+      `INSERT INTO "_GridFlowMigration" ("name") VALUES ($1)`,
+      [migration],
+    );
+  }
+}
 
-    await database.transaction(async (tx) => {
-      await tx.exec(sql);
-      await tx.query(
-        `INSERT INTO "_GridFlowMigration" ("name") VALUES ($1)`,
-        [migration],
-      );
-    });
+export async function migrateDatabase(database: GridFlowDatabase): Promise<void> {
+  await database.transaction(async (tx) => {
+    if (database.kind === "postgres") {
+      await tx.query("SELECT pg_advisory_xact_lock($1)", [840_728_611]);
+    }
+    await applyMigrations(tx, database.kind);
+  });
+}
+
+export async function migrateConfiguredDatabase(runtimeDatabase: GridFlowDatabase): Promise<void> {
+  const migrationUrl = process.env.DATABASE_MIGRATION_URL?.trim();
+  if (!migrationUrl || migrationUrl === databaseUrl()) {
+    await migrateDatabase(runtimeDatabase);
+    return;
+  }
+
+  const migrationDatabase = await createDatabase(migrationUrl);
+  try {
+    await migrateDatabase(migrationDatabase);
+  } finally {
+    await migrationDatabase.close();
   }
 }

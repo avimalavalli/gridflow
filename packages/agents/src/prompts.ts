@@ -15,6 +15,7 @@ const sharedEvidenceRules = `
 Evidence rules:
 - Never invent a company, person, job title, email, phone number, website, commercial fact or source.
 - Use only facts supported by supplied records or current public evidence.
+- For web-research agents, copy every source URL exactly from a URL returned by web search in the current run. Never reconstruct, predict or infer a source URL from a title, snippet or known URL pattern.
 - Store a source URL, page title, supported fact, retrieval timestamp, source type and confidence for every factual claim used.
 - State Unknown when reliable evidence is unavailable. Do not fill gaps with plausible-sounding assumptions.
 - Prefer the company's own site, official registries, filings and current public professional profiles. Use news or industry sources only where appropriate.
@@ -23,7 +24,7 @@ Evidence rules:
 
 export const atlasPrompt: AgentPromptDefinition = {
   name: "ATLAS",
-  version: "reconstructed-1.0.0",
+  version: "reconstructed-1.0.1",
   provenance: "RECONSTRUCTED",
   responsibility: "Discover realistic sponsor companies from an active Discovery Brief and athlete profile.",
   webSearchAllowed: true,
@@ -62,7 +63,7 @@ Return only an object matching the output schema.`,
 
 export const sagePrompt: AgentPromptDefinition = {
   name: "SAGE",
-  version: "reconstructed-1.0.0",
+  version: "reconstructed-1.0.1",
   provenance: "RECONSTRUCTED",
   responsibility: "Research, score and qualify a company for the athlete's sponsorship pipeline.",
   webSearchAllowed: true,
@@ -106,7 +107,7 @@ Return only an object matching the output schema.`,
 
 export const relayPrompt: AgentPromptDefinition = {
   name: "RELAY",
-  version: "reconstructed-1.0.0",
+  version: "reconstructed-1.0.1",
   provenance: "RECONSTRUCTED",
   responsibility: "Find current, evidenced decision-makers for one researched company.",
   webSearchAllowed: true,

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AtlasOutput, EchoOutput, RelayOutput, SageOutput } from "@gridflow/agents";
 import { createDatabase, migrateDatabase, setTenantContext, type GridFlowDatabase } from "@gridflow/database";
-import { FixtureAgentProvider } from "@gridflow/integrations";
+import { AgentEvidenceProvenanceError, FixtureAgentProvider } from "@gridflow/integrations";
 import { AgentEngine } from "../src/engine.js";
 
 const source = {
@@ -388,5 +388,79 @@ describe("GridFlow core agent engine", () => {
     expect(allocation.rows).toEqual([{type:"ULTRA_INCLUDED",reserved:1},{type:"CORE_STARTER",reserved:1},{type:"PURCHASED",reserved:1}]);
   });
 
+
+  it("adds strict provenance guidance before retrying a rejected web-research result", async () => {
+    database = await createDatabase("pglite://memory");
+    await migrateDatabase(database);
+
+    const identity = await database.transaction(async (tx) => {
+      const user = await tx.query<{ id: string }>(
+        `INSERT INTO "User" ("email","passwordHash","name","updatedAt")
+         VALUES ('provenance-retry@example.test','x','Retry Test',CURRENT_TIMESTAMP) RETURNING "id"`,
+      );
+      const organisation = await tx.query<{ id: string }>(
+        `INSERT INTO "Organisation" ("name","slug","type","updatedAt")
+         VALUES ('Retry Athlete','retry-athlete','DRIVER',CURRENT_TIMESTAMP) RETURNING "id"`,
+      );
+      const userId = user.rows[0]!.id;
+      const tenantId = organisation.rows[0]!.id;
+      await tx.query(
+        `INSERT INTO "OrganisationMembership" ("organisationId","userId","role")
+         VALUES ($1::uuid,$2::uuid,'OWNER')`,
+        [tenantId, userId],
+      );
+      await setTenantContext(tx, tenantId);
+      await tx.query(
+        `INSERT INTO "ProductEntitlement"
+           ("tenantId","plan","status","agentExecutionMode","researchCreditsUnlimited","seatLimit","startsAt","approvedAt","updatedAt")
+         VALUES ($1::uuid,'CORE','ACTIVE','MANAGED',true,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+        [tenantId],
+      );
+      await tx.query(
+        `INSERT INTO "DriverProfile"
+           ("tenantId","athleteName","sport","countryOfResidence","currentProgramme","futureGoals","onboardingStatus","updatedAt")
+         VALUES ($1::uuid,'Retry Athlete','GT racing','United Kingdom','National GT','European endurance','COMPLETED',CURRENT_TIMESTAMP)`,
+        [tenantId],
+      );
+      const brief = await tx.query<{ id: string }>(
+        `INSERT INTO "DiscoveryBrief"
+           ("tenantId","briefName","active","region","industryFocus","searchTheme","companiesPerRun","updatedAt")
+         VALUES ($1::uuid,'Retry Brief',true,'United Kingdom','Engineering','Find evidenced companies.',1,CURRENT_TIMESTAMP)
+         RETURNING "id"`,
+        [tenantId],
+      );
+      return { tenantId, userId, briefId: brief.rows[0]!.id };
+    });
+
+    const failingProvider = {
+      name: "provenance-retry-fixture",
+      async generate() {
+        throw new AgentEvidenceProvenanceError(
+          "The agent declared evidence that was not returned by web search: https://invented.example/profile",
+        );
+      },
+    };
+    const engine = new AgentEngine(database, failingProvider);
+    const run = await engine.enqueue(identity.tenantId, identity.userId, {
+      agentName: "ATLAS",
+      discoveryBriefId: identity.briefId,
+    });
+
+    expect(await engine.processNext()).toMatchObject({ status: "RETRY_QUEUED" });
+
+    const retry = await database.transaction(async (tx) => {
+      await setTenantContext(tx, identity.tenantId);
+      return (await tx.query<{ status: string; errorCode: string; feedback: string }>(
+        `SELECT "status"::text AS "status","errorCode",
+                "input"->>'_gridflow_retry_feedback' AS "feedback"
+         FROM "AgentRun" WHERE "id"=$1::uuid`,
+        [run.id],
+      )).rows[0]!;
+    });
+    expect(retry.status).toBe("QUEUED");
+    expect(retry.errorCode).toBe("AGENT_EVIDENCE_PROVENANCE_FAILED");
+    expect(retry.feedback).toContain("copied exactly from a URL returned by web search");
+    expect(retry.feedback).toContain("Omit any contact or claim");
+  });
 
 });

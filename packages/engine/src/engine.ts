@@ -652,6 +652,10 @@ export class AgentEngine {
     } catch (error) {
       const failure = errorDetails(error);
       const willRetry = job.attempts < job.maxAttempts;
+      const provenanceRetryFeedback =
+        willRetry && failure.code === "AGENT_EVIDENCE_PROVENANCE_FAILED"
+          ? "The previous generation failed evidence provenance validation. In this retry, every sources[].url must be copied exactly from a URL returned by web search in this same attempt. Never reconstruct or infer a URL. Omit any contact or claim without an exact returned source URL."
+          : null;
       await this.database.transaction(async (tx) => {
         await setTenantContext(tx, job.tenantId);
         await this.applyFailureState(tx, job.tenantId, job.agentRunId, job.jobName, failure.details);
@@ -659,8 +663,10 @@ export class AgentEngine {
           const delaySeconds = Math.min(300, 5 * 2 ** Math.max(0, job.attempts - 1));
           await tx.query(
             `UPDATE "AgentRun" SET "status"='QUEUED',"errorCode"=$2,"errorDetails"=$3,"retryCount"=$4,
+               "input"=CASE WHEN $5::text IS NULL THEN "input"
+                 ELSE jsonb_set("input",'{_gridflow_retry_feedback}',to_jsonb($5::text),true) END,
                "heartbeatAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP WHERE "id"=$1::uuid`,
-            [job.agentRunId, failure.code, failure.details, job.attempts],
+            [job.agentRunId, failure.code, failure.details, job.attempts, provenanceRetryFeedback],
           );
           await tx.query(
             `UPDATE "AutomationJob" SET "status"='QUEUED',"scheduledFor"=CURRENT_TIMESTAMP+($2||' seconds')::interval,

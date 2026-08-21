@@ -91,6 +91,7 @@ async function register(email, name, organisationName) {
 }
 
 async function completeOnboarding(cookie, name, residenceCountry, targetCountry) {
+  const linkedinSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const result = await request("/onboarding/complete", {
     cookie,
     method: "POST",
@@ -109,6 +110,12 @@ async function completeOnboarding(cookie, name, residenceCountry, targetCountry)
       excludedIndustries: [],
       outreachStrategy: "LINKEDIN_FIRST",
       emailAutomationMode: "APPROVED_AUTOMATIC",
+      linkedinReadiness: "EXISTING",
+      linkedinProfileUrl: `https://www.linkedin.com/in/${linkedinSlug}`,
+      linkedinHeadline: `${name} | GT racing, performance and commercial partnerships`,
+      linkedinAbout: `${name} competes in GT racing and develops credible commercial partnerships through measurable performance, technical insight and shared long-term growth.`,
+      linkedinChecklist: ["account", "photo", "headline", "about", "experience", "featured", "skills", "security"],
+      linkedinSetupConfirmed: true,
       audienceCountries: [residenceCountry],
       approvalMode: "EVERY_MESSAGE",
       dailyEmailLimit: 20,

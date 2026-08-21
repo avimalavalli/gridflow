@@ -92,6 +92,7 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
   if (page.url().endsWith("/welcome")) {
     await expect(page.getByRole("heading", { name: /Welcome, Release\. Your commercial operation, connected\./i })).toBeVisible();
     await expect(page.getByText(/Five short slides · about two minutes/i)).toBeVisible();
+    await expect(page.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute("aria-valuenow", "20");
     await expectNoWcagViolations(page);
     const introductionHeadings = [
       "A coordinated team works behind the interface.",
@@ -102,6 +103,7 @@ test("signup and reduced-motion behaviour remain usable across release browsers"
     for (const [index, heading] of introductionHeadings.entries()) {
       await page.getByRole("button", { name: "Continue" }).click();
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      await expect(page.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute("aria-valuenow", String((index + 2) * 20));
       if (index === 0) await expect(page.getByText(/Atlas discovers\. Sage verifies\. Relay identifies decision-makers\./i)).toBeVisible();
     }
     await expect(page.getByRole("button", { name: /Build my GridFlow/i })).toBeEnabled();
